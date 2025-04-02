@@ -277,18 +277,79 @@ def compare_with_human_review(
     return output_file
 
 
+class ImprovedExample(BaseModel):
+    choice1: str = Field(description="First improved example of the risk description")
+    choice2: str = Field(description="Second improved example of the risk description")
+    choice3: str = Field(description="Third improved example of the risk description")
+
+
+def _generate_improved_example(
+    original_text: str,
+    invalid_metrics: List[str],
+) -> Dict[str, str]:
+    """Generate improved examples based on the original text and invalid metrics using LLM.
+
+    Args:
+        original_text: The original user input text
+        invalid_metrics: List of metrics that failed validation
+
+
+    Returns:
+        Dictionary containing three improved examples
+    """
+    llm = get_llm()
+    parser = JsonOutputParser(pydantic_object=ImprovedExample)
+
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                """You are an expert in risk assessment and validation. Generate three different improved versions of a risk description 
+            that address the validation criteria that were not met in the original text.
+
+            Each version should:
+            1. Maintain the core risk context from the original text
+            2. Address all the invalid metrics provided
+            3. Be clear, concise, and specific
+            4. Include cause, risk event, and impact where appropriate
+            5. Be distinctly different from each other
+
+            Return the results in JSON format with keys:
+            - choice1: First improved version
+            - choice2: Second improved version
+            - choice3: Third improved version
+            """,
+            ),
+            (
+                "human",
+                """Original text: {original_text}
+            Failed metrics: {metrics}
+            
+            Please provide three improved versions that address these specific aspects.""",
+            ),
+        ]
+    )
+
+    chain = prompt | llm | parser
+
+    result = chain.invoke(
+        {
+            "original_text": original_text,
+            "metrics": ", ".join(invalid_metrics),
+        }
+    )
+
+    return {
+        "choice1": result.get("choice1", "No example sentence provided"),
+        "choice2": result.get("choice2", "No example sentence provided"),
+        "choice3": result.get("choice3", "No example sentence provided"),
+    }
+
+
 def generate_feedback_questions(
     validation_results: List[Dict[str, Any]], user_text: str
 ) -> Dict[str, Any]:
-    """Generate a consolidated feedback question and examples for invalid metrics.
-
-    Args:
-        validation_results: List of validation results from validate_text function
-        user_text: Original user input text
-
-    Returns:
-        Dictionary containing a consolidated question and contextual examples
-    """
+    """Generate a consolidated feedback question and examples for invalid metrics."""
     invalid_metrics = []
     invalid_reasons = []
 
@@ -300,18 +361,13 @@ def generate_feedback_questions(
     if not invalid_metrics:
         return {}
 
-    # Create a consolidated feedback message
     feedback_message = f"Your risk description needs improvement in the following areas: {', '.join(invalid_metrics)}. "
     feedback_message += (
         "Please provide a more comprehensive description that addresses these aspects."
     )
 
-    # Generate contextual examples using the original input and invalid metrics
-    examples = [
-        f"{_generate_improved_example(user_text, invalid_metrics, 1)}",
-        f"{_generate_improved_example(user_text, invalid_metrics, 2)}",
-        f"{_generate_improved_example(user_text, invalid_metrics, 3)}",
-    ]
+    # Generate improved examples using LLM
+    examples = _generate_improved_example(user_text, invalid_metrics)
 
     return {
         "consolidated_feedback": {
@@ -323,60 +379,60 @@ def generate_feedback_questions(
     }
 
 
-def _generate_improved_example(
-    original_text: str, invalid_metrics: List[str], variant: int
-) -> str:
-    """Generate an improved example based on the original text and invalid metrics using LLM.
+# def _generate_improved_example(
+#     original_text: str, invalid_metrics: List[str], variant: int
+# ) -> str:
+#     """Generate an improved example based on the original text and invalid metrics using LLM.
 
-    Args:
-        original_text: The original user input text
-        invalid_metrics: List of metrics that failed validation
-        variant: Integer to generate different variations of examples
+#     Args:
+#         original_text: The original user input text
+#         invalid_metrics: List of metrics that failed validation
+#         variant: Integer to generate different variations of examples
 
-    Returns:
-        A string containing an improved example
-    """
-    llm = get_llm()
+#     Returns:
+#         A string containing an improved example
+#     """
+#     llm = get_llm()
 
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            (
-                "system",
-                """You are an expert in risk assessment and validation. Your task is to improve a given risk description 
-        by addressing specific validation criteria that were not met in the original text. Generate an improved version that 
-        specifically addresses these missing aspects while maintaining relevance to the original context.
-        
-        The improved example should:
-        1. Maintain the core risk context from the original text
-        2. Address all the invalid metrics provided
-        3. Be clear, concise, and specific
-        4. Include cause, risk event, and impact where appropriate
-        5. Generate a different variation based on the variant number provided
-        """,
-            ),
-            (
-                "human",
-                """Original text: {original_text}
-        Failed metrics: {metrics}
-        Variation: {variant}
-        
-        Please provide an improved version that addresses these specific aspects while maintaining the original context.
-        """,
-            ),
-        ]
-    )
+#     prompt = ChatPromptTemplate.from_messages(
+#         [
+#             (
+#                 "system",
+#                 """You are an expert in risk assessment and validation. Your task is to improve a given risk description
+#         by addressing specific validation criteria that were not met in the original text. Generate an improved version that
+#         specifically addresses these missing aspects while maintaining relevance to the original context.
 
-    chain = prompt | llm
+#         The improved example should:
+#         1. Maintain the core risk context from the original text
+#         2. Address all the invalid metrics provided
+#         3. Be clear, concise, and specific
+#         4. Include cause, risk event, and impact where appropriate
+#         5. Generate a different variation based on the variant number provided
+#         """,
+#             ),
+#             (
+#                 "human",
+#                 """Original text: {original_text}
+#         Failed metrics: {metrics}
+#         Variation: {variant}
 
-    result = chain.invoke(
-        {
-            "original_text": original_text,
-            "metrics": ", ".join(invalid_metrics),
-            "variant": f"Variation {variant}",
-        }
-    )
+#         Please provide an improved version that addresses these specific aspects while maintaining the original context.
+#         """,
+#             ),
+#         ]
+#     )
 
-    return result.content.strip()
+#     chain = prompt | llm
+
+#     result = chain.invoke(
+#         {
+#             "original_text": original_text,
+#             "metrics": ", ".join(invalid_metrics),
+#             "variant": f"Variation {variant}",
+#         }
+#     )
+
+#     return result.content.strip()
 
 
 # Main function to run the full flow
