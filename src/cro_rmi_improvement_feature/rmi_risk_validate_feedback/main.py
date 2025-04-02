@@ -346,6 +346,44 @@ def _generate_improved_example(
     }
 
 
+def generate_feedback_message(
+    invalid_metrics: List[str], invalid_reasons: List[str], user_text: str
+) -> str:
+    """Generate a personalized feedback message using LLM."""
+    llm = get_llm()
+
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                """You are an expert risk assessment advisor. Create a constructive and specific feedback message 
+            about how to improve a risk description. Focus on the aspects that need improvement.""",
+            ),
+            (
+                "human",
+                """Original text: {text}
+            Areas needing improvement: {metrics}
+            Validation reasons: {reasons}
+            
+            Provide a concise, constructive feedback message explaining what needs to be improved and why. 
+            and return with same language as Original text.""",
+            ),
+        ]
+    )
+
+    chain = prompt | llm
+
+    result = chain.invoke(
+        {
+            "text": user_text,
+            "metrics": ", ".join(invalid_metrics),
+            "reasons": ", ".join(invalid_reasons),
+        }
+    )
+
+    return result.content
+
+
 def generate_feedback_questions(
     validation_results: List[Dict[str, Any]], user_text: str
 ) -> Dict[str, Any]:
@@ -361,9 +399,8 @@ def generate_feedback_questions(
     if not invalid_metrics:
         return {}
 
-    feedback_message = f"Your risk description needs improvement in the following areas: {', '.join(invalid_metrics)}. "
-    feedback_message += (
-        "Please provide a more comprehensive description that addresses these aspects."
+    feedback_message = generate_feedback_message(
+        invalid_metrics, invalid_reasons, user_text
     )
 
     # Generate improved examples using LLM
