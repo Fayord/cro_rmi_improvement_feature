@@ -277,6 +277,108 @@ def compare_with_human_review(
     return output_file
 
 
+def generate_feedback_questions(
+    validation_results: List[Dict[str, Any]], user_text: str
+) -> Dict[str, Any]:
+    """Generate a consolidated feedback question and examples for invalid metrics.
+
+    Args:
+        validation_results: List of validation results from validate_text function
+        user_text: Original user input text
+
+    Returns:
+        Dictionary containing a consolidated question and contextual examples
+    """
+    invalid_metrics = []
+    invalid_reasons = []
+
+    for result in validation_results:
+        if not result["is_valid"]:
+            invalid_metrics.append(result["metric"])
+            invalid_reasons.append(result["reason"])
+
+    if not invalid_metrics:
+        return {}
+
+    # Create a consolidated feedback message
+    feedback_message = f"Your risk description needs improvement in the following areas: {', '.join(invalid_metrics)}. "
+    feedback_message += (
+        "Please provide a more comprehensive description that addresses these aspects."
+    )
+
+    # Generate contextual examples using the original input and invalid metrics
+    examples = [
+        f"{_generate_improved_example(user_text, invalid_metrics, 1)}",
+        f"{_generate_improved_example(user_text, invalid_metrics, 2)}",
+        f"{_generate_improved_example(user_text, invalid_metrics, 3)}",
+    ]
+
+    return {
+        "consolidated_feedback": {
+            "invalid_metrics": invalid_metrics,
+            "question": feedback_message,
+            "examples": examples,
+            "original_text": user_text,
+        }
+    }
+
+
+def _generate_improved_example(
+    original_text: str, invalid_metrics: List[str], variant: int
+) -> str:
+    """Generate an improved example based on the original text and invalid metrics using LLM.
+
+    Args:
+        original_text: The original user input text
+        invalid_metrics: List of metrics that failed validation
+        variant: Integer to generate different variations of examples
+
+    Returns:
+        A string containing an improved example
+    """
+    llm = get_llm()
+
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                """You are an expert in risk assessment and validation. Your task is to improve a given risk description 
+        by addressing specific validation criteria that were not met in the original text. Generate an improved version that 
+        specifically addresses these missing aspects while maintaining relevance to the original context.
+        
+        The improved example should:
+        1. Maintain the core risk context from the original text
+        2. Address all the invalid metrics provided
+        3. Be clear, concise, and specific
+        4. Include cause, risk event, and impact where appropriate
+        5. Generate a different variation based on the variant number provided
+        """,
+            ),
+            (
+                "human",
+                """Original text: {original_text}
+        Failed metrics: {metrics}
+        Variation: {variant}
+        
+        Please provide an improved version that addresses these specific aspects while maintaining the original context.
+        """,
+            ),
+        ]
+    )
+
+    chain = prompt | llm
+
+    result = chain.invoke(
+        {
+            "original_text": original_text,
+            "metrics": ", ".join(invalid_metrics),
+            "variant": f"Variation {variant}",
+        }
+    )
+
+    return result.content.strip()
+
+
 # Main function to run the full flow
 def validate_user_input(
     user_text: str,
@@ -295,7 +397,7 @@ def validate_user_input(
         additional_information: Optional dictionary containing business context
 
     Returns:
-        Validation results and optionally file path
+        Validation results, feedback, and optionally file paths
     """
     print(f"Validating user input: '{user_text}'")
     print(f"Using provider: {provider}, model: {model_name or 'default'}")
@@ -309,19 +411,29 @@ def validate_user_input(
         additional_information=additional_information,
     )
 
-    # Print results
+    # Generate consolidated feedback
+    feedback = generate_feedback_questions(results, user_text)
+
+    # Print results and feedback
     for result in results:
         valid_str = "VALID" if result["is_valid"] else "INVALID"
         print(f"\nMetric: {result['metric']} - {valid_str}")
         print(f"Reason: {result['reason']}")
 
+    if feedback:
+        print("\nConsolidated Feedback:")
+        print(f"Question: {feedback['consolidated_feedback']['question']}")
+        print("\nImprovement Examples:")
+        for example in feedback["consolidated_feedback"]["examples"]:
+            print(f"\n{example}")
+
     # Export if requested
     if export:
         file_path = export_to_excel(results)
         human_template = create_human_review_template(results)
-        return results, file_path, human_template
+        return results, feedback, file_path, human_template
 
-    return results
+    return results, feedback
 
 
 # Example usage
@@ -345,18 +457,6 @@ if __name__ == "__main__":
     add_metric(
         "Accuracy",
         "Text should contain factually correct information about risks and controls",
-    )
-    add_metric(
-        "Relevance",
-        "Text should be appropriate for its intended risk management context",
-    )
-    add_metric(
-        "Consistency",
-        "Text should maintain consistent terminology and tone in risk descriptions",
-    )
-    add_metric(
-        "Completeness",
-        "Text should cover all necessary information for effective risk assessment",
     )
 
     # Run with OpenAI
