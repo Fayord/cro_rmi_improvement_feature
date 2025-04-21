@@ -77,6 +77,54 @@ def find_similar_sentences_batch(
     return results
 
 
+def find_similar_sentences_batch_with_embeddings(
+    input_sentences: List[str],
+    input_embeddings: List[np.ndarray],
+    candidate_embeddings: List[np.ndarray],
+    candidate_sentences: List[str],
+    distance_function: Callable[[np.ndarray, np.ndarray], float],
+) -> List[Dict[str, List]]:
+    """
+    Find the most similar sentences using pre-computed embeddings.
+
+    Args:
+        input_sentences: List of input sentences
+        input_embeddings: List of pre-computed embeddings for input sentences
+        candidate_embeddings: List of pre-computed embeddings for candidate sentences
+        candidate_sentences: List of candidate sentences (for output)
+        distance_function: Function to calculate distance between embeddings
+
+    Returns:
+        List of dictionaries, each containing:
+        - 'input_sentence': Original input sentence
+        - 'similar_sentences': List of most similar sentences
+        - 'similar_indices': List of indices of most similar sentences
+    """
+    results = []
+    for input_sentence, input_embedding in zip(input_sentences, input_embeddings):
+        # Calculate distances
+        distances = [
+            distance_function(input_embedding, candidate_embedding)
+            for candidate_embedding in candidate_embeddings
+        ]
+
+        # Get sorted indices (ascending order of distances)
+        sorted_indices = np.argsort(distances)
+
+        # Get the corresponding sentences
+        similar_sentences = [candidate_sentences[idx] for idx in sorted_indices]
+
+        results.append(
+            {
+                "input_sentence": input_sentence,
+                "similar_sentences": similar_sentences,
+                "similar_indices": sorted_indices.tolist(),
+            }
+        )
+
+    return results
+
+
 # Example usage:
 if __name__ == "__main__":
     # Example distance functions
@@ -110,6 +158,21 @@ if __name__ == "__main__":
 
     print("\nResults for multiple input sentences:")
     for idx, result in enumerate(results):
+        print(f"\nInput sentence {idx + 1}: {result["input_sentence"]}")
+        print("Most similar sentences (in order):")
+        for i, sentence in enumerate(result["similar_sentences"]):
+            print(f"{i + 1}. {sentence}")
+        print("Corresponding indices:", result["similar_indices"])
+
+    print("\nExample with pre-computed embeddings:")
+    input_embeddings = model.encode(input_texts)
+    candidate_embeddings = model.encode(candidates)
+
+    results_with_embeddings = find_similar_sentences_batch_with_embeddings(
+        input_texts, input_embeddings, candidate_embeddings, candidates, cosine_distance
+    )
+    print("result with embeding")
+    for idx, result in enumerate(results_with_embeddings):
         print(f"\nInput sentence {idx + 1}: {result["input_sentence"]}")
         print("Most similar sentences (in order):")
         for i, sentence in enumerate(result["similar_sentences"]):
