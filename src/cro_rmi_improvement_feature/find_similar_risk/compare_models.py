@@ -2,6 +2,7 @@ from typing import List, Dict, Union, Callable
 import numpy as np
 from sentence_transformers import SentenceTransformer
 from main import find_similar_sentences_batch, cosine_distance, euclidean_distance
+from embedding_providers import BaseEmbeddingProvider
 import pandas as pd
 from pydantic import BaseModel
 
@@ -20,7 +21,7 @@ class CompareResultDict(BaseModel):
 def compare_target_sentence_rankings(
     input_sentences: List[str],
     candidate_sets: Dict[str, Dict[str, Union[str, List[str]]]],
-    embedding_models: Dict[str, SentenceTransformer],
+    embedding_models: Dict[str, BaseEmbeddingProvider],
     distance_functions: Dict[str, Callable[[np.ndarray, np.ndarray], float]],
 ) -> List[dict]:
     """
@@ -39,6 +40,12 @@ def compare_target_sentence_rankings(
                 )
 
             for model_name, model in embedding_models.items():
+                # Generate embeddings using get_embedding method
+                input_embedding = model.get_embedding(input_sentence)
+                candidate_embeddings = np.array(
+                    [model.get_embedding(sent) for sent in candidate_sentences]
+                )
+
                 for dist_name, dist_func in distance_functions.items():
                     batch_results = find_similar_sentences_batch(
                         [input_sentence], candidate_sentences, dist_func, model

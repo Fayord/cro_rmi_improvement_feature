@@ -1,4 +1,4 @@
-from typing import List, Tuple, Callable, Dict
+from typing import List, Tuple, Callable, Dict, Any
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
@@ -6,40 +6,31 @@ from sentence_transformers import SentenceTransformer
 def find_similar_sentences(
     input_sentence: str,
     candidate_sentences: List[str],
-    distance_function: Callable[[np.ndarray, np.ndarray], float],
-    embedding_model: SentenceTransformer,
+    distance_function: Callable,
+    embedding_model: Any,
 ) -> Tuple[List[str], List[int]]:
     """
     Find the most similar sentences from a list of candidates.
-
-    Args:
-        input_sentence: The reference sentence to compare against
-        candidate_sentences: List of sentences to compare with
-        distance_function: Function to calculate distance between embeddings
-        embedding_model: SentenceTransformer model for generating embeddings
-
-    Returns:
-        Tuple containing:
-        - List of most similar sentences
-        - List of indices of most similar sentences
     """
     # Generate embeddings
-    input_embedding = embedding_model.encode([input_sentence])[0]
-    candidate_embeddings = embedding_model.encode(candidate_sentences)
+    input_embedding = embedding_model.get_embedding(input_sentence)
+    candidate_embeddings = np.array(
+        [embedding_model.get_embedding(sent) for sent in candidate_sentences]
+    )
 
     # Calculate distances
-    distances = [
-        distance_function(input_embedding, candidate_embedding)
-        for candidate_embedding in candidate_embeddings
-    ]
+    distances = np.array(
+        [
+            distance_function(input_embedding, candidate_embedding)
+            for candidate_embedding in candidate_embeddings
+        ]
+    )
 
-    # Get sorted indices (ascending order of distances)
+    # Sort by distance
     sorted_indices = np.argsort(distances)
+    sorted_sentences = [candidate_sentences[i] for i in sorted_indices]
 
-    # Get the corresponding sentences
-    similar_sentences = [candidate_sentences[idx] for idx in sorted_indices]
-
-    return similar_sentences, sorted_indices.tolist()
+    return sorted_sentences, sorted_indices.tolist()
 
 
 def find_similar_sentences_batch(
