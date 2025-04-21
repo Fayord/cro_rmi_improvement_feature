@@ -9,6 +9,10 @@ from langchain_core.pydantic_v1 import BaseModel, Field
 from datetime import datetime
 import json
 from dotenv import load_dotenv
+from langchain.cache import SQLiteCache
+from langchain.globals import set_llm_cache
+
+set_llm_cache(SQLiteCache(database_path=".langchain.db"))
 
 # Define the metrics to validate with their descriptions
 METRICS = {}
@@ -204,14 +208,7 @@ def create_human_review_template(
     df["human_is_valid"] = None
     df["human_reason"] = None
 
-    if filename is None:
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        provider = results[0]["provider"] if results else "unknown"
-        filename = f"human_review_template_{provider}_{timestamp}.xlsx"
-
-    df.to_excel(filename, index=False)
-    print(f"Human review template exported to {filename}")
-    return filename
+    return df
 
 
 def compare_with_human_review(
@@ -311,8 +308,7 @@ def _generate_improved_example(
             1. Maintain the core risk context from the original text
             2. Address all the invalid metrics provided
             3. Be clear, concise, and specific
-            4. Include cause, risk event, and impact where appropriate
-            5. Be distinctly different from each other
+            4. Be distinctly different from each other
 
             Return the results in JSON format with keys:
             - choice1: First improved version
@@ -325,7 +321,7 @@ def _generate_improved_example(
                 """Original text: {original_text}
             Failed metrics: {metrics}
             
-            Please provide three improved versions that address these specific aspects.""",
+            Please provide three improved versions sentences that address these specific aspects.""",
             ),
         ]
     )
@@ -346,45 +342,7 @@ def _generate_improved_example(
     }
 
 
-def generate_feedback_message(
-    invalid_metrics: List[str], invalid_reasons: List[str], user_text: str
-) -> str:
-    """Generate a personalized feedback message using LLM."""
-    llm = get_llm()
-
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            (
-                "system",
-                """You are an expert risk assessment advisor. Create a constructive and specific feedback message 
-            about how to improve a risk description. Focus on the aspects that need improvement.""",
-            ),
-            (
-                "human",
-                """Original text: {text}
-            Areas needing improvement: {metrics}
-            Validation reasons: {reasons}
-            
-            Provide a concise, constructive feedback message explaining what needs to be improved and why. 
-            and return with same language as Original text.""",
-            ),
-        ]
-    )
-
-    chain = prompt | llm
-
-    result = chain.invoke(
-        {
-            "text": user_text,
-            "metrics": ", ".join(invalid_metrics),
-            "reasons": ", ".join(invalid_reasons),
-        }
-    )
-
-    return result.content
-
-
-def generate_feedback_questions(
+def generate_improved_example_text(
     validation_results: List[Dict[str, Any]], user_text: str
 ) -> Dict[str, Any]:
     """Generate a consolidated feedback question and examples for invalid metrics."""
@@ -399,17 +357,12 @@ def generate_feedback_questions(
     if not invalid_metrics:
         return {}
 
-    feedback_message = generate_feedback_message(
-        invalid_metrics, invalid_reasons, user_text
-    )
-
     # Generate improved examples using LLM
     examples = _generate_improved_example(user_text, invalid_metrics)
 
     return {
-        "consolidated_feedback": {
+        "improved_example_text": {
             "invalid_metrics": invalid_metrics,
-            "question": feedback_message,
             "examples": examples,
             "original_text": user_text,
         }
@@ -477,7 +430,6 @@ def validate_user_input(
     user_text: str,
     provider: str = "openai",
     model_name: Optional[str] = None,
-    export: bool = True,
     additional_information: Optional[Dict[str, Any]] = None,
 ):
     """Main function to validate user input text against all metrics.
@@ -486,7 +438,6 @@ def validate_user_input(
         user_text: The text to validate
         provider: LLM provider to use
         model_name: Name of the model to use
-        export: Whether to export results to Excel
         additional_information: Optional dictionary containing business context
 
     Returns:
@@ -505,28 +456,125 @@ def validate_user_input(
     )
 
     # Generate consolidated feedback
-    feedback = generate_feedback_questions(results, user_text)
-
-    # Print results and feedback
+    improved_example_text = generate_improved_example_text(results, user_text)
+    metrics_assessment = []
     for result in results:
-        valid_str = "VALID" if result["is_valid"] else "INVALID"
-        print(f"\nMetric: {result['metric']} - {valid_str}")
-        print(f"Reason: {result['reason']}")
+        if not result["is_valid"]:
+            metrics_assessment.append(
+                {
+                    "metric_name": result["metric"],
+                    "metric_description": result["metric_detail"],
+                    "reason": result["reason"],
+                }
+            )
 
-    if feedback:
-        print("\nConsolidated Feedback:")
-        print(f"Question: {feedback['consolidated_feedback']['question']}")
-        print("\nImprovement Examples:")
-        for example in feedback["consolidated_feedback"]["examples"]:
-            print(f"\n{example}")
+    feedback = generate_executive_summary_feedback(
+        user_sentence=user_text, metrics_assessment=metrics_assessment
+    )
 
-    # Export if requested
-    if export:
-        file_path = export_to_excel(results)
-        human_template = create_human_review_template(results)
-        return results, feedback, file_path, human_template
+    return results, improved_example_text, feedback
 
-    return results, feedback
+
+from typing import List, Dict, Optional
+from pydantic import BaseModel, Field
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import PydanticOutputParser
+
+
+# Define the Pydantic models for structured output
+class Reason(BaseModel):
+    reason_title: str = Field(description="A short title for the reason")
+    reason_description: str = Field(
+        description="Detailed explanation of why this is an issue"
+    )
+    related_metrics: List[str] = Field(
+        description="List of metrics related to this reason"
+    )
+    improvement_suggestion: str = Field(description="Suggestion on how to improve")
+
+
+class ExecutiveSummary(BaseModel):
+    summary_paragraph: str = Field(
+        description="A concise executive summary paragraph explaining overall assessment"
+    )
+    reasons: List[Reason] = Field(
+        description="List of reasons why the user sentence did not pass metrics, maximum 5 reasons",
+        max_items=5,
+    )
+
+
+def generate_executive_summary_feedback(
+    user_sentence: str,
+    metrics_assessment: List[Dict],
+    model_name: str = "gpt-4o-mini",
+) -> ExecutiveSummary:
+    """
+    Generate an executive summary with reasons why a user's sentence didn't pass certain metrics.
+    Reasons can be consolidated from multiple metrics.
+
+    Args:
+        user_sentence: The sentence provided by the user
+        metrics_assessment: List of dictionaries with metric_name, metric_description, and reason
+        api_key: OpenAI API key
+        model_name: The model to use (default: gpt-4o-mini)
+
+    Returns:
+        ExecutiveSummary object with summary_paragraph and reasons (max 5)
+    """
+    if metrics_assessment == []:
+        return {}
+    api_key = os.getenv("OPENAI_API_KEY", None)
+    assert api_key is not None, "OPENAI_API_KEY is not set"
+    # Initialize the LLM
+    llm = ChatOpenAI(model=model_name, openai_api_key=api_key, temperature=0.1)
+
+    # Create a Pydantic output parser
+    parser = PydanticOutputParser(pydantic_object=ExecutiveSummary)
+
+    # Create a prompt template
+    template = """
+    You are an expert content analyzer. Your task is to create an executive summary explaining 
+    why a user's sentence did not pass certain metrics and provide reasons for improvement.
+    
+    User sentence: {user_sentence}
+    
+    Metrics assessment:
+    {metrics_assessment}
+    
+    Create an executive summary with:
+    1. A single concise summary paragraph that captures the overall assessment
+    2. A maximum of 5 key reasons why the sentence didn't pass metrics
+    
+    IMPORTANT: Each reason should be a consolidated theme that may relate to multiple metrics.
+    Don't create a separate reason for each metric - instead, group related issues together.
+    For example, if there are issues with both "Clarity" and "Specificity" metrics, these could
+    be combined into a single reason about "Lack of Clear and Specific Details".
+
+    For each reason, include:
+    - A short, clear reason title
+    - A detailed explanation of the issue
+    - A list of the related metrics that this reason addresses
+    - A concrete suggestion for improvement
+    
+    {format_instructions}
+    """
+
+    prompt = ChatPromptTemplate.from_template(
+        template=template,
+        partial_variables={"format_instructions": parser.get_format_instructions()},
+    )
+
+    # Create the chain
+    chain = prompt | llm | parser
+
+    # Execute the chain
+    result = chain.invoke(
+        {"user_sentence": user_sentence, "metrics_assessment": metrics_assessment}
+    )
+    result = result.model_dump(mode="json")
+    result["original_text"] = user_sentence
+    return result
 
 
 # Example usage
@@ -537,34 +585,92 @@ if __name__ == "__main__":
     api_key = os.getenv("OPENAI_API_KEY")
     assert api_key, "API key is missing"
 
-    # Initialize default metrics
-    add_metric(
-        "Conciseness",
-        "Text should be brief and to the point without unnecessary details",
-    )
-
-    add_metric(
-        "Clarity",
-        "Text should be easy to understand with precise language and clear risk descriptions",
-    )
-    add_metric(
-        "Accuracy",
-        "Text should contain factually correct information about risks and controls",
-    )
-
-    # Run with OpenAI
-    user_input = input("Enter text to validate: ")
-    results, file_path, template_path = validate_user_input(
-        user_input, provider="openai"
-    )
-
-    # Optional: Run with a local model for comparison
-    # local_results, local_file_path, local_template_path = validate_user_input(
-    #     user_input,
-    #     provider="local",
-    #     model_name="./models/gemma-7b.gguf"
+    # # Initialize default metrics
+    # add_metric(
+    #     "Conciseness",
+    #     "Text should be brief and to the point without unnecessary details",
     # )
 
-    print("\nAfter human review is completed, compare results with:")
-    print(f"compare_with_human_review('{file_path}', 'completed_{template_path}')")
-    print(results)
+    # add_metric(
+    #     "Clarity",
+    #     "Text should be easy to understand with precise language and clear risk descriptions",
+    # )
+    # add_metric(
+    #     "Accuracy",
+    #     "Text should contain factually correct information about risks and controls",
+    # )
+
+    # # Run with OpenAI
+    # user_input = input("Enter text to validate: ")
+    # results, file_path, template_path = validate_user_input(
+    #     user_input, provider="openai"
+    # )
+
+    # # Optional: Run with a local model for comparison
+    # # local_results, local_file_path, local_template_path = validate_user_input(
+    # #     user_input,
+    # #     provider="local",
+    # #     model_name="./models/gemma-7b.gguf"
+    # # )
+
+    # print("\nAfter human review is completed, compare results with:")
+    # print(f"compare_with_human_review('{file_path}', 'completed_{template_path}')")
+    # print(results)
+    user_sentence = "The product is good."
+
+    # Example with more than 5 metrics
+    metrics_assessment = [
+        {
+            "metric_name": "Specificity",
+            "metric_description": "Sentence should provide specific details about the subject",
+            "reason": "The statement is too vague and doesn't specify what aspects make the product good",
+        },
+        {
+            "metric_name": "Evidence",
+            "metric_description": "Claims should be supported with evidence or examples",
+            "reason": "No supporting evidence or examples are provided to back up the claim",
+        },
+        {
+            "metric_name": "Length",
+            "metric_description": "Response should be at least 15 words",
+            "reason": "The sentence contains only 4 words, which is below the minimum requirement",
+        },
+        {
+            "metric_name": "Audience Targeting",
+            "metric_description": "Content should address the intended audience",
+            "reason": "The statement doesn't consider the target audience's interests or needs",
+        },
+        {
+            "metric_name": "Comparison",
+            "metric_description": "Content should provide comparative analysis when relevant",
+            "reason": "No comparison to alternatives or previous versions is provided",
+        },
+        {
+            "metric_name": "Clarity",
+            "metric_description": "Statement should be clear and easy to understand",
+            "reason": "While simple, the statement lacks clarity about what 'good' means in this context",
+        },
+        {
+            "metric_name": "Actionability",
+            "metric_description": "Content should provide actionable insights",
+            "reason": "The statement provides no actionable information for the reader",
+        },
+    ]
+
+    # Replace with your OpenAI API key
+    api_key = os.getenv("OPENAI_API_KEY")
+
+    executive_summary = generate_executive_summary_feedback(
+        user_sentence=user_sentence,
+        metrics_assessment=metrics_assessment,
+    )
+    executive_summary_dict = executive_summary.model_dump(mode="json")
+    print(executive_summary_dict)
+    # print(f"Summary: {executive_summary.summary_paragraph}")
+    # print("\nReasons:")
+    # for i, reason in enumerate(executive_summary.reasons, 1):
+    #     print(f"{i}. {reason.reason_title}")
+    #     print(f"   {reason.reason_description}")
+    #     print(f"   Related metrics: {', '.join(reason.related_metrics)}")
+    #     print(f"   Suggestion: {reason.improvement_suggestion}")
+    #     print()

@@ -45,6 +45,10 @@ Run the main script directly:
 python src/cro_rmi_improvement_feature/rmi_risk_validate_feedback/main.py
 ```
 
+## For clearing cache
+```from langchain.globals import clear_llm_cache
+clear_llm_cache() 
+```
 ## Note
 
 Make sure to set up your environment variables (like API keys) as shown in the notebook examples before running the code.
