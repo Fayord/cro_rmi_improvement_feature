@@ -125,14 +125,17 @@ def find_similar_sentences_batch_with_embeddings(
     return results
 
 
+def cosine_distance(a, b):
+    return 1 - np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+
+
+def euclidean_distance(a, b):
+    return np.linalg.norm(a - b)
+
+
 # Example usage:
 if __name__ == "__main__":
     # Example distance functions
-    def cosine_distance(a, b):
-        return 1 - np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
-
-    def euclidean_distance(a, b):
-        return np.linalg.norm(a - b)
 
     # Example usage
     print("START")
