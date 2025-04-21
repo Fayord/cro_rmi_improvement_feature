@@ -1,0 +1,117 @@
+from typing import List, Tuple, Callable, Dict
+import numpy as np
+from sentence_transformers import SentenceTransformer
+
+
+def find_similar_sentences(
+    input_sentence: str,
+    candidate_sentences: List[str],
+    distance_function: Callable[[np.ndarray, np.ndarray], float],
+    embedding_model: SentenceTransformer,
+) -> Tuple[List[str], List[int]]:
+    """
+    Find the most similar sentences from a list of candidates.
+
+    Args:
+        input_sentence: The reference sentence to compare against
+        candidate_sentences: List of sentences to compare with
+        distance_function: Function to calculate distance between embeddings
+        embedding_model: SentenceTransformer model for generating embeddings
+
+    Returns:
+        Tuple containing:
+        - List of most similar sentences
+        - List of indices of most similar sentences
+    """
+    # Generate embeddings
+    input_embedding = embedding_model.encode([input_sentence])[0]
+    candidate_embeddings = embedding_model.encode(candidate_sentences)
+
+    # Calculate distances
+    distances = [
+        distance_function(input_embedding, candidate_embedding)
+        for candidate_embedding in candidate_embeddings
+    ]
+
+    # Get sorted indices (ascending order of distances)
+    sorted_indices = np.argsort(distances)
+
+    # Get the corresponding sentences
+    similar_sentences = [candidate_sentences[idx] for idx in sorted_indices]
+
+    return similar_sentences, sorted_indices.tolist()
+
+
+def find_similar_sentences_batch(
+    input_sentences: List[str],
+    candidate_sentences: List[str],
+    distance_function: Callable[[np.ndarray, np.ndarray], float],
+    embedding_model: SentenceTransformer,
+) -> List[Dict[str, List]]:
+    """
+    Find the most similar sentences for multiple input sentences.
+
+    Args:
+        input_sentences: List of reference sentences to compare against
+        candidate_sentences: List of sentences to compare with
+        distance_function: Function to calculate distance between embeddings
+        embedding_model: SentenceTransformer model for generating embeddings
+
+    Returns:
+        List of dictionaries, each containing:
+        - 'similar_sentences': List of most similar sentences
+        - 'similar_indices': List of indices of most similar sentences
+    """
+    results = []
+    for input_sentence in input_sentences:
+        similar_sentences, similar_indices = find_similar_sentences(
+            input_sentence, candidate_sentences, distance_function, embedding_model
+        )
+        results.append(
+            {
+                "input_sentence": input_sentence,
+                "similar_sentences": similar_sentences,
+                "similar_indices": similar_indices,
+            }
+        )
+    return results
+
+
+# Example usage:
+if __name__ == "__main__":
+    # Example distance functions
+    def cosine_distance(a, b):
+        return 1 - np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+
+    def euclidean_distance(a, b):
+        return np.linalg.norm(a - b)
+
+    # Example usage
+    print("START")
+    model = SentenceTransformer("all-MiniLM-L6-v2")
+    print("complete load model")
+
+    input_texts = [
+        "The risk of market volatility affects investment returns",
+        "Cybersecurity threats pose significant risks to organizations",
+    ]
+
+    candidates = [
+        "Market fluctuations can impact investment performance",
+        "The weather is nice today",
+        "Financial markets show increased volatility",
+        "Data breaches can compromise sensitive information",
+        "I like to play tennis",
+    ]
+
+    results = find_similar_sentences_batch(
+        input_texts, candidates, cosine_distance, model
+    )
+
+    print("\nResults for multiple input sentences:")
+    for idx, result in enumerate(results):
+        print(f"\nInput sentence {idx + 1}: {result["input_sentence"]}")
+        print("Most similar sentences (in order):")
+        for i, sentence in enumerate(result["similar_sentences"]):
+            print(f"{i + 1}. {sentence}")
+        print("Corresponding indices:", result["similar_indices"])
