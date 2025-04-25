@@ -180,3 +180,5 @@ Thumbs.db
 
 *.xlsx
 *.db
+*.pkl
+*.json

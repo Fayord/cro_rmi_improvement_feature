@@ -5,6 +5,7 @@ from main import find_similar_sentences_batch, cosine_distance, euclidean_distan
 from embedding_providers import BaseEmbeddingProvider
 import pandas as pd
 from pydantic import BaseModel
+from tqdm import tqdm
 
 
 class CompareResultDict(BaseModel):
@@ -29,15 +30,33 @@ def compare_target_sentence_rankings(
     """
     results = []
 
-    for input_sentence in input_sentences:
-        for set_name, candidate_set in candidate_sets.items():
-            candidate_sentences = candidate_set["candidate_sentences"]
-            target_sentence = candidate_set["target_sentence"]
+    # Validate target_sentences length matches input_sentences
+    for set_name, candidate_set in candidate_sets.items():
+        if len(candidate_set["target_sentences"]) != len(input_sentences):
+            raise ValueError(
+                f"Number of target sentences ({len(candidate_set['target_sentences'])}) "
+                f"in set '{set_name}' does not match number of input sentences ({len(input_sentences)})"
+            )
 
-            if target_sentence not in candidate_sentences:
+        # Validate all target sentences are in candidate sentences
+        for target_sentence in candidate_set["target_sentences"]:
+            if target_sentence not in candidate_set["candidate_sentences"]:
                 raise ValueError(
                     f"Target sentence '{target_sentence}' not found in candidate set {set_name}"
                 )
+    total_iterations = (
+        len(input_sentences)
+        * len(candidate_sets)
+        * len(embedding_models)
+        * len(distance_functions)
+    )
+
+    # Create progress bar
+    pbar = tqdm(total=total_iterations, desc="Processing comparisons")
+    for idx, input_sentence in enumerate(input_sentences):  # this line add tqdm
+        for set_name, candidate_set in candidate_sets.items():
+            candidate_sentences = candidate_set["candidate_sentences"]
+            target_sentence = candidate_set["target_sentences"][idx]
 
             for model_name, model in embedding_models.items():
                 # Generate embeddings using get_embedding method
@@ -73,6 +92,8 @@ def compare_target_sentence_rankings(
                     )
                     result_dict = result.model_dump(mode="json")
                     results.append(result_dict)
+                    pbar.update(1)
+    pbar.close()
 
     return results
 
@@ -85,7 +106,7 @@ if __name__ == "__main__":
         "Credit risk in lending operations",
     ]
 
-    candidate_sets = {
+    old_candidate_sets = {
         "candidate_set_1": {
             "candidate_sentences": [
                 "Market fluctuations impact returns",
@@ -112,6 +133,47 @@ if __name__ == "__main__":
                 "Enterprise risk management",
             ],
             "target_sentence": "Financial market volatility",
+        },
+    }
+    candidate_sets = {
+        "candidate_set_1": {
+            "candidate_sentences": [
+                "Market fluctuations impact returns",
+                "Weather is nice today",
+                "Investment returns affected by market",
+                "Cybersecurity threats are increasing",
+            ],
+            "target_sentences": [
+                "Market fluctuations impact returns",
+                "Market fluctuations impact returns",
+                "Investment returns affected by market",
+            ],
+        },
+        "candidate_set_2": {
+            "candidate_sentences": [
+                "Credit risk assessment in banking",
+                "Market volatility affects investments",
+                "Cyber attacks on organizations",
+                "Risk management in finance",
+            ],
+            "target_sentences": [
+                "Market volatility affects investments",
+                "Market volatility affects investments",
+                "Cyber attacks on organizations",
+            ],
+        },
+        "candidate_set_3": {
+            "candidate_sentences": [
+                "Financial market volatility",
+                "Credit risk evaluation methods",
+                "Information security threats",
+                "Enterprise risk management",
+            ],
+            "target_sentences": [
+                "Financial market volatility",
+                "Financial market volatility",
+                "Information security threats",
+            ],
         },
     }
 

@@ -13,9 +13,16 @@ def convert_feedback_to_excel(feedback_data, output_file=None):
     with pd.ExcelWriter(output_file) as writer:
         # Original Text and Metrics Sheet
         original_data = {
-            "Original Text": [item["consolidated_feedback"]["original_text"] for item in feedback_data],
-            "Invalid Metrics": [", ".join(item["consolidated_feedback"]["invalid_metrics"]) for item in feedback_data],
-            "Feedback Message": [item["consolidated_feedback"]["question"] for item in feedback_data]
+            "Original Text": [
+                item["consolidated_feedback"]["original_text"] for item in feedback_data
+            ],
+            "Invalid Metrics": [
+                ", ".join(item["consolidated_feedback"]["invalid_metrics"])
+                for item in feedback_data
+            ],
+            "Feedback Message": [
+                item["consolidated_feedback"]["question"] for item in feedback_data
+            ],
         }
         pd.DataFrame(original_data).to_excel(
             writer, sheet_name="Original Analysis", index=False
@@ -26,14 +33,16 @@ def convert_feedback_to_excel(feedback_data, output_file=None):
         for idx, item in enumerate(feedback_data, 1):
             examples = item["consolidated_feedback"]["examples"]
             for ex_num, choice in enumerate(["choice1", "choice2", "choice3"], 1):
-                examples_rows.append({
-                    "Feedback Number": f"Feedback {idx}",
-                    "Example Number": f"Example {ex_num}",
-                    "Improved Text": examples[choice],
-                    "Reviewer Comments": "",
-                    "Approved": ""
-                })
-        
+                examples_rows.append(
+                    {
+                        "Feedback Number": f"Feedback {idx}",
+                        "Example Number": f"Example {ex_num}",
+                        "Improved Text": examples[choice],
+                        "Reviewer Comments": "",
+                        "Approved": "",
+                    }
+                )
+
         pd.DataFrame(examples_rows).to_excel(
             writer, sheet_name="Examples Review", index=False
         )
@@ -42,13 +51,15 @@ def convert_feedback_to_excel(feedback_data, output_file=None):
         review_rows = []
         for idx, _ in enumerate(feedback_data, 1):
             for aspect in ["Clarity", "Completeness", "Accuracy", "Overall Quality"]:
-                review_rows.append({
-                    "Feedback Number": f"Feedback {idx}",
-                    "Aspect": aspect,
-                    "Rating (1-5)": "",
-                    "Comments": ""
-                })
-        
+                review_rows.append(
+                    {
+                        "Feedback Number": f"Feedback {idx}",
+                        "Aspect": aspect,
+                        "Rating (1-5)": "",
+                        "Comments": "",
+                    }
+                )
+
         pd.DataFrame(review_rows).to_excel(
             writer, sheet_name="Quality Review", index=False
         )
