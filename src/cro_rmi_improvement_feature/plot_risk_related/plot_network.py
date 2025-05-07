@@ -61,14 +61,15 @@ def generate_az_network():
         edge_color = random.choice(rgb_color_list)
 
         for letter2 in string.ascii_uppercase[i + 1 :]:
-            current_weight = random.randint(1, 3) * 5
+            current_weight = random.randint(50, 199)
             line_weight_list.append(current_weight)  # Collect edge weight
             edges.append(
                 {
                     "data": {
                         "source": letter1,
                         "target": letter2,
-                        "weight": current_weight,
+                        "weight": math.floor(current_weight / 50) * 5,
+                        "raw_weight": current_weight,
                         "color": edge_color,
                     }
                 }
@@ -133,16 +134,16 @@ app.layout = html.Div(
             min=slider_min,
             max=slider_max,
             value=initial_slider_value,  # Set initial value
-            step=0.1,  # Or choose a step that makes sense for your range
+            step=1,  # Or choose a step that makes sense for your range
             marks={
                 i: str(i)
-                for i in range(math.ceil(slider_min), math.floor(slider_max) + 1)
+                for i in range(math.ceil(slider_min), math.floor(slider_max) + 1, 50)
             },  # Optional: marks on the slider
         ),
         html.Div(id="slider-output-container"),  # To display slider value
         cyto.Cytoscape(
             id="cytospace",
-            elements=elements,  # Use the generated elements
+            elements=elements,  # Initial elements
             layout={"name": "preset"},
             stylesheet=default_stylesheet,
             style={"width": "800px", "height": "800px"},
@@ -151,13 +152,29 @@ app.layout = html.Div(
 )
 
 
-# Callback to update the slider output and print value
+# Callback to update the graph elements and slider output
 @app.callback(
-    Output("slider-output-container", "children"), [Input("weight-slider", "value")]
+    [
+        Output("cytospace", "elements"),  # Add Output for cytoscape elements
+        Output("slider-output-container", "children"),
+    ],
+    [Input("weight-slider", "value")],
 )
-def update_output(value):
-    print(f"Slider value: {value}")  # Print value to console
-    return f"Current slider value: {value}"
+def update_graph_and_output(slider_value):
+    filtered_elements = []
+    # 'elements' is the global variable holding all original nodes and edges
+    for el in elements:
+        # Check if the element is an edge by looking for 'source' key in its data
+        if "source" in el.get("data", {}):
+            if el["data"]["raw_weight"] >= slider_value:
+                filtered_elements.append(el)
+        else:  # It's a node, always include nodes
+            filtered_elements.append(el)
+
+    print(f"Slider value: {slider_value}")  # Print value to console
+    # Update the message to reflect the filtering
+    output_text = f"Current threshold: {slider_value:.2f}. Showing edges with weight >= {slider_value:.2f}."
+    return filtered_elements, output_text
 
 
 if __name__ == "__main__":
