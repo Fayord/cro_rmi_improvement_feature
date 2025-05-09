@@ -6,6 +6,8 @@ from dash.dependencies import Input, Output  # For callbacks
 import random
 import string
 import math
+import numpy as np
+from .utils import find_equal_count_boundaries
 
 
 def generate_az_network():
@@ -78,10 +80,162 @@ def generate_az_network():
     return nodes + edges, line_weight_list  # Return the list of weights
 
 
+def generate_network_from_real_data(data_list):
+    """
+    data_list: list of dicts, each dict contains:
+        - "risk": str
+        - "embedding_risk": list or np.array
+        - "risk_desc": str
+        - "embedding_risk_desc": list or np.array
+    """
+    number_of_scales = 3
+    nodes = []
+    edges = []
+    line_weight_list = []
+
+    # Create nodes for each risk
+    for idx, data in enumerate(data_list):
+        nodes.append(
+            {
+                "data": {
+                    "id": f"risk_{idx}",
+                    "label": data["risk"],
+                    "size": 10,
+                    "color": "rgb(54, 162, 235)",
+                },
+                "position": {
+                    "x": random.uniform(100, 700),
+                    "y": random.uniform(100, 700),
+                },
+            }
+        )
+
+    # Create edges based on embedding distance (Euclidean)
+    # cal the distance between each pair of risks first
+    stored_distances = {}
+    for i in range(len(data_list)):
+        for j in range(i + 1, len(data_list)):
+            emb1 = np.array(data_list[i]["embedding_risk"])
+            emb2 = np.array(data_list[j]["embedding_risk"])
+            distance = np.linalg.norm(emb1 - emb2)
+            line_weight_list.append(distance)
+            stored_distances[(i, j)] = distance
+
+    min_dist = min(line_weight_list)
+    max_dist = max(line_weight_list)
+    # then create edges
+    for i in range(len(data_list)):
+        for j in range(i + 1, len(data_list)):
+            display_weight = stored_distances[(i, j)]
+            # display_weight is seperated into 3 scales based on the min_dist and max_dist
+            edges.append(
+                {
+                    "data": {
+                        "source": f"risk_{i}",
+                        "target": f"risk_{j}",
+                        "weight": math.floor(
+                            (stored_distances[(i, j)] - min_dist)
+                            / (max_dist - min_dist)
+                            * 20
+                        ),
+                        "raw_weight": stored_distances[(i, j)],
+                        "color": "rgb(54, 162, 235)",
+                    }
+                }
+            )
+
+    return nodes + edges, line_weight_list
+
+
+# Example data and embedding generation
+example_data = [
+    # Operation risks
+    {
+        "risk": "System outage",
+        "risk_desc": "Unexpected downtime of critical systems.",
+    },
+    {
+        "risk": "Process failure",
+        "risk_desc": "Breakdown in internal processes affecting operations.",
+    },
+    {
+        "risk": "Supply chain disruption",
+        "risk_desc": "Delays or interruptions in the supply chain.",
+    },
+    # Strategic risks
+    {
+        "risk": "Mergers gone wrong",
+        "risk_desc": "Failed integration after a merger or acquisition.",
+    },
+    {
+        "risk": "Innovation failure",
+        "risk_desc": "Inability to keep up with technological advancements.",
+    },
+    {
+        "risk": "Reputation damage",
+        "risk_desc": "Negative publicity affecting brand value.",
+    },
+    # Market risks
+    {
+        "risk": "Interest rate fluctuation",
+        "risk_desc": "Changes in interest rates impacting profitability.",
+    },
+    {
+        "risk": "Currency volatility",
+        "risk_desc": "Losses due to changes in foreign exchange rates.",
+    },
+    {
+        "risk": "Market demand shift",
+        "risk_desc": "Sudden changes in customer preferences.",
+    },
+    # Compliance risks
+    {
+        "risk": "Regulatory breach",
+        "risk_desc": "Violation of industry regulations.",
+    },
+    {
+        "risk": "Data privacy violation",
+        "risk_desc": "Failure to protect customer data as per laws.",
+    },
+    {
+        "risk": "Reporting error",
+        "risk_desc": "Incorrect financial or operational reporting.",
+    },
+]
+
+# example_data.save to pickle file
+import pickle
+import os
+
+dir_path = os.path.dirname(os.path.realpath(__file__))
+file_path = f"{dir_path}/example_data.pkl"
+
+if not os.path.exists(file_path):
+    from sentence_transformers import SentenceTransformer
+
+    # Load local embedding model
+    embedder = SentenceTransformer("all-MiniLM-L6-v2")
+
+    # Generate embeddings for risks and risk_descs
+    for item in example_data:
+        item["embedding_risk"] = embedder.encode(item["risk"])
+        item["embedding_risk_desc"] = embedder.encode(item["risk_desc"])
+
+    # Save the data to a pickle file
+    with open(file_path, "wb") as f:
+        pickle.dump(example_data, f)
+else:
+    # Load the data from the pickle file
+    with open(file_path, "rb") as f:
+        example_data = pickle.load(f)
+
+# Use the real data network generator
+elements, line_weights = generate_network_from_real_data(example_data)
+
 app = dash.Dash(__name__)
 
 # Generate elements and line weights
-elements, line_weights = generate_az_network()
+# elements, line_weights = generate_az_network()
 
 checkbox_labels = [
     {"label": "risks", "value": ["risks"]},
