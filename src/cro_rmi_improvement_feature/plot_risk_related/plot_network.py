@@ -83,6 +83,24 @@ app = dash.Dash(__name__)
 # Generate elements and line weights
 elements, line_weights = generate_az_network()
 
+checkbox_labels = [
+    {"label": "risks", "value": ["risks"]},
+    {"label": "risks+risk_descs", "value": ["risks", "risk_descs"]},
+    {
+        "label": "risks+risk_descs+risk_categories",
+        "value": ["risks", "risk_descs", "risk_categories"],
+    },
+    {
+        "label": "risks+risk_descs+risk_categories+risk_types",
+        "value": ["risks", "risk_descs", "risk_categories", "risk_types"],
+    },
+]
+
+# Prepare options for the checklist
+checklist_options = [
+    {"label": item["label"], "value": item["label"]} for item in checkbox_labels
+]
+
 # Calculate slider range
 if line_weights:  # Ensure list is not empty
     min_weight = min(line_weights)
@@ -129,6 +147,16 @@ default_stylesheet = [
 
 app.layout = html.Div(
     [
+        dcc.Checklist(
+            id="filter-checklist",
+            options=checklist_options,
+            value=(
+                [checklist_options[0]["value"]] if checklist_options else []
+            ),  # Default to the first option selected
+            inline=True,
+        ),
+        html.Div(id="checklist-output-container"),  # To display checklist selection
+        html.Hr(),  # Add a horizontal line for separation
         dcc.Slider(
             id="weight-slider",
             min=slider_min,
@@ -175,6 +203,25 @@ def update_graph_and_output(slider_value):
     # Update the message to reflect the filtering
     output_text = f"Current threshold: {slider_value:.2f}. Showing edges with weight >= {slider_value:.2f}."
     return filtered_elements, output_text
+
+
+# Callback to update the checklist output
+@app.callback(
+    Output("checklist-output-container", "children"),
+    [Input("filter-checklist", "value")],
+)
+def update_checklist_output(selected_values):
+    if selected_values is None:
+        selected_values = []
+    print(f"Checklist values changed to: {selected_values}")  # Print to console
+    # You can also retrieve the original complex value from checkbox_labels if needed:
+    original_selected_data = [
+        item for item in checkbox_labels if item["label"] in selected_values
+    ]
+    print(f"Original data for selected items: {original_selected_data}")
+    return (
+        f"Selected options: {', '.join(selected_values) if selected_values else 'None'}"
+    )
 
 
 if __name__ == "__main__":
