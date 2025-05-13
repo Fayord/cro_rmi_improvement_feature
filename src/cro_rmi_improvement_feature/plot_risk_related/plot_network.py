@@ -7,7 +7,36 @@ import random
 import string
 import math
 import numpy as np
-from .utils import find_equal_count_boundaries
+from utils import find_equal_count_boundaries, get_level_from_boundaries
+
+rgb_color_list = [
+    "rgb(255, 99, 132)",  # Red
+    "rgb(54, 162, 235)",  # Blue
+    "rgb(255, 206, 86)",  # Yellow
+    "rgb(75, 192, 192)",  # Green
+    "rgb(153, 102, 255)",  # Purple
+    "rgb(255, 159, 64)",  # Orange
+    "rgb(201, 203, 207)",  # Grey
+    "rgb(255, 99, 71)",  # Tomato
+    "rgb(60, 179, 113)",  # MediumSeaGreen
+    "rgb(218, 112, 214)",  # Orchid
+    "rgb(0, 255, 255)",  # Aqua
+    "rgb(240, 230, 140)",  # Khaki
+]
+edge_rgb_color_list = [
+    # very light grey
+    "rgb(201, 203, 207)",
+    # light grey
+    # "rgb(211, 211, 211)",
+    # grey
+    "rgb(169, 169, 169)",
+    # dark grey
+    "rgb(128, 128, 128)",
+    # very dark grey
+    "rgb(80, 80, 80)",
+    # black
+    "rgb(0, 0, 0)",
+]
 
 
 def generate_az_network():
@@ -21,20 +50,6 @@ def generate_az_network():
     center_x = 350
     center_y = 350
     node_count = 26
-    rgb_color_list = [
-        "rgb(255, 99, 132)",  # Red
-        "rgb(54, 162, 235)",  # Blue
-        "rgb(255, 206, 86)",  # Yellow
-        "rgb(75, 192, 192)",  # Green
-        "rgb(153, 102, 255)",  # Purple
-        "rgb(255, 159, 64)",  # Orange
-        "rgb(201, 203, 207)",  # Grey
-        "rgb(255, 99, 71)",  # Tomato
-        "rgb(60, 179, 113)",  # MediumSeaGreen
-        "rgb(218, 112, 214)",  # Orchid
-        "rgb(0, 255, 255)",  # Aqua
-        "rgb(240, 230, 140)",  # Khaki
-    ]
 
     # Generate nodes
     for i, letter in enumerate(string.ascii_uppercase):
@@ -92,16 +107,88 @@ def generate_network_from_real_data(data_list):
     nodes = []
     edges = []
     line_weight_list = []
+    # print checkbox value in this function
+    ...
+    # Create edges based on embedding distance (Euclidean)
+    # cal the distance between each pair of risks first
+    # print(data_list[0])
+    # print(data_list[0].keys())
+    stored_distances = {}
+    for i in range(len(data_list)):
+        for j in range(i + 1, len(data_list)):
+            emb1 = np.array(data_list[i][tuple(sorted(["risk", "embedding"]))])
+            emb2 = np.array(data_list[j][tuple(sorted(["risk", "embedding"]))])
+            distance = np.linalg.norm(emb1 - emb2) * 100
+            line_weight_list.append(distance)
+            stored_distances[(i, j)] = distance
 
+    min_dist = min(line_weight_list)
+    max_dist = max(line_weight_list)
+    avg_dist = np.mean(line_weight_list)
+    print(f"{avg_dist=}")
+
+    edge_boudaries = find_equal_count_boundaries(line_weight_list, number_of_scales)
+    # then create edges
+    for i in range(len(data_list)):
+        for j in range(i + 1, len(data_list)):
+            raw_weight = stored_distances[(i, j)]
+            # display_weight is seperated into 3 scales based on the min_dist and max_dist
+            level = get_level_from_boundaries(edge_boudaries, raw_weight)
+            display_weight = level * 5
+            edge_color = edge_rgb_color_list[level - 1]
+            edges.append(
+                {
+                    "data": {
+                        "source": f"risk_{i}",
+                        "target": f"risk_{j}",
+                        "weight": display_weight,
+                        "raw_weight": raw_weight,
+                        "color": edge_color,
+                    }
+                }
+            )
+
+    # Calculate raw_size for each node (sum of all connected edge weights)
+    node_raw_sizes = [0.0 for _ in range(len(data_list))]
+
+    for edge in edges:
+        src = int(edge["data"]["source"].split("_")[1])
+        tgt = int(edge["data"]["target"].split("_")[1])
+        w = edge["data"]["raw_weight"]
+        node_raw_sizes[src] += w
+        node_raw_sizes[tgt] += w
+
+    node_boudaries = find_equal_count_boundaries(node_raw_sizes, number_of_scales)
+    # Scale node sizes for display (between 20 and 100)
+    min_raw = min(node_raw_sizes)
+    max_raw = max(node_raw_sizes)
+
+    def scale_size(raw):
+        if max_raw == min_raw:
+            return 60  # fallback if all are equal
+        return 20 + (raw - min_raw) / (max_raw - min_raw) * (100 - 20)
+
+    all_risk_cat = []
+    for data in data_list:
+        risk_cat = data["risk_cat"]
+        if risk_cat not in all_risk_cat:
+            all_risk_cat.append(risk_cat)
+    all_risk_cat.sort()
     # Create nodes for each risk
     for idx, data in enumerate(data_list):
+        raw_size = node_raw_sizes[idx]
+        level = get_level_from_boundaries(node_boudaries, raw_size)
+        display_size = level * 30
+        risk_cat = data["risk_cat"]
+        risk_cat_color = rgb_color_list[all_risk_cat.index(risk_cat)]
         nodes.append(
             {
                 "data": {
                     "id": f"risk_{idx}",
                     "label": data["risk"],
-                    "size": 10,
-                    "color": "rgb(54, 162, 235)",
+                    "raw_size": raw_size,
+                    "size": display_size,
+                    "color": risk_cat_color,
                 },
                 "position": {
                     "x": random.uniform(100, 700),
@@ -109,40 +196,6 @@ def generate_network_from_real_data(data_list):
                 },
             }
         )
-
-    # Create edges based on embedding distance (Euclidean)
-    # cal the distance between each pair of risks first
-    stored_distances = {}
-    for i in range(len(data_list)):
-        for j in range(i + 1, len(data_list)):
-            emb1 = np.array(data_list[i]["embedding_risk"])
-            emb2 = np.array(data_list[j]["embedding_risk"])
-            distance = np.linalg.norm(emb1 - emb2)
-            line_weight_list.append(distance)
-            stored_distances[(i, j)] = distance
-
-    min_dist = min(line_weight_list)
-    max_dist = max(line_weight_list)
-    # then create edges
-    for i in range(len(data_list)):
-        for j in range(i + 1, len(data_list)):
-            display_weight = stored_distances[(i, j)]
-            # display_weight is seperated into 3 scales based on the min_dist and max_dist
-            edges.append(
-                {
-                    "data": {
-                        "source": f"risk_{i}",
-                        "target": f"risk_{j}",
-                        "weight": math.floor(
-                            (stored_distances[(i, j)] - min_dist)
-                            / (max_dist - min_dist)
-                            * 20
-                        ),
-                        "raw_weight": stored_distances[(i, j)],
-                        "color": "rgb(54, 162, 235)",
-                    }
-                }
-            )
 
     return nodes + edges, line_weight_list
 
@@ -229,8 +282,14 @@ else:
     with open(file_path, "rb") as f:
         example_data = pickle.load(f)
 
+real_data_path = f"{dir_path}/company_risk_data_with_embedding.pkl"
+real_data = pickle.load(open(real_data_path, "rb"))
+
+
 # Use the real data network generator
-elements, line_weights = generate_network_from_real_data(example_data)
+# elements, line_weights = generate_network_from_real_data(example_data)
+
+elements, line_weights = generate_network_from_real_data(real_data)
 
 app = dash.Dash(__name__)
 
@@ -238,16 +297,9 @@ app = dash.Dash(__name__)
 # elements, line_weights = generate_az_network()
 
 checkbox_labels = [
-    {"label": "risks", "value": ["risks"]},
-    {"label": "risks+risk_descs", "value": ["risks", "risk_descs"]},
-    {
-        "label": "risks+risk_descs+risk_categories",
-        "value": ["risks", "risk_descs", "risk_categories"],
-    },
-    {
-        "label": "risks+risk_descs+risk_categories+risk_types",
-        "value": ["risks", "risk_descs", "risk_categories", "risk_types"],
-    },
+    {"label": "risk_descs", "value": "risk_descs"},
+    {"label": "rootcause", "value": "rootcause"},
+    {"label": "process", "value": "process"},
 ]
 
 # Prepare options for the checklist
@@ -319,7 +371,7 @@ app.layout = html.Div(
             step=1,  # Or choose a step that makes sense for your range
             marks={
                 i: str(i)
-                for i in range(math.ceil(slider_min), math.floor(slider_max) + 1, 50)
+                for i in range(math.ceil(slider_min), math.floor(slider_max) + 1, 10)
             },  # Optional: marks on the slider
         ),
         html.Div(id="slider-output-container"),  # To display slider value

@@ -1,7 +1,7 @@
 import random
 
 
-def find_equal_count_boundaries(numbers, n_sections):
+def find_equal_count_boundaries(numbers: list[float], n_sections: int):
     """
     Given a list of numbers, find the boundary values that split the list into n_sections
     such that each section has (as close as possible) the same number of elements.
@@ -26,6 +26,15 @@ def find_equal_count_boundaries(numbers, n_sections):
     return boundaries
 
 
+def get_level_from_boundaries(boundaries: list[int], test_number: float):
+    for i in range(len(boundaries) - 1):
+        start = boundaries[i]
+        end = boundaries[i + 1]
+        if start <= test_number < end:
+            return i + 1
+    raise ValueError(f"Number {test_number} is outside the range of boundaries.")
+
+
 if __name__ == "__main__":
     numbers = random.sample(range(1, 201), 100)  # 100 unique numbers from 1 to 100
     numbers.sort()
@@ -39,4 +48,7 @@ if __name__ == "__main__":
         section = [num for num in numbers if start <= num < end]
 
         print(f"Section  {i + 1}: {len(section)} {section}")
+    test_number = 170
+    level = get_level_from_boundaries(boundaries, test_number)
+    print(level)
     print(boundaries)
