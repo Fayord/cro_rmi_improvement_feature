@@ -285,26 +285,26 @@ import pickle
 import os
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
-file_path = f"{dir_path}/example_data.pkl"
+# file_path = f"{dir_path}/example_data.pkl"
 
-if not os.path.exists(file_path):
-    from sentence_transformers import SentenceTransformer
+# if not os.path.exists(file_path):
+#     from sentence_transformers import SentenceTransformer
 
-    # Load local embedding model
-    embedder = SentenceTransformer("all-MiniLM-L6-v2")
+#     # Load local embedding model
+#     embedder = SentenceTransformer("all-MiniLM-L6-v2")
 
-    # Generate embeddings for risks and risk_descs
-    for item in example_data:
-        item["embedding_risk"] = embedder.encode(item["risk"])
-        item["embedding_risk_desc"] = embedder.encode(item["risk_desc"])
+#     # Generate embeddings for risks and risk_descs
+#     for item in example_data:
+#         item["embedding_risk"] = embedder.encode(item["risk"])
+#         item["embedding_risk_desc"] = embedder.encode(item["risk_desc"])
 
-    # Save the data to a pickle file
-    with open(file_path, "wb") as f:
-        pickle.dump(example_data, f)
-else:
-    # Load the data from the pickle file
-    with open(file_path, "rb") as f:
-        example_data = pickle.load(f)
+#     # Save the data to a pickle file
+#     with open(file_path, "wb") as f:
+#         pickle.dump(example_data, f)
+# else:
+#     # Load the data from the pickle file
+#     with open(file_path, "rb") as f:
+#         example_data = pickle.load(f)
 
 real_data_path = f"{dir_path}/company_risk_data_with_embedding.pkl"
 real_data = pickle.load(open(real_data_path, "rb"))
