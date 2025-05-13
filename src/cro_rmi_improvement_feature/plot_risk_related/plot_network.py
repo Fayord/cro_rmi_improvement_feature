@@ -9,6 +9,8 @@ import math
 import numpy as np
 from utils import find_equal_count_boundaries, get_level_from_boundaries
 
+cyto.load_extra_layouts()
+
 rgb_color_list = [
     "rgb(255, 99, 132)",  # Red
     "rgb(54, 162, 235)",  # Blue
@@ -289,7 +291,24 @@ real_data = pickle.load(open(real_data_path, "rb"))
 # Use the real data network generator
 # elements, line_weights = generate_network_from_real_data(example_data)
 
-elements, line_weights = generate_network_from_real_data(real_data)
+print(f"{real_data[0].keys()=}")
+# Extract unique company names from real_data
+companys = sorted({item["company"] for item in real_data})
+
+# Set default company
+default_company = companys[0] if companys else None
+
+
+# Initial elements for the default company
+def get_elements_for_company(company):
+    filtered = [item for item in real_data if item["company"] == company]
+    if filtered:
+        return generate_network_from_real_data(filtered)
+    else:
+        return [], []
+
+
+elements, line_weights = get_elements_for_company(default_company)
 
 app = dash.Dash(__name__)
 
@@ -314,7 +333,9 @@ if line_weights:  # Ensure list is not empty
     weight_diff = max_weight - min_weight
     slider_min = min_weight - 0.25 * weight_diff
     slider_max = max_weight + 0.25 * weight_diff
-    initial_slider_value = min_weight  # Or any other appropriate initial value
+    initial_slider_value = (
+        5 * max_weight + min_weight
+    ) / 6  # Or any other appropriate initial value
 else:  # Default values if no weights (e.g., no edges)
     slider_min = 0
     slider_max = 10
@@ -351,8 +372,92 @@ default_stylesheet = [
     },
 ]
 
+# *** Bezier Curve Style with Edge Bundling ***
+bezier_stylesheet = [
+    {
+        "selector": "node",
+        "style": {
+            "width": "mapData(size, 0, 100, 20, 60)",
+            "height": "mapData(size, 0, 100, 20, 60)",
+            "content": "data(label)",
+            "font-size": "12px",
+            "text-valign": "center",
+            "text-halign": "center",
+            "background-color": "data(color)",
+        },
+    },
+    {
+        "selector": "edge",
+        "style": {
+            "curve-style": "unbundled-bezier",
+            "control-point-step-size": 10,  # Adjust for bundling strength
+            "control-point-weight": 0.5,  # Adjust for bundling shape
+            "opacity": 0.6,
+            "line-color": "data(color)",
+            "width": "mapData(weight, 0, 20, 1, 8)",
+            "overlay-padding": "3px",
+            "content": "data(weight)",
+            "font-size": "0px",
+            "text-valign": "center",
+            "text-halign": "center",
+        },
+    },
+]
+
+# *** Taxi Curve Style with Potential for Bundling Effect ***
+taxi_stylesheet = [
+    {
+        "selector": "node",
+        "style": {
+            "width": "mapData(size, 0, 100, 20, 60)",
+            "height": "mapData(size, 0, 100, 20, 60)",
+            "content": "data(label)",
+            "font-size": "12px",
+            "text-valign": "center",
+            "text-halign": "center",
+            "background-color": "data(color)",
+        },
+    },
+    {
+        "selector": "edge",
+        "style": {
+            "curve-style": "taxi",
+            "taxi-direction": "vertical",  # Or 'horizontal' depending on layout
+            "taxi-turn": 20,  # Adjust for the number of turns and bundling
+            "opacity": 0.6,
+            "line-color": "data(color)",
+            "width": "mapData(weight, 0, 20, 1, 8)",
+            "overlay-padding": "3px",
+            "content": "data(weight)",
+            "font-size": "0px",
+            "text-valign": "center",
+            "text-halign": "center",
+        },
+    },
+]
+layout_list = [
+    "concentric",
+    "spread",
+    "cose",
+    "euler",
+]
+
 app.layout = html.Div(
     [
+        dcc.Dropdown(
+            id="company-dropdown",
+            options=[{"label": name, "value": name} for name in companys],
+            value=default_company,
+            clearable=False,
+            style={"width": "400px", "margin-bottom": "10px"},
+        ),
+        dcc.Dropdown(
+            id="layout-dropdown",
+            options=[{"label": l, "value": l} for l in layout_list],
+            value=layout_list[0],
+            clearable=False,
+            style={"width": "200px", "margin-bottom": "10px"},
+        ),
         dcc.Checklist(
             id="filter-checklist",
             options=checklist_options,
@@ -378,8 +483,18 @@ app.layout = html.Div(
         cyto.Cytoscape(
             id="cytospace",
             elements=elements,  # Initial elements
-            layout={"name": "preset"},
-            stylesheet=default_stylesheet,
+            # layout={"name": "concentric"}, # good with symetric visual
+            # layout={"name": "cose"},
+            # layout={"name": "cose-bilkent"},
+            # layout={"name": "cola"},
+            # layout={"name": "euler"}, #good if less data or maybe need to make thing smaller
+            # layout={"name": "spread"},  # good with asymetric and distributed in square
+            # layout={"name": "dagre"},
+            # layout={"name": "klay"},
+            layout={"name": layout_list[0]},  # Use the default layout
+            # stylesheet=default_stylesheet,
+            stylesheet=bezier_stylesheet,
+            # stylesheet=taxi_stylesheet,
             style={"width": "800px", "height": "800px"},
         ),
     ]
@@ -387,28 +502,29 @@ app.layout = html.Div(
 
 
 # Callback to update the graph elements and slider output
-@app.callback(
-    [
-        Output("cytospace", "elements"),  # Add Output for cytoscape elements
-        Output("slider-output-container", "children"),
-    ],
-    [Input("weight-slider", "value")],
-)
-def update_graph_and_output(slider_value):
-    filtered_elements = []
-    # 'elements' is the global variable holding all original nodes and edges
-    for el in elements:
-        # Check if the element is an edge by looking for 'source' key in its data
-        if "source" in el.get("data", {}):
-            if el["data"]["raw_weight"] >= slider_value:
-                filtered_elements.append(el)
-        else:  # It's a node, always include nodes
-            filtered_elements.append(el)
-
-    print(f"Slider value: {slider_value}")  # Print value to console
-    # Update the message to reflect the filtering
-    output_text = f"Current threshold: {slider_value:.2f}. Showing edges with weight >= {slider_value:.2f}."
-    return filtered_elements, output_text
+# Callback to update the graph elements and slider output
+# @app.callback(
+#     [
+#         Output("cytospace", "elements"),  # Add Output for cytoscape elements
+#         Output("slider-output-container", "children"),
+#     ],
+#     [Input("weight-slider", "value")],
+# )
+# def update_graph_and_output(slider_value):
+#     filtered_elements = []
+#     # 'elements' is the global variable holding all original nodes and edges
+#     for el in elements:
+#         # Check if the element is an edge by looking for 'source' key in its data
+#         if "source" in el.get("data", {}):
+#             if el["data"]["raw_weight"] >= slider_value:
+#                 filtered_elements.append(el)
+#         else:  # It's a node, always include nodes
+#             filtered_elements.append(el)
+#
+#     print(f"Slider value: {slider_value}")  # Print value to console
+#     # Update the message to reflect the filtering
+#     output_text = f"Current threshold: {slider_value:.2f}. Showing edges with weight >= {slider_value:.2f}."
+#     return filtered_elements, output_text
 
 
 # Callback to update the checklist output
@@ -427,6 +543,66 @@ def update_checklist_output(selected_values):
     print(f"Original data for selected items: {original_selected_data}")
     return (
         f"Selected options: {', '.join(selected_values) if selected_values else 'None'}"
+    )
+
+
+# Callback to update the graph elements and slider output based on company selection
+# Remove the two separate callbacks for cytoscape/slider outputs and combine into one:
+@app.callback(
+    [
+        Output("cytospace", "elements"),
+        Output("slider-output-container", "children"),
+        Output("weight-slider", "min"),
+        Output("weight-slider", "max"),
+        Output("weight-slider", "value"),
+        Output("weight-slider", "marks"),
+        Output("cytospace", "layout"),
+    ],
+    [
+        Input("company-dropdown", "value"),
+        Input("weight-slider", "value"),
+        Input("layout-dropdown", "value"),
+    ],
+)
+def update_graph_and_output(company, slider_value, layout_name):
+    filtered_data = [item for item in real_data if item["company"] == company]
+    elements, line_weights = generate_network_from_real_data(filtered_data)
+    # Calculate slider range
+    if line_weights:
+        min_weight = min(line_weights)
+        max_weight = max(line_weights)
+        weight_diff = max_weight - min_weight
+        slider_min = min_weight - 0.25 * weight_diff
+        slider_max = max_weight + 0.25 * weight_diff
+        if slider_value is None or not (slider_min <= slider_value <= slider_max):
+            slider_value = min_weight
+        marks = {
+            i: str(i)
+            for i in range(math.ceil(slider_min), math.floor(slider_max) + 1, 10)
+        }
+    else:
+        slider_min = 0
+        slider_max = 10
+        slider_value = 5
+        marks = {i: str(i) for i in range(0, 11, 2)}
+
+    filtered_elements = []
+    for el in elements:
+        if "source" in el.get("data", {}):
+            if el["data"]["raw_weight"] >= slider_value:
+                filtered_elements.append(el)
+        else:
+            filtered_elements.append(el)
+
+    output_text = f"Current threshold: {slider_value:.2f}. Showing edges with weight >= {slider_value:.2f}."
+    return (
+        filtered_elements,
+        output_text,
+        slider_min,
+        slider_max,
+        slider_value,
+        marks,
+        {"name": layout_name},
     )
 
 
