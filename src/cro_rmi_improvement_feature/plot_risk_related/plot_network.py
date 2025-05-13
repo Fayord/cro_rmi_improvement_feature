@@ -114,8 +114,8 @@ def generate_network_from_real_data(data_list, selected_checklist_values=None):
         - "risk_desc": str
         - "embedding_risk_desc": list or np.array
     """
-    edge_size_multiplier = 0.5
-    node_size_multiplier = 0.5
+    edge_size_multiplier = 2
+    node_size_multiplier = 10
     number_of_scales = 3
     nodes = []
     edges = []
