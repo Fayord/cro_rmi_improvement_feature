@@ -8,6 +8,7 @@ import string
 import math
 import numpy as np
 from utils import find_equal_count_boundaries, get_level_from_boundaries
+import argparse
 
 FONT_SIZE = 5
 cyto.load_extra_layouts()
@@ -673,4 +674,11 @@ def update_graph_and_output(
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=7070)
+    # for dev 6060
+    # for production 7070
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--port", type=int, default=6060, help="Port to run the Dash app on"
+    )
+    args = parser.parse_args()
+    app.run(debug=True, port=args.port)
