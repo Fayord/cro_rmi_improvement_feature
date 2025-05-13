@@ -12,6 +12,13 @@ from utils import find_equal_count_boundaries, get_level_from_boundaries
 FONT_SIZE = 5
 cyto.load_extra_layouts()
 
+CHECKLIST_OPTIONS = [
+    {"label": "risk_desc_label", "value": "risk_desc"},
+    {"label": "rootcause_label", "value": "rootcause"},
+    {"label": "process_label", "value": "process"},
+]
+
+
 rgb_color_list = [
     "rgb(255, 99, 132)",  # Red
     "rgb(54, 162, 235)",  # Blue
@@ -98,7 +105,7 @@ def generate_az_network():
     return nodes + edges, line_weight_list  # Return the list of weights
 
 
-def generate_network_from_real_data(data_list):
+def generate_network_from_real_data(data_list, selected_checklist_values=None):
     """
     data_list: list of dicts, each dict contains:
         - "risk": str
@@ -113,16 +120,27 @@ def generate_network_from_real_data(data_list):
     edges = []
     line_weight_list = []
     # print checkbox value in this function
-    ...
+    selected_checkbox_value_list = []
+    if selected_checklist_values is None:
+        selected_checklist_values = []
+    for selected_checklist_value in selected_checklist_values:
+        selected_checkbox_value_list.append(selected_checklist_value)
+
     # Create edges based on embedding distance (Euclidean)
     # cal the distance between each pair of risks first
-    # print(data_list[0])
-    # print(data_list[0].keys())
     stored_distances = {}
     for i in range(len(data_list)):
         for j in range(i + 1, len(data_list)):
-            emb1 = np.array(data_list[i][tuple(sorted(["risk", "embedding"]))])
-            emb2 = np.array(data_list[j][tuple(sorted(["risk", "embedding"]))])
+            emb1 = np.array(
+                data_list[i][
+                    tuple(sorted(["risk", "embedding"] + selected_checkbox_value_list))
+                ]
+            )
+            emb2 = np.array(
+                data_list[j][
+                    tuple(sorted(["risk", "embedding"] + selected_checkbox_value_list))
+                ]
+            )
             distance = np.linalg.norm(emb1 - emb2) * 100
             line_weight_list.append(distance)
             stored_distances[(i, j)] = distance
@@ -317,17 +335,6 @@ app = dash.Dash(__name__)
 
 # Generate elements and line weights
 # elements, line_weights = generate_az_network()
-
-checkbox_labels = [
-    {"label": "risk_descs", "value": "risk_descs"},
-    {"label": "rootcause", "value": "rootcause"},
-    {"label": "process", "value": "process"},
-]
-
-# Prepare options for the checklist
-checklist_options = [
-    {"label": item["label"], "value": item["label"]} for item in checkbox_labels
-]
 
 # Calculate slider range
 if line_weights:  # Ensure list is not empty
@@ -528,8 +535,9 @@ app.layout = html.Div(
         ),
         dcc.Checklist(
             id="filter-checklist",
-            options=checklist_options,
-            value=([checklist_options[0]["value"]] if checklist_options else []),
+            options=CHECKLIST_OPTIONS,
+            # value=([CHECKLIST_OPTIONS[0]["value"]] if CHECKLIST_OPTIONS else []),
+            value=([]),
             inline=True,
         ),
         html.Div(id="checklist-output-container"),
@@ -567,11 +575,7 @@ def update_checklist_output(selected_values):
     if selected_values is None:
         selected_values = []
     print(f"Checklist values changed to: {selected_values}")  # Print to console
-    # You can also retrieve the original complex value from checkbox_labels if needed:
-    original_selected_data = [
-        item for item in checkbox_labels if item["label"] in selected_values
-    ]
-    print(f"Original data for selected items: {original_selected_data}")
+    # You can also retrieve the original complex value from CHECKLIST_OPTIONS if needed:
     return (
         f"Selected options: {', '.join(selected_values) if selected_values else 'None'}"
     )
@@ -596,13 +600,21 @@ def update_checklist_output(selected_values):
         Input("layout-dropdown", "value"),
         Input("bezier-step-size-slider", "value"),
         Input("bezier-weight-slider", "value"),
+        Input("filter-checklist", "value"),  # <-- Add this line
     ],
 )
 def update_graph_and_output(
-    company, slider_value, layout_name, bezier_step_size, bezier_weight
+    company,
+    slider_value,
+    layout_name,
+    bezier_step_size,
+    bezier_weight,
+    selected_checklist_values,
 ):
     filtered_data = [item for item in real_data if item["company"] == company]
-    elements, line_weights = generate_network_from_real_data(filtered_data)
+    elements, line_weights = generate_network_from_real_data(
+        filtered_data, selected_checklist_values
+    )
     # Calculate slider range
     if line_weights:
         min_weight = min(line_weights)
