@@ -9,6 +9,7 @@ import math
 import numpy as np
 from utils import find_equal_count_boundaries, get_level_from_boundaries
 
+FONT_SIZE = 5
 cyto.load_extra_layouts()
 
 rgb_color_list = [
@@ -105,6 +106,8 @@ def generate_network_from_real_data(data_list):
         - "risk_desc": str
         - "embedding_risk_desc": list or np.array
     """
+    edge_size_multiplier = 0.5
+    node_size_multiplier = 0.5
     number_of_scales = 3
     nodes = []
     edges = []
@@ -136,7 +139,7 @@ def generate_network_from_real_data(data_list):
             raw_weight = stored_distances[(i, j)]
             # display_weight is seperated into 3 scales based on the min_dist and max_dist
             level = get_level_from_boundaries(edge_boudaries, raw_weight)
-            display_weight = level * 5
+            display_weight = level * edge_size_multiplier
             edge_color = edge_rgb_color_list[level - 1]
             edges.append(
                 {
@@ -180,7 +183,7 @@ def generate_network_from_real_data(data_list):
     for idx, data in enumerate(data_list):
         raw_size = node_raw_sizes[idx]
         level = get_level_from_boundaries(node_boudaries, raw_size)
-        display_size = level * 30
+        display_size = level * node_size_multiplier
         risk_cat = data["risk_cat"]
         risk_cat_color = rgb_color_list[all_risk_cat.index(risk_cat)]
         nodes.append(
@@ -349,7 +352,7 @@ default_stylesheet = [
             "width": "mapData(size, 0, 100, 20, 60)",
             "height": "mapData(size, 0, 100, 20, 60)",
             "content": "data(label)",
-            "font-size": "12px",
+            "font-size": f"{FONT_SIZE}px",
             "text-valign": "center",
             "text-halign": "center",
             "background-color": "data(color)",  # Use the color data property
@@ -380,7 +383,7 @@ bezier_stylesheet = [
             "width": "mapData(size, 0, 100, 20, 60)",
             "height": "mapData(size, 0, 100, 20, 60)",
             "content": "data(label)",
-            "font-size": "12px",
+            "font-size": f"{FONT_SIZE}px",
             "text-valign": "center",
             "text-halign": "center",
             "background-color": "data(color)",
@@ -404,6 +407,44 @@ bezier_stylesheet = [
     },
 ]
 
+
+# *** Round-Segment Style ***
+round_segment_stylesheet = [
+    {
+        "selector": "node",
+        "style": {
+            "width": "mapData(size, 0, 100, 20, 60)",
+            "height": "mapData(size, 0, 100, 20, 60)",
+            "content": "data(label)",
+            "font-size": f"{FONT_SIZE}px",
+            "text-valign": "center",
+            "text-halign": "center",
+            "background-color": "data(color)",
+        },
+    },
+    {
+        "selector": "edge",
+        "style": {
+            "curve-style": "segments",
+            "segment-distances": "20 80",  # Adjust for segment positioning (percentage along the direct line)
+            "segment-weights": "0.3 0.7",  # Adjust for segment positioning (weight towards source/target)
+            "line-style": "solid",
+            "line-color": "data(color)",
+            "width": "mapData(weight, 0, 20, 1, 8)",
+            "overlay-padding": "3px",
+            "content": "data(weight)",
+            "font-size": "0px",
+            "text-valign": "center",
+            "text-halign": "center",
+            "border-width": 1,
+            "border-color": "data(color)",
+            "border-style": "solid",
+            "line-cap": "round",  # Make the ends of segments round
+            "line-join": "round",  # Make the corners where segments meet round
+        },
+    },
+]
+
 # *** Taxi Curve Style with Potential for Bundling Effect ***
 taxi_stylesheet = [
     {
@@ -412,7 +453,7 @@ taxi_stylesheet = [
             "width": "mapData(size, 0, 100, 20, 60)",
             "height": "mapData(size, 0, 100, 20, 60)",
             "content": "data(label)",
-            "font-size": "12px",
+            "font-size": f"{FONT_SIZE}px",
             "text-valign": "center",
             "text-halign": "center",
             "background-color": "data(color)",
@@ -437,9 +478,10 @@ taxi_stylesheet = [
 ]
 layout_list = [
     "concentric",
-    "spread",
-    "cose",
+    "fcose",
+    # "cose",
     "euler",
+    "spread",
 ]
 
 app.layout = html.Div(
@@ -458,73 +500,62 @@ app.layout = html.Div(
             clearable=False,
             style={"width": "200px", "margin-bottom": "10px"},
         ),
+        # --- Add sliders for bezier controls ---
+        html.Div(
+            [
+                html.Label("Bezier control-point-step-size"),
+                dcc.Slider(
+                    id="bezier-step-size-slider",
+                    min=1,
+                    max=50,
+                    step=1,
+                    value=10,
+                    marks={i: str(i) for i in range(1, 51, 5)},
+                    tooltip={"placement": "bottom", "always_visible": False},
+                ),
+                html.Label("Bezier control-point-weight"),
+                dcc.Slider(
+                    id="bezier-weight-slider",
+                    min=0,
+                    max=1,
+                    step=0.01,
+                    value=0.5,
+                    marks={0: "0", 0.5: "0.5", 1: "1"},
+                    tooltip={"placement": "bottom", "always_visible": False},
+                ),
+            ],
+            style={"margin-bottom": "20px"},
+        ),
         dcc.Checklist(
             id="filter-checklist",
             options=checklist_options,
-            value=(
-                [checklist_options[0]["value"]] if checklist_options else []
-            ),  # Default to the first option selected
+            value=([checklist_options[0]["value"]] if checklist_options else []),
             inline=True,
         ),
-        html.Div(id="checklist-output-container"),  # To display checklist selection
-        html.Hr(),  # Add a horizontal line for separation
+        html.Div(id="checklist-output-container"),
+        html.Hr(),
         dcc.Slider(
             id="weight-slider",
             min=slider_min,
             max=slider_max,
-            value=initial_slider_value,  # Set initial value
-            step=1,  # Or choose a step that makes sense for your range
+            value=initial_slider_value,
+            step=1,
             marks={
                 i: str(i)
                 for i in range(math.ceil(slider_min), math.floor(slider_max) + 1, 10)
-            },  # Optional: marks on the slider
+            },
         ),
-        html.Div(id="slider-output-container"),  # To display slider value
+        html.Div(id="slider-output-container"),
         cyto.Cytoscape(
             id="cytospace",
-            elements=elements,  # Initial elements
-            # layout={"name": "concentric"}, # good with symetric visual
-            # layout={"name": "cose"},
-            # layout={"name": "cose-bilkent"},
-            # layout={"name": "cola"},
-            # layout={"name": "euler"}, #good if less data or maybe need to make thing smaller
-            # layout={"name": "spread"},  # good with asymetric and distributed in square
-            # layout={"name": "dagre"},
-            # layout={"name": "klay"},
-            layout={"name": layout_list[0]},  # Use the default layout
-            # stylesheet=default_stylesheet,
-            stylesheet=bezier_stylesheet,
-            # stylesheet=taxi_stylesheet,
+            elements=elements,
+            layout={"name": layout_list[0]},
+            # stylesheet=bezier_stylesheet,
+            stylesheet=round_segment_stylesheet,
             style={"width": "800px", "height": "800px"},
         ),
     ]
 )
-
-
-# Callback to update the graph elements and slider output
-# Callback to update the graph elements and slider output
-# @app.callback(
-#     [
-#         Output("cytospace", "elements"),  # Add Output for cytoscape elements
-#         Output("slider-output-container", "children"),
-#     ],
-#     [Input("weight-slider", "value")],
-# )
-# def update_graph_and_output(slider_value):
-#     filtered_elements = []
-#     # 'elements' is the global variable holding all original nodes and edges
-#     for el in elements:
-#         # Check if the element is an edge by looking for 'source' key in its data
-#         if "source" in el.get("data", {}):
-#             if el["data"]["raw_weight"] >= slider_value:
-#                 filtered_elements.append(el)
-#         else:  # It's a node, always include nodes
-#             filtered_elements.append(el)
-#
-#     print(f"Slider value: {slider_value}")  # Print value to console
-#     # Update the message to reflect the filtering
-#     output_text = f"Current threshold: {slider_value:.2f}. Showing edges with weight >= {slider_value:.2f}."
-#     return filtered_elements, output_text
 
 
 # Callback to update the checklist output
@@ -557,14 +588,19 @@ def update_checklist_output(selected_values):
         Output("weight-slider", "value"),
         Output("weight-slider", "marks"),
         Output("cytospace", "layout"),
+        Output("cytospace", "stylesheet"),
     ],
     [
         Input("company-dropdown", "value"),
         Input("weight-slider", "value"),
         Input("layout-dropdown", "value"),
+        Input("bezier-step-size-slider", "value"),
+        Input("bezier-weight-slider", "value"),
     ],
 )
-def update_graph_and_output(company, slider_value, layout_name):
+def update_graph_and_output(
+    company, slider_value, layout_name, bezier_step_size, bezier_weight
+):
     filtered_data = [item for item in real_data if item["company"] == company]
     elements, line_weights = generate_network_from_real_data(filtered_data)
     # Calculate slider range
@@ -595,6 +631,23 @@ def update_graph_and_output(company, slider_value, layout_name):
             filtered_elements.append(el)
 
     output_text = f"Current threshold: {slider_value:.2f}. Showing edges with weight >= {slider_value:.2f}."
+
+    # Dynamically update bezier stylesheet with slider values
+    dynamic_bezier_stylesheet = [
+        {
+            "selector": "node",
+            "style": bezier_stylesheet[0]["style"],
+        },
+        {
+            "selector": "edge",
+            "style": {
+                **bezier_stylesheet[1]["style"],
+                "control-point-step-size": bezier_step_size,
+                "control-point-weight": bezier_weight,
+            },
+        },
+    ]
+
     return (
         filtered_elements,
         output_text,
@@ -603,6 +656,7 @@ def update_graph_and_output(company, slider_value, layout_name):
         slider_value,
         marks,
         {"name": layout_name},
+        dynamic_bezier_stylesheet,
     )
 
 
