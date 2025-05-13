@@ -332,7 +332,7 @@ def get_elements_for_company(company):
 
 elements, line_weights = get_elements_for_company(default_company)
 
-app = dash.Dash(__name__)
+app = dash.Dash(__name__, url_base_pathname="/plot_network/")
 
 # Generate elements and line weights
 # elements, line_weights = generate_az_network()
