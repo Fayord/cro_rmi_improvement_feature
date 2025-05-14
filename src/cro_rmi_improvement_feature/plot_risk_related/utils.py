@@ -26,6 +26,32 @@ def find_equal_count_boundaries(numbers: list[float], n_sections: int):
     return boundaries
 
 
+def find_proportional_count_boundaries(
+    numbers: list[float], proportion_member_list: list[int]
+):
+    """
+    Given a list of numbers and a list of proportions (as percentages summing to 100),
+    find the boundary values that split the list into sections according to those proportions.
+    Returns a list of boundary values (length len(proportion_member_list)+1).
+    """
+    assert sum(proportion_member_list) == 100, "Sum of proportions must be 100"
+    if not numbers or not proportion_member_list:
+        return []
+
+    sorted_numbers = sorted(numbers)
+    total = len(sorted_numbers)
+    boundaries = [sorted_numbers[0]]
+    cumulative = 0
+    for proportion in proportion_member_list[:-1]:
+        cumulative += proportion
+        idx = int(round(cumulative * total / 100))
+        idx = min(idx, total - 1)
+        boundaries.append(sorted_numbers[idx])
+    boundaries.append(sorted_numbers[-1])
+    boundaries[-1] += 1
+    return boundaries
+
+
 def get_level_from_boundaries(boundaries: list[int], test_number: float):
     for i in range(len(boundaries) - 1):
         start = boundaries[i]
@@ -40,7 +66,8 @@ if __name__ == "__main__":
     numbers.sort()
     print(numbers)
     print("numbers", len(numbers))
-    boundaries = find_equal_count_boundaries(numbers, 4)
+    boundaries = find_proportional_count_boundaries(numbers, [40, 40, 10, 10])
+
     # display member of each section
     for i in range(len(boundaries) - 1):
         start = boundaries[i]

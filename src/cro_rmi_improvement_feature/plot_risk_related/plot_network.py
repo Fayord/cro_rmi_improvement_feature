@@ -7,8 +7,13 @@ import random
 import string
 import math
 import numpy as np
-from utils import find_equal_count_boundaries, get_level_from_boundaries
+from utils import (
+    find_equal_count_boundaries,
+    get_level_from_boundaries,
+    find_proportional_count_boundaries,
+)
 import argparse
+from collections import Counter
 
 FONT_SIZE = 5
 cyto.load_extra_layouts()
@@ -117,6 +122,9 @@ def generate_network_from_real_data(data_list, selected_checklist_values=None):
     edge_size_multiplier = 2
     node_size_multiplier = 10
     number_of_scales = 3
+    node_proportion_list = [50, 30, 20]
+    node_size_counter = Counter()
+    assert len(node_proportion_list) == number_of_scales
     # node_size_list = [1, 30, 60]
     node_size_list = [1, 50, 120]
     assert len(node_size_list) == number_of_scales
@@ -185,7 +193,9 @@ def generate_network_from_real_data(data_list, selected_checklist_values=None):
         node_raw_sizes[src] += w
         node_raw_sizes[tgt] += w
 
-    node_boudaries = find_equal_count_boundaries(node_raw_sizes, number_of_scales)
+    node_boudaries = find_proportional_count_boundaries(
+        node_raw_sizes, node_proportion_list
+    )
     # Scale node sizes for display (between 20 and 100)
     min_raw = min(node_raw_sizes)
     max_raw = max(node_raw_sizes)
@@ -205,6 +215,7 @@ def generate_network_from_real_data(data_list, selected_checklist_values=None):
     for idx, data in enumerate(data_list):
         raw_size = node_raw_sizes[idx]
         level = get_level_from_boundaries(node_boudaries, raw_size)
+        node_size_counter[level] += 1
         display_size = node_size_list[level - 1]
         risk_cat = data["risk_cat"]
         risk_cat_color = rgb_color_list[all_risk_cat.index(risk_cat)]
@@ -223,7 +234,7 @@ def generate_network_from_real_data(data_list, selected_checklist_values=None):
                 },
             }
         )
-
+    print(f"{node_size_counter=}")
     return nodes + edges, line_weight_list
 
 
