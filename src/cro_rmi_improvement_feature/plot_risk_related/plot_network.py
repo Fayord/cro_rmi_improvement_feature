@@ -548,9 +548,9 @@ taxi_stylesheet = [
     },
 ]
 layout_list = [
+    "fcose",
     "circle",
     "concentric",
-    "fcose",
     # "cose",
     "euler",
     "spread",
