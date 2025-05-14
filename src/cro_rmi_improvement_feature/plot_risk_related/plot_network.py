@@ -632,6 +632,14 @@ def update_graph_and_output(
     elements, line_weights = generate_network_from_real_data(
         filtered_data, selected_checklist_values
     )
+    # save_file_path = f"network_{company}_{selected_checklist_values}_{slider_value}.pkl"
+    # data = {
+    #     "elements": elements,
+    #     "line_weights": line_weights,
+    # }
+
+    # with open(save_file_path, "wb") as f:
+    #     pickle.dump(data, f)
     # Calculate slider range
     if line_weights:
         min_weight = min(line_weights)
