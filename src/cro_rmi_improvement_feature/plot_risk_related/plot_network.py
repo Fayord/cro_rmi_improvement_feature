@@ -17,7 +17,7 @@ from collections import Counter
 
 FONT_SIZE = 5
 cyto.load_extra_layouts()
-
+EDGE_SIZE_MULTIPLIER = 2
 CHECKLIST_OPTIONS = [
     {"label": "risk_desc_label", "value": "risk_desc"},
     {"label": "rootcause_label", "value": "rootcause"},
@@ -119,7 +119,6 @@ def generate_network_from_real_data(data_list, selected_checklist_values=None):
         - "risk_desc": str
         - "embedding_risk_desc": list or np.array
     """
-    edge_size_multiplier = 2
     node_size_multiplier = 10
     number_of_scales = 3
     node_proportion_list = [65, 30, 5]
@@ -171,7 +170,7 @@ def generate_network_from_real_data(data_list, selected_checklist_values=None):
             raw_weight = stored_distances[(i, j)]
             # display_weight is seperated into 3 scales based on the min_dist and max_dist
             level = get_level_from_boundaries(edge_boudaries, raw_weight)
-            display_weight = level * edge_size_multiplier
+            display_weight = level * EDGE_SIZE_MULTIPLIER
             edge_color = edge_rgb_color_list[level - 1]
             edges.append(
                 {
@@ -661,16 +660,32 @@ def update_graph_and_output(
         marks = {i: str(i) for i in range(0, 11, 2)}
     node_edge_counter = Counter()
     filtered_elements = []
+    old_line_weights = []
     for el in elements:
         if "source" in el.get("data", {}):
             if el["data"]["raw_weight"] >= slider_value:
                 filtered_elements.append(el)
                 node_edge_counter["edge"] += 1
+                old_line_weights.append(el["data"]["raw_weight"])
 
         else:
             filtered_elements.append(el)
             node_edge_counter["node"] += 1
+    edge_boudaries = find_proportional_count_boundaries(old_line_weights, [60, 30, 10])
+    for el in elements:
+        if "source" in el.get("data", {}):
+            if el["data"]["raw_weight"] >= slider_value:
+                filtered_elements.append(el)
+                node_edge_counter["edge"] += 1
+                old_line_weight = el["data"]["raw_weight"]
+                level = get_level_from_boundaries(old_line_weight, edge_boudaries)
+                display_weight = level * EDGE_SIZE_MULTIPLIER
+                el["data"]["color"] = edge_rgb_color_list[level - 1]
+                el["data"]["weight"] = display_weight
 
+        else:
+            filtered_elements.append(el)
+            node_edge_counter["node"] += 1
     output_text = f"Current threshold: {slider_value:.2f}. Showing edges with weight >= {slider_value:.2f}.\nNode: {node_edge_counter['node']}, Edge: {node_edge_counter['edge']}"
     # Dynamically update bezier stylesheet with slider values
     dynamic_bezier_stylesheet = [
