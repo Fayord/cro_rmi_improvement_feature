@@ -750,6 +750,7 @@ def update_graph_and_output(
             "selector": "edge",
             "style": {
                 **bezier_stylesheet[1]["style"],
+                "curve-style": "unbundled-bezier",
                 "control-point-step-size": bezier_step_size,
                 "control-point-weight": bezier_weight,
             },
