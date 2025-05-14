@@ -25,6 +25,40 @@ CHECKLIST_OPTIONS = [
 ]
 
 
+node_highlight_selector_risk_level4 = {
+    "selector": "node[risk_level = 4]",
+    "style": {
+        "border-width": "3px",
+        "border-color": "#FF7F7F",  # dim red
+        "border-style": "solid",
+    },
+}
+node_highlight_selector_risk_level3 = {
+    "selector": "node[risk_level = 3]",
+    "style": {
+        "border-width": "3px",
+        "border-color": "#FFB17F",  # dim orange
+        "border-style": "solid",
+    },
+}
+node_highlight_selector_risk_level2 = {
+    "selector": "node[risk_level = 2]",
+    "style": {
+        "border-width": "3px",
+        "border-color": "#FFFF7F",  # dim yellow
+        "border-style": "solid",
+    },
+}
+node_highlight_selector_risk_level1 = {
+    "selector": "node[risk_level = 1]",
+    "style": {
+        "border-width": "3px",
+        "border-color": "#7FFF7F",  # dim green
+        "border-style": "solid",
+    },
+}
+
+
 rgb_color_list = [
     "rgb(255, 99, 132)",  # Red
     "rgb(54, 162, 235)",  # Blue
@@ -228,6 +262,7 @@ def generate_network_from_real_data(data_list, selected_checklist_values=None):
                     "raw_size": raw_size,
                     "size": display_size,
                     "color": risk_cat_color,
+                    "risk_level": data["risk_level"],
                 },
                 "position": {
                     "x": random.uniform(100, 700),
@@ -412,6 +447,11 @@ bezier_stylesheet = [
             "background-color": "data(color)",
         },
     },
+    # Add this new selector for large nodes
+    node_highlight_selector_risk_level1,
+    node_highlight_selector_risk_level2,
+    node_highlight_selector_risk_level3,
+    node_highlight_selector_risk_level4,
     {
         "selector": "edge",
         "style": {
@@ -445,6 +485,10 @@ round_segment_stylesheet = [
             "background-color": "data(color)",
         },
     },
+    node_highlight_selector_risk_level1,
+    node_highlight_selector_risk_level2,
+    node_highlight_selector_risk_level3,
+    node_highlight_selector_risk_level4,
     {
         "selector": "edge",
         "style": {
@@ -482,6 +526,10 @@ taxi_stylesheet = [
             "background-color": "data(color)",
         },
     },
+    node_highlight_selector_risk_level1,
+    node_highlight_selector_risk_level2,
+    node_highlight_selector_risk_level3,
+    node_highlight_selector_risk_level4,
     {
         "selector": "edge",
         "style": {
@@ -693,6 +741,11 @@ def update_graph_and_output(
             "selector": "node",
             "style": bezier_stylesheet[0]["style"],
         },
+        # Add this new selector for large nodes
+        node_highlight_selector_risk_level1,
+        node_highlight_selector_risk_level2,
+        node_highlight_selector_risk_level3,
+        node_highlight_selector_risk_level4,
         {
             "selector": "edge",
             "style": {
