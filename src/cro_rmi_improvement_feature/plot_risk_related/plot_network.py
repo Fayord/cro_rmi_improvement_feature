@@ -724,7 +724,6 @@ def update_graph_and_output(
         if "source" in el.get("data", {}):
             if el["data"]["raw_weight"] >= slider_value:
                 filtered_elements.append(el)
-                node_edge_counter["edge"] += 1
                 old_line_weight = el["data"]["raw_weight"]
                 level = get_level_from_boundaries(edge_boudaries, old_line_weight)
                 display_weight = level * EDGE_SIZE_MULTIPLIER
@@ -733,7 +732,6 @@ def update_graph_and_output(
 
         else:
             filtered_elements.append(el)
-            node_edge_counter["node"] += 1
     output_text = f"Current threshold: {slider_value:.2f}. Showing edges with weight >= {slider_value:.2f}.\nNode: {node_edge_counter['node']}, Edge: {node_edge_counter['edge']}"
     # Dynamically update bezier stylesheet with slider values
     dynamic_bezier_stylesheet = [
