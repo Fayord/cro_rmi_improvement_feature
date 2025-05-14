@@ -623,8 +623,8 @@ app.layout = html.Div(
             id="cytospace",
             elements=elements,
             layout={"name": layout_list[0]},
-            # stylesheet=bezier_stylesheet,
-            stylesheet=round_segment_stylesheet,
+            stylesheet=bezier_stylesheet,
+            # stylesheet=round_segment_stylesheet,
             style={"width": "800px", "height": "800px"},
         ),
     ]
