@@ -117,6 +117,9 @@ def generate_network_from_real_data(data_list, selected_checklist_values=None):
     edge_size_multiplier = 2
     node_size_multiplier = 10
     number_of_scales = 3
+    # node_size_list = [1, 30, 60]
+    node_size_list = [1, 50, 120]
+    assert len(node_size_list) == number_of_scales
     nodes = []
     edges = []
     line_weight_list = []
@@ -202,7 +205,7 @@ def generate_network_from_real_data(data_list, selected_checklist_values=None):
     for idx, data in enumerate(data_list):
         raw_size = node_raw_sizes[idx]
         level = get_level_from_boundaries(node_boudaries, raw_size)
-        display_size = level * node_size_multiplier
+        display_size = node_size_list[level - 1]
         risk_cat = data["risk_cat"]
         risk_cat_color = rgb_color_list[all_risk_cat.index(risk_cat)]
         nodes.append(
@@ -485,6 +488,7 @@ taxi_stylesheet = [
     },
 ]
 layout_list = [
+    "circle",
     "concentric",
     "fcose",
     # "cose",
