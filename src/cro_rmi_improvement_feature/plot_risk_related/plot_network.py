@@ -678,7 +678,7 @@ def update_graph_and_output(
                 filtered_elements.append(el)
                 node_edge_counter["edge"] += 1
                 old_line_weight = el["data"]["raw_weight"]
-                level = get_level_from_boundaries(old_line_weight, edge_boudaries)
+                level = get_level_from_boundaries(edge_boudaries, old_line_weight)
                 display_weight = level * EDGE_SIZE_MULTIPLIER
                 el["data"]["color"] = edge_rgb_color_list[level - 1]
                 el["data"]["weight"] = display_weight
