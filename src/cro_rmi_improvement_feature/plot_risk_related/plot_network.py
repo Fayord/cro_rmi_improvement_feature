@@ -122,7 +122,7 @@ def generate_network_from_real_data(data_list, selected_checklist_values=None):
     edge_size_multiplier = 2
     node_size_multiplier = 10
     number_of_scales = 3
-    node_proportion_list = [60, 30, 10]
+    node_proportion_list = [65, 30, 5]
     node_size_counter = Counter()
     assert len(node_proportion_list) == number_of_scales
     # node_size_list = [1, 30, 60]
@@ -154,7 +154,8 @@ def generate_network_from_real_data(data_list, selected_checklist_values=None):
                     tuple(sorted(["risk", "embedding"] + selected_checkbox_value_list))
                 ]
             )
-            distance = np.linalg.norm(emb1 - emb2) * 100
+            distance = np.linalg.norm(emb1 - emb2)
+            distance = 1 / distance * 100
             line_weight_list.append(distance)
             stored_distances[(i, j)] = distance
 
