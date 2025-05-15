@@ -619,13 +619,25 @@ app.layout = html.Div(
             },
         ),
         html.Div(id="slider-output-container"),
-        cyto.Cytoscape(
-            id="cytospace",
-            elements=elements,
-            layout={"name": layout_list[0]},
-            stylesheet=bezier_stylesheet,
-            # stylesheet=round_segment_stylesheet,
-            style={"width": "800px", "height": "800px"},
+        html.Div(
+            cyto.Cytoscape(
+                id="cytospace",
+                elements=elements,
+                layout={"name": layout_list[0]},
+                stylesheet=bezier_stylesheet,
+                # stylesheet=round_segment_stylesheet,
+                style={
+                    "width": "100%",
+                    "height": "80vh",  # 80% of viewport height
+                    "border": "2px solid #ccc",
+                    "border-radius": "8px",
+                    "box-shadow": "0 4px 6px rgba(0, 0, 0, 0.1)",
+                },
+            ),
+            style={
+                "margin": "20px",
+                "padding": "10px",
+            },
         ),
     ]
 )
