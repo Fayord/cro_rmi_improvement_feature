@@ -89,62 +89,6 @@ edge_rgb_color_list = [
 ]
 
 
-def generate_az_network():
-    # Generate nodes A-Z
-    nodes = []
-    edges = []
-    line_weight_list = []  # Initialize the list to store edge weights
-
-    # Calculate circle layout parameters
-    radius = 300
-    center_x = 350
-    center_y = 350
-    node_count = 26
-
-    # Generate nodes
-    for i, letter in enumerate(string.ascii_uppercase):
-        # Calculate position on a circle for better layout
-        angle = (2 * math.pi * i) / node_count
-        x = center_x + radius * math.cos(angle)
-        y = center_y + radius * math.sin(angle)
-        # Generate random RGB color
-        # random from rgb_color_list
-        node_color = random.choice(rgb_color_list)
-
-        nodes.append(
-            {
-                "data": {
-                    "id": letter,
-                    "label": letter,
-                    "size": random.randint(1, 3) * 30,
-                    "color": node_color,  # Add random color here
-                },
-                "position": {"x": x, "y": y},
-            }
-        )
-
-    # Generate edges between all nodes
-    for i, letter1 in enumerate(string.ascii_uppercase):
-        edge_color = random.choice(rgb_color_list)
-
-        for letter2 in string.ascii_uppercase[i + 1 :]:
-            current_weight = random.randint(50, 199)
-            line_weight_list.append(current_weight)  # Collect edge weight
-            edges.append(
-                {
-                    "data": {
-                        "source": letter1,
-                        "target": letter2,
-                        "weight": math.floor(current_weight / 50) * 5,
-                        "raw_weight": current_weight,
-                        "color": edge_color,
-                    }
-                }
-            )
-
-    return nodes + edges, line_weight_list  # Return the list of weights
-
-
 def generate_network_from_real_data(data_list, selected_checklist_values=None):
     """
     data_list: list of dicts, each dict contains:
@@ -274,94 +218,14 @@ def generate_network_from_real_data(data_list, selected_checklist_values=None):
     return nodes + edges, line_weight_list
 
 
-# Example data and embedding generation
-example_data = [
-    # Operation risks
-    {
-        "risk": "System outage",
-        "risk_desc": "Unexpected downtime of critical systems.",
-    },
-    {
-        "risk": "Process failure",
-        "risk_desc": "Breakdown in internal processes affecting operations.",
-    },
-    {
-        "risk": "Supply chain disruption",
-        "risk_desc": "Delays or interruptions in the supply chain.",
-    },
-    # Strategic risks
-    {
-        "risk": "Mergers gone wrong",
-        "risk_desc": "Failed integration after a merger or acquisition.",
-    },
-    {
-        "risk": "Innovation failure",
-        "risk_desc": "Inability to keep up with technological advancements.",
-    },
-    {
-        "risk": "Reputation damage",
-        "risk_desc": "Negative publicity affecting brand value.",
-    },
-    # Market risks
-    {
-        "risk": "Interest rate fluctuation",
-        "risk_desc": "Changes in interest rates impacting profitability.",
-    },
-    {
-        "risk": "Currency volatility",
-        "risk_desc": "Losses due to changes in foreign exchange rates.",
-    },
-    {
-        "risk": "Market demand shift",
-        "risk_desc": "Sudden changes in customer preferences.",
-    },
-    # Compliance risks
-    {
-        "risk": "Regulatory breach",
-        "risk_desc": "Violation of industry regulations.",
-    },
-    {
-        "risk": "Data privacy violation",
-        "risk_desc": "Failure to protect customer data as per laws.",
-    },
-    {
-        "risk": "Reporting error",
-        "risk_desc": "Incorrect financial or operational reporting.",
-    },
-]
-
-# example_data.save to pickle file
 import pickle
 import os
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
-# file_path = f"{dir_path}/example_data.pkl"
-
-# if not os.path.exists(file_path):
-#     from sentence_transformers import SentenceTransformer
-
-#     # Load local embedding model
-#     embedder = SentenceTransformer("all-MiniLM-L6-v2")
-
-#     # Generate embeddings for risks and risk_descs
-#     for item in example_data:
-#         item["embedding_risk"] = embedder.encode(item["risk"])
-#         item["embedding_risk_desc"] = embedder.encode(item["risk_desc"])
-
-#     # Save the data to a pickle file
-#     with open(file_path, "wb") as f:
-#         pickle.dump(example_data, f)
-# else:
-#     # Load the data from the pickle file
-#     with open(file_path, "rb") as f:
-#         example_data = pickle.load(f)
 
 real_data_path = f"{dir_path}/company_risk_data_with_embedding.pkl"
 real_data = pickle.load(open(real_data_path, "rb"))
 
-
-# Use the real data network generator
-# elements, line_weights = generate_network_from_real_data(example_data)
 
 print(f"{real_data[0].keys()=}")
 # Extract unique company names from real_data
@@ -372,20 +236,91 @@ default_company = companys[0] if companys else None
 
 
 # Initial elements for the default company
-def get_elements_for_company(company):
+def get_elements_for_company(company, selected_checklist_values):
     filtered = [item for item in real_data if item["company"] == company]
     if filtered:
-        return generate_network_from_real_data(filtered)
+        return generate_network_from_real_data(filtered, selected_checklist_values)
     else:
         return [], []
 
+# New function to filter elements by weight and recalculate edge properties
+def filter_elements_by_weight_and_recalculate_edges(elements, slider_value, edge_rgb_color_list):
+    node_edge_counter = Counter()
+    filtered_elements = []
+    old_line_weights = []
 
-elements, line_weights = get_elements_for_company(default_company)
+    # First pass: Filter edges and collect raw weights of visible edges
+    for el in elements:
+        if "source" in el.get("data", {}):
+            if el["data"]["raw_weight"] >= slider_value:
+                # Append edge for now, will update properties in second pass
+                filtered_elements.append(el)
+                node_edge_counter["edge"] += 1
+                old_line_weights.append(el["data"]["raw_weight"])
+        else:
+            # Keep all nodes
+            filtered_elements.append(el)
+            node_edge_counter["node"] += 1
+
+    # Recalculate edge boundaries and update edge properties for visible edges
+    if old_line_weights:
+        edge_boudaries = find_proportional_count_boundaries(old_line_weights, [60, 30, 10])
+        for el in filtered_elements:
+            if "source" in el.get("data", {}):
+                old_line_weight = el["data"]["raw_weight"]
+                level = get_level_from_boundaries(edge_boudaries, old_line_weight)
+                display_weight = level * EDGE_SIZE_MULTIPLIER
+                el["data"]["color"] = edge_rgb_color_list[level - 1]
+                el["data"]["weight"] = display_weight
+
+    return filtered_elements, node_edge_counter
+
+# New function to generate dynamic stylesheet
+def generate_dynamic_stylesheet(
+    bezier_stylesheet,
+    bezier_step_size,
+    bezier_weight,
+    node_highlight_selector_risk_level1,
+    node_highlight_selector_risk_level2,
+    node_highlight_selector_risk_level3,
+    node_highlight_selector_risk_level4,
+):
+    dynamic_bezier_stylesheet = [
+        {
+            "selector": "node",
+            "style": bezier_stylesheet[0]["style"],
+        },
+        node_highlight_selector_risk_level1,
+        node_highlight_selector_risk_level2,
+        node_highlight_selector_risk_level3,
+        node_highlight_selector_risk_level4,
+        {
+            "selector": "edge",
+            "style": {
+                "curve-style": "unbundled-bezier",
+                "control-point-step-size": bezier_step_size,
+                "control-point-weight": bezier_weight,
+                "opacity": 0.6,
+                "line-color": "data(color)",
+                "width": "mapData(weight, 0, 20, 1, 8)",
+                "overlay-padding": "3px",
+                "content": "data(weight)",
+                "font-size": "0px",
+                "text-valign": "center",
+                "text-halign": "center",
+            },
+        },
+    ]
+    return dynamic_bezier_stylesheet
+
+
+elements, line_weights = get_elements_for_company(default_company, []) # Initial call with empty checklist
+
 
 app = dash.Dash(__name__, url_base_pathname="/plot_network/")
 
 # Generate elements and line weights
-# elements, line_weights = generate_az_network()
+
 
 # Calculate slider range
 if line_weights:  # Ensure list is not empty
@@ -622,9 +557,9 @@ app.layout = html.Div(
         html.Div(
             cyto.Cytoscape(
                 id="cytospace",
-                elements=elements,
+                elements=elements, # Use initial elements
                 layout={"name": layout_list[0]},
-                stylesheet=bezier_stylesheet,
+                stylesheet=bezier_stylesheet, # Use initial stylesheet
                 # stylesheet=round_segment_stylesheet,
                 style={
                     "width": "100%",
@@ -688,25 +623,19 @@ def update_graph_and_output(
     bezier_weight,
     selected_checklist_values,
 ):
-    filtered_data = [item for item in real_data if item["company"] == company]
-    elements, line_weights = generate_network_from_real_data(
-        filtered_data, selected_checklist_values
+    # Regenerate elements based on company and checklist selection
+    elements, line_weights = get_elements_for_company(
+        company, selected_checklist_values
     )
-    # save_file_path = f"network_{company}_{selected_checklist_values}_{slider_value}.pkl"
-    # data = {
-    #     "elements": elements,
-    #     "line_weights": line_weights,
-    # }
 
-    # with open(save_file_path, "wb") as f:
-    #     pickle.dump(data, f)
-    # Calculate slider range
+    # Calculate slider range based on the newly generated line weights
     if line_weights:
         min_weight = min(line_weights)
         max_weight = max(line_weights)
         weight_diff = max_weight - min_weight
         slider_min = min_weight - 0.25 * weight_diff
         slider_max = max_weight + 0.25 * weight_diff
+        # Ensure slider value is within the new range, default to min if not
         if slider_value is None or not (slider_min <= slider_value <= slider_max):
             slider_value = min_weight
         marks = {
@@ -718,54 +647,40 @@ def update_graph_and_output(
         slider_max = 10
         slider_value = 5
         marks = {i: str(i) for i in range(0, 11, 2)}
-    node_edge_counter = Counter()
-    filtered_elements = []
-    old_line_weights = []
-    for el in elements:
-        if "source" in el.get("data", {}):
-            if el["data"]["raw_weight"] >= slider_value:
-                filtered_elements.append(el)
-                node_edge_counter["edge"] += 1
-                old_line_weights.append(el["data"]["raw_weight"])
 
-        else:
-            filtered_elements.append(el)
-            node_edge_counter["node"] += 1
-    edge_boudaries = find_proportional_count_boundaries(old_line_weights, [60, 30, 10])
-    for el in elements:
-        if "source" in el.get("data", {}):
-            if el["data"]["raw_weight"] >= slider_value:
-                filtered_elements.append(el)
-                old_line_weight = el["data"]["raw_weight"]
-                level = get_level_from_boundaries(edge_boudaries, old_line_weight)
-                display_weight = level * EDGE_SIZE_MULTIPLIER
-                el["data"]["color"] = edge_rgb_color_list[level - 1]
-                el["data"]["weight"] = display_weight
+    # Filter elements based on the current slider value and recalculate edge properties
+    filtered_elements, node_edge_counter = filter_elements_by_weight_and_recalculate_edges(
+        elements, slider_value, edge_rgb_color_list
+    )
 
-        else:
-            filtered_elements.append(el)
     output_text = f"Current threshold: {slider_value:.2f}. Showing edges with weight >= {slider_value:.2f}.\nNode: {node_edge_counter['node']}, Edge: {node_edge_counter['edge']}"
-    # Dynamically update bezier stylesheet with slider values
-    dynamic_bezier_stylesheet = [
-        {
-            "selector": "node",
-            "style": bezier_stylesheet[0]["style"],
-        },
-        # Add this new selector for large nodes
-        node_highlight_selector_risk_level1,
-        node_highlight_selector_risk_level2,
-        node_highlight_selector_risk_level3,
-        node_highlight_selector_risk_level4,
-        {
-            "selector": "edge",
-            "style": {
-                **bezier_stylesheet[1]["style"],
-                "curve-style": "unbundled-bezier",
-                "control-point-step-size": bezier_step_size,
-                "control-point-weight": bezier_weight,
-            },
-        },
-    ]
+
+    # Dynamically update stylesheet based on layout and bezier slider values
+    if layout_name == "unbundled-bezier": # Assuming bezier stylesheet is used with this layout
+         dynamic_stylesheet = generate_dynamic_stylesheet(
+            bezier_stylesheet,
+            bezier_step_size,
+            bezier_weight,
+            node_highlight_selector_risk_level1,
+            node_highlight_selector_risk_level2,
+            node_highlight_selector_risk_level3,
+            node_highlight_selector_risk_level4,
+        )
+    elif layout_name == "segments": # Assuming round_segment stylesheet is used with this layout
+        dynamic_stylesheet = round_segment_stylesheet
+    elif layout_name == "taxi": # Assuming taxi stylesheet is used with this layout
+        dynamic_stylesheet = taxi_stylesheet
+    else: # Default to bezier stylesheet for other layouts or if layout_name is None
+         dynamic_stylesheet = generate_dynamic_stylesheet(
+            bezier_stylesheet,
+            bezier_step_size,
+            bezier_weight,
+            node_highlight_selector_risk_level1,
+            node_highlight_selector_risk_level2,
+            node_highlight_selector_risk_level3,
+            node_highlight_selector_risk_level4,
+        )
+
 
     return (
         filtered_elements,
@@ -775,7 +690,7 @@ def update_graph_and_output(
         slider_value,
         marks,
         {"name": layout_name},
-        dynamic_bezier_stylesheet,
+        dynamic_stylesheet,
     )
 
 
