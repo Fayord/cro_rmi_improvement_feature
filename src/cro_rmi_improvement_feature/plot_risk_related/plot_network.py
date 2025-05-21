@@ -215,7 +215,8 @@ def generate_network_from_real_data(data_list, selected_checklist_values=None):
             }
         )
     print(f"{node_size_counter=}")
-    return nodes + edges, line_weight_list
+    # Return nodes, edges, line_weight_list, and total number of edges
+    return nodes + edges, line_weight_list, len(edges)
 
 
 import pickle
@@ -239,16 +240,23 @@ default_company = companys[0] if companys else None
 def get_elements_for_company(company, selected_checklist_values):
     filtered = [item for item in real_data if item["company"] == company]
     if filtered:
-        return generate_network_from_real_data(filtered, selected_checklist_values)
+        # Capture total_edges from the return value
+        elements, line_weights, total_edges = generate_network_from_real_data(
+            filtered, selected_checklist_values
+        )
+        return elements, line_weights, total_edges
     else:
-        return [], []
+        return [], [], 0  # Return 0 total edges if no data
+
 
 # New function to filter elements by weight and recalculate edge properties
-def filter_elements_by_weight_and_recalculate_edges(elements, slider_value, edge_rgb_color_list):
+def filter_elements_by_weight_and_recalculate_edges(
+    elements, slider_value, edge_rgb_color_list
+):
     node_edge_counter = Counter()
     filtered_elements = []
     old_line_weights = []
-    nodes_in_filtered = {} # Store nodes for easy access
+    nodes_in_filtered = {}  # Store nodes for easy access
 
     # First pass: Filter edges and collect raw weights of visible edges
     for el in elements:
@@ -266,14 +274,18 @@ def filter_elements_by_weight_and_recalculate_edges(elements, slider_value, edge
 
     # Recalculate edge boundaries and update edge properties for visible edges
     if old_line_weights:
-        edge_boudaries = find_proportional_count_boundaries(old_line_weights, [60, 30, 10])
+        edge_boudaries = find_proportional_count_boundaries(
+            old_line_weights, [60, 30, 10]
+        )
         for el in filtered_elements:
             if "source" in el.get("data", {}):
                 old_line_weight = el["data"]["raw_weight"]
                 level = get_level_from_boundaries(edge_boudaries, old_line_weight)
                 display_weight = level * EDGE_SIZE_MULTIPLIER
                 el["data"]["color"] = edge_rgb_color_list[level - 1]
-                el["data"]["weight"] = display_weight # Update edge weight to display weight
+                el["data"][
+                    "weight"
+                ] = display_weight  # Update edge weight to display weight
 
     # --- New logic to recalculate node raw_size based on filtered edge display weights ---
     # Initialize node raw sizes based on filtered edges
@@ -291,15 +303,19 @@ def filter_elements_by_weight_and_recalculate_edges(elements, slider_value, edge
                 node_raw_sizes[tgt_id] += w
 
     # Get the list of raw sizes in the same order as nodes were added to filtered_elements
-    current_node_raw_sizes = [node_raw_sizes[el["data"]["id"]] for el in filtered_elements if "source" not in el.get("data", {})]
+    current_node_raw_sizes = [
+        node_raw_sizes[el["data"]["id"]]
+        for el in filtered_elements
+        if "source" not in el.get("data", {})
+    ]
 
     # Recalculate node boundaries and update node sizes for visible nodes
     if current_node_raw_sizes:
         # Assuming node_proportion_list and node_size_list are accessible in this scope
         # (They are defined globally in the provided context)
-        node_proportion_list = [65, 30, 5] # Define or ensure access to these
-        node_size_list = [1, 50, 120] # Define or ensure access to these
-        number_of_scales = len(node_proportion_list) # Or len(node_size_list)
+        node_proportion_list = [65, 30, 5]  # Define or ensure access to these
+        node_size_list = [1, 50, 120]  # Define or ensure access to these
+        number_of_scales = len(node_proportion_list)  # Or len(node_size_list)
 
         node_boudaries = find_proportional_count_boundaries(
             current_node_raw_sizes, node_proportion_list
@@ -311,12 +327,12 @@ def filter_elements_by_weight_and_recalculate_edges(elements, slider_value, edge
                 raw_size = current_node_raw_sizes[node_idx]
                 level = get_level_from_boundaries(node_boudaries, raw_size)
                 display_size = node_size_list[level - 1]
-                el["data"]["size"] = display_size # Update node size to display size
+                el["data"]["size"] = display_size  # Update node size to display size
                 node_idx += 1
     # --- End of new logic ---
 
-
     return filtered_elements, node_edge_counter
+
 
 # New function to generate dynamic stylesheet
 def generate_dynamic_stylesheet(
@@ -357,7 +373,10 @@ def generate_dynamic_stylesheet(
     return dynamic_bezier_stylesheet
 
 
-elements, line_weights = get_elements_for_company(default_company, []) # Initial call with empty checklist
+# Capture total_edges in the initial call
+elements, line_weights, total_edges = get_elements_for_company(
+    default_company, []
+)  # Initial call with empty checklist
 
 
 app = dash.Dash(__name__, url_base_pathname="/plot_network/")
@@ -365,20 +384,20 @@ app = dash.Dash(__name__, url_base_pathname="/plot_network/")
 # Generate elements and line weights
 
 
-# Calculate slider range
-if line_weights:  # Ensure list is not empty
-    min_weight = min(line_weights)
-    max_weight = max(line_weights)
-    weight_diff = max_weight - min_weight
-    slider_min = min_weight - 0.25 * weight_diff
-    slider_max = max_weight + 0.25 * weight_diff
-    initial_slider_value = (
-        5 * max_weight + min_weight
-    ) / 6  # Or any other appropriate initial value
-else:  # Default values if no weights (e.g., no edges)
-    slider_min = 0
-    slider_max = 10
-    initial_slider_value = 5
+# Calculate slider range (This is for the old weight slider, can be removed or ignored)
+# if line_weights:  # Ensure list is not empty
+#     min_weight = min(line_weights)
+#     max_weight = max(line_weights)
+#     weight_diff = max_weight - min_weight
+#     slider_min = min_weight - 0.25 * weight_diff
+#     slider_max = max_weight + 0.25 * weight_diff
+#     initial_slider_value = (
+#         5 * max_weight + min_weight
+#     ) / 6  # Or any other appropriate initial value
+# else:  # Default values if no weights (e.g., no edges)
+#     slider_min = 0
+#     slider_max = 10
+#     initial_slider_value = 5
 
 
 default_stylesheet = [
@@ -585,24 +604,42 @@ app.layout = html.Div(
         ),
         html.Div(id="checklist-output-container"),
         html.Hr(),
-        dcc.Slider(
-            id="weight-slider",
-            min=slider_min,
-            max=slider_max,
-            value=initial_slider_value,
-            step=1,
-            marks={
-                i: str(i)
-                for i in range(math.ceil(slider_min), math.floor(slider_max) + 1, 10)
-            },
+        # --- New slider for selecting number of edges ---
+        html.Div(
+            [
+                html.Label("Number of Edges to Display"),
+                dcc.Slider(
+                    id="num-edges-slider",  # Changed ID
+                    min=0,
+                    max=total_edges,  # Set max to total edges
+                    step=1,
+                    value=total_edges,  # Default to showing all edges
+                    # Marks will be generated dynamically in the callback
+                    # marks={i: str(i) for i in range(0, total_edges + 1, max(1, total_edges // 10))},
+                    tooltip={"placement": "bottom", "always_visible": False},
+                ),
+            ],
+            style={"margin-bottom": "20px"},
         ),
+        # Removed the old weight-slider
+        # dcc.Slider(
+        #     id="weight-slider",
+        #     min=slider_min,
+        #     max=slider_max,
+        #     value=initial_slider_value,
+        #     step=1,
+        #     marks={
+        #         i: str(i)
+        #         for i in range(math.ceil(slider_min), math.floor(slider_max) + 1, 10)
+        #     },
+        # ),
         html.Div(id="slider-output-container"),
         html.Div(
             cyto.Cytoscape(
                 id="cytospace",
-                elements=elements, # Use initial elements
+                elements=elements,  # Use initial elements
                 layout={"name": layout_list[0]},
-                stylesheet=bezier_stylesheet, # Use initial stylesheet
+                stylesheet=bezier_stylesheet,  # Use initial stylesheet
                 # stylesheet=round_segment_stylesheet,
                 style={
                     "width": "100%",
@@ -642,65 +679,106 @@ def update_checklist_output(selected_values):
     [
         Output("cytospace", "elements"),
         Output("slider-output-container", "children"),
-        Output("weight-slider", "min"),
-        Output("weight-slider", "max"),
-        Output("weight-slider", "value"),
-        Output("weight-slider", "marks"),
+        # Removed outputs for the old weight-slider
+        # Output("weight-slider", "min"),
+        # Output("weight-slider", "max"),
+        # Output("weight-slider", "value"),
+        # Output("weight-slider", "marks"),
+        # Add outputs for the new number of edges slider
+        Output("num-edges-slider", "min"),
+        Output("num-edges-slider", "max"),
+        Output("num-edges-slider", "value"),
+        Output("num-edges-slider", "marks"),
         Output("cytospace", "layout"),
         Output("cytospace", "stylesheet"),
     ],
     [
         Input("company-dropdown", "value"),
-        Input("weight-slider", "value"),
+        # Removed input for the old weight-slider
+        # Input("weight-slider", "value"),
         Input("layout-dropdown", "value"),
         Input("bezier-step-size-slider", "value"),
         Input("bezier-weight-slider", "value"),
-        Input("filter-checklist", "value"),  # <-- Add this line
+        Input("filter-checklist", "value"),
+        Input("num-edges-slider", "value"),  # <-- Add input for the new slider
     ],
 )
 def update_graph_and_output(
     company,
-    slider_value,
+    # Removed slider_value input
+    # slider_value,
     layout_name,
     bezier_step_size,
     bezier_weight,
     selected_checklist_values,
+    num_edges_to_show,  # <-- Add input parameter for the new slider value
 ):
     # Regenerate elements based on company and checklist selection
-    elements, line_weights = get_elements_for_company(
+    elements, line_weights, total_edges = get_elements_for_company(
         company, selected_checklist_values
     )
 
-    # Calculate slider range based on the newly generated line weights
-    if line_weights:
-        min_weight = min(line_weights)
-        max_weight = max(line_weights)
-        weight_diff = max_weight - min_weight
-        slider_min = min_weight - 0.25 * weight_diff
-        slider_max = max_weight + 0.25 * weight_diff
-        # Ensure slider value is within the new range, default to min if not
-        if slider_value is None or not (slider_min <= slider_value <= slider_max):
-            slider_value = min_weight
-        marks = {
-            i: str(i)
-            for i in range(math.ceil(slider_min), math.floor(slider_max) + 1, 10)
-        }
+    # --- New logic to calculate slider_value (weight threshold) based on num_edges_to_show ---
+    if total_edges == 0:
+        # No edges, threshold doesn't matter for filtering, but set a high value
+        slider_value = float("inf")
+        current_num_edges_shown = 0
     else:
-        slider_min = 0
-        slider_max = 10
-        slider_value = 5
-        marks = {i: str(i) for i in range(0, 11, 2)}
+        # Ensure num_edges_to_show is within the valid range [0, total_edges]
+        num_edges_to_show = max(0, min(total_edges, num_edges_to_show))
 
-    # Filter elements based on the current slider value and recalculate edge properties
-    filtered_elements, node_edge_counter = filter_elements_by_weight_and_recalculate_edges(
-        elements, slider_value, edge_rgb_color_list
+        if num_edges_to_show == 0:
+            # If showing 0 edges, set threshold higher than max weight
+            slider_value = max(line_weights) + 1 if line_weights else float("inf")
+        elif num_edges_to_show == total_edges:
+            # If showing all edges, set threshold lower than min weight
+            slider_value = min(line_weights) - 1 if line_weights else float("-inf")
+        else:
+            # Sort weights descending and find the weight at the index corresponding to the number of edges
+            sorted_weights = sorted(line_weights, reverse=True)
+            # The threshold is the weight of the (num_edges_to_show)-th edge (0-indexed)
+            slider_value = sorted_weights[num_edges_to_show - 1]
+        current_num_edges_shown = (
+            num_edges_to_show  # The number of edges we intend to show
+        )
+
+    # Calculate min, max, value, and marks for the new number of edges slider
+    num_edges_slider_min = 0
+    num_edges_slider_max = total_edges
+    # If the current num_edges_to_show is outside the new range, reset it to the max (show all)
+    if num_edges_to_show is None or not (
+        num_edges_slider_min <= num_edges_to_show <= num_edges_slider_max
+    ):
+        num_edges_slider_value = total_edges
+    else:
+        num_edges_slider_value = num_edges_to_show
+
+    # Generate marks for the number of edges slider
+    if total_edges > 0:
+        # Create marks every 10% of the total edges, or at least every 10 edges, or just 0 and max if small
+        step = max(1, total_edges // 10)
+        marks = {i: str(i) for i in range(0, total_edges + 1, step)}
+        # Ensure 0 and total_edges are always included in marks
+        marks[0] = "0"
+        marks[total_edges] = str(total_edges)
+    else:
+        marks = {0: "0"}
+
+    # Filter elements based on the calculated slider value and recalculate edge properties
+    filtered_elements, node_edge_counter = (
+        filter_elements_by_weight_and_recalculate_edges(
+            elements, slider_value, edge_rgb_color_list
+        )
     )
 
-    output_text = f"Current threshold: {slider_value:.2f}. Showing edges with weight >= {slider_value:.2f}.\nNode: {node_edge_counter['node']}, Edge: {node_edge_counter['edge']}"
+    # Update output text to reflect the number of edges shown and the threshold
+    output_text = f"Showing {node_edge_counter['edge']} out of {total_edges} edges. Threshold weight: {slider_value:.2f}. Nodes: {node_edge_counter['node']}"
 
     # Dynamically update stylesheet based on layout and bezier slider values
-    if layout_name == "unbundled-bezier": # Assuming bezier stylesheet is used with this layout
-         dynamic_stylesheet = generate_dynamic_stylesheet(
+    if (
+        layout_name == "unbundled-bezier"
+    ):  # Assuming bezier stylesheet is used with this layout
+        dynamic_stylesheet = generate_dynamic_stylesheet(
             bezier_stylesheet,
             bezier_step_size,
             bezier_weight,
@@ -709,12 +787,14 @@ def update_graph_and_output(
             node_highlight_selector_risk_level3,
             node_highlight_selector_risk_level4,
         )
-    elif layout_name == "segments": # Assuming round_segment stylesheet is used with this layout
+    elif (
+        layout_name == "segments"
+    ):  # Assuming round_segment stylesheet is used with this layout
         dynamic_stylesheet = round_segment_stylesheet
-    elif layout_name == "taxi": # Assuming taxi stylesheet is used with this layout
+    elif layout_name == "taxi":  # Assuming taxi stylesheet is used with this layout
         dynamic_stylesheet = taxi_stylesheet
-    else: # Default to bezier stylesheet for other layouts or if layout_name is None
-         dynamic_stylesheet = generate_dynamic_stylesheet(
+    else:  # Default to bezier stylesheet for other layouts or if layout_name is None
+        dynamic_stylesheet = generate_dynamic_stylesheet(
             bezier_stylesheet,
             bezier_step_size,
             bezier_weight,
@@ -723,14 +803,19 @@ def update_graph_and_output(
             node_highlight_selector_risk_level3,
             node_highlight_selector_risk_level4,
         )
-
 
     return (
         filtered_elements,
         output_text,
-        slider_min,
-        slider_max,
-        slider_value,
+        # Removed outputs for the old weight-slider
+        # slider_min,
+        # slider_max,
+        # slider_value,
+        # marks,
+        # Add outputs for the new number of edges slider
+        num_edges_slider_min,
+        num_edges_slider_max,
+        num_edges_slider_value,
         marks,
         {"name": layout_name},
         dynamic_stylesheet,
