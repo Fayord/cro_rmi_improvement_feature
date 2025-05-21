@@ -224,7 +224,7 @@ import os
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
-real_data_path = f"{dir_path}/company_risk_data_with_embedding.pkl"
+real_data_path = f"{dir_path}/250520-company_risk_data_with_embedding.pkl"
 real_data = pickle.load(open(real_data_path, "rb"))
 
 
@@ -308,7 +308,7 @@ def filter_elements_by_weight_and_recalculate_edges(
         for el in filtered_elements
         if "source" not in el.get("data", {})
     ]
-
+    node_size_counter = Counter()
     # Recalculate node boundaries and update node sizes for visible nodes
     if current_node_raw_sizes:
         # Assuming node_proportion_list and node_size_list are accessible in this scope
@@ -327,10 +327,11 @@ def filter_elements_by_weight_and_recalculate_edges(
                 raw_size = current_node_raw_sizes[node_idx]
                 level = get_level_from_boundaries(node_boudaries, raw_size)
                 display_size = node_size_list[level - 1]
+                node_size_counter[level] += 1
                 el["data"]["size"] = display_size  # Update node size to display size
                 node_idx += 1
     # --- End of new logic ---
-
+    print(f"{node_size_counter=}")
     return filtered_elements, node_edge_counter
 
 
