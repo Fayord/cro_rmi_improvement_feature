@@ -654,6 +654,46 @@ app.layout = html.Div(
                 "padding": "10px",
             },
         ),
+        # --- Moved dropdown for selecting a node below the main plot ---
+        html.Div(
+            [
+                html.Label("Select a Node"),
+                dcc.Dropdown(
+                    id="node-dropdown",
+                    options=[],  # Options will be populated by callback
+                    value=None,
+                    clearable=True,
+                    placeholder="Select a node...",
+                    style={"width": "400px"},
+                ),
+            ],
+            style={
+                "margin": "20px",
+                "padding": "10px",
+            },  # Added margin/padding for spacing
+        ),
+        # --- New Div for displaying selected node info and secondary plot ---
+        html.Div(id="selected-node-info"),  # Text output for primary/secondary nodes
+        html.Div(
+            cyto.Cytoscape(
+                id="subgraph-cytospace",  # New ID for the secondary plot
+                elements=[],  # Initially empty
+                layout={"name": "cose"},  # Use a standard layout for the subgraph
+                stylesheet=bezier_stylesheet,  # Can reuse or define a new stylesheet
+                style={
+                    "width": "100%",
+                    "height": "40vh",  # Smaller height for the subgraph
+                    "border": "2px solid #ccc",
+                    "border-radius": "8px",
+                    "box-shadow": "0 4px 6px rgba(0, 0, 0, 0.1)",
+                    "margin-top": "20px",  # Add space above the subgraph
+                },
+            ),
+            style={
+                "margin": "20px",
+                "padding": "10px",
+            },
+        ),
     ]
 )
 
@@ -689,6 +729,8 @@ def update_checklist_output(selected_values):
         Output("num-edges-slider", "max"),
         Output("num-edges-slider", "value"),
         Output("num-edges-slider", "marks"),
+        # Add output for the node dropdown options
+        Output("node-dropdown", "options"),
         Output("cytospace", "layout"),
         Output("cytospace", "stylesheet"),
     ],
@@ -771,6 +813,21 @@ def update_graph_and_output(
         )
     )
 
+    # --- Generate options for the node dropdown ---
+    node_options = []
+    # Iterate through filtered_elements to find nodes
+    for el in filtered_elements:
+        if "source" not in el.get("data", {}):  # Check if it's a node
+            node_options.append(
+                {
+                    "label": el["data"].get(
+                        "label", el["data"]["id"]
+                    ),  # Use label if available, otherwise id
+                    "value": el["data"]["id"],
+                }
+            )
+    # --- End of node dropdown options generation ---
+
     # Update output text to reflect the number of edges shown and the threshold
     output_text = f"Showing {node_edge_counter['edge']} out of {total_edges} edges. Threshold weight: {slider_value:.2f}. Nodes: {node_edge_counter['node']}"
 
@@ -817,9 +874,200 @@ def update_graph_and_output(
         num_edges_slider_max,
         num_edges_slider_value,
         marks,
+        # Return node options
+        node_options,
         {"name": layout_name},
         dynamic_stylesheet,
     )
+
+
+# --- Helper function to find primary and secondary neighbors ---
+def find_neighbors(selected_node_id, all_elements):
+    primary_neighbors = set()
+    secondary_neighbors = set()
+    edges_to_primary = []
+
+    # Find primary neighbors and edges
+    for el in all_elements:
+        if "source" in el.get("data", {}):  # It's an edge
+            source = el["data"]["source"]
+            target = el["data"]["target"]
+            if source == selected_node_id:
+                primary_neighbors.add(target)
+                edges_to_primary.append(el)
+            elif target == selected_node_id:
+                primary_neighbors.add(source)
+                edges_to_primary.append(el)
+
+    # Find secondary neighbors
+    for el in all_elements:
+        if "source" in el.get("data", {}):  # It's an edge
+            source = el["data"]["source"]
+            target = el["data"]["target"]
+            # If the edge connects a primary neighbor to another node
+            if (
+                source in primary_neighbors
+                and target != selected_node_id
+                and target not in primary_neighbors
+            ):
+                secondary_neighbors.add(target)
+            elif (
+                target in primary_neighbors
+                and source != selected_node_id
+                and source not in primary_neighbors
+            ):
+                secondary_neighbors.add(source)
+
+    # Get node elements for selected, primary, and secondary neighbors
+    subgraph_nodes = []
+    all_neighbor_ids = primary_neighbors.union(secondary_neighbors)
+    all_neighbor_ids.add(selected_node_id)  # Include the selected node itself
+
+    for el in all_elements:
+        if "source" not in el.get("data", {}):  # It's a node
+            if el["data"]["id"] in all_neighbor_ids:
+                subgraph_nodes.append(el)
+
+    # Get edges within the subgraph (between selected, primary, and secondary nodes)
+    subgraph_edges = []
+    for el in all_elements:
+        if "source" in el.get("data", {}):  # It's an edge
+            source = el["data"]["source"]
+            target = el["data"]["target"]
+            if source in all_neighbor_ids and target in all_neighbor_ids:
+                subgraph_edges.append(el)
+
+    return (
+        list(primary_neighbors),
+        list(secondary_neighbors),
+        subgraph_nodes + subgraph_edges,
+    )
+
+
+# --- New function to calculate custom pyramid layout positions ---
+def calculate_pyramid_layout(
+    selected_node_id, primary_neighbors, secondary_neighbors, subgraph_elements
+):
+    # Define base positions and spacing
+    center_x = 500
+    top_y = 100
+    primary_y_base = 175
+    secondary_y_base = 250
+    horizontal_spacing = 150
+    vertical_zigzag_offset = 10  # How much to offset vertically for zigzag
+
+    # Create a dictionary to store calculated positions by node ID
+    positions = {}
+
+    # Position the selected node at the top center
+    positions[selected_node_id] = {"x": center_x, "y": top_y}
+
+    # Position primary neighbors
+    num_primary = len(primary_neighbors)
+    if num_primary > 0:
+        # Calculate starting x position to center the primary nodes
+        primary_start_x = center_x - (num_primary - 1) * horizontal_spacing / 2
+        for i, node_id in enumerate(primary_neighbors):
+            x = primary_start_x + i * horizontal_spacing
+            # Apply zigzag vertical offset
+            y = primary_y_base + (vertical_zigzag_offset if i % 2 == 1 else 0)
+            positions[node_id] = {"x": x, "y": y}
+
+    # Position secondary neighbors
+    num_secondary = len(secondary_neighbors)
+    if num_secondary > 0:
+        # Calculate starting x position to center the secondary nodes
+        secondary_start_x = center_x - (num_secondary - 1) * horizontal_spacing / 2
+        for i, node_id in enumerate(secondary_neighbors):
+            x = secondary_start_x + i * horizontal_spacing
+            # Apply zigzag vertical offset (use a different offset or pattern if desired)
+            y = secondary_y_base + (
+                vertical_zigzag_offset if i % 2 == 0 else 0
+            )  # Alternate zigzag pattern
+            positions[node_id] = {"x": x, "y": y}
+
+    # Update the position data for each node in the subgraph elements
+    updated_elements = []
+    for el in subgraph_elements:
+        if "source" not in el.get("data", {}):  # It's a node
+            node_id = el["data"]["id"]
+            if node_id in positions:
+                el["position"] = positions[node_id]
+        updated_elements.append(el)
+
+    return updated_elements
+
+
+# --- New callback to update the subgraph plot and info ---
+@app.callback(
+    [
+        Output("subgraph-cytospace", "elements"),
+        Output("subgraph-cytospace", "layout"),
+        Output("selected-node-info", "children"),
+    ],
+    [
+        Input("node-dropdown", "value"),
+        Input("cytospace", "elements"),  # Get the elements from the main graph
+    ],
+)
+def update_subgraph_and_info(selected_node_id, main_graph_elements):
+    if not selected_node_id or not main_graph_elements:
+        # Return empty graph and info if no node is selected or main graph is empty
+        return [], {"name": "cose"}, ""
+
+    # Find primary and secondary neighbors and the subgraph elements
+    primary_neighbors, secondary_neighbors, subgraph_elements = find_neighbors(
+        selected_node_id, main_graph_elements
+    )
+
+    # --- Create a mapping from node ID to node label from the main graph elements ---
+    node_id_to_label = {}
+    for el in main_graph_elements:
+        if "source" not in el.get("data", {}):  # It's a node
+            node_id_to_label[el["data"]["id"]] = el["data"].get(
+                "label", el["data"]["id"]
+            )  # Use label if available, otherwise id
+    # --- End of mapping creation ---
+
+    # Get labels for primary and secondary neighbors
+    primary_neighbor_labels = [
+        node_id_to_label.get(node_id, node_id) for node_id in primary_neighbors
+    ]
+    secondary_neighbor_labels = [
+        node_id_to_label.get(node_id, node_id) for node_id in secondary_neighbors
+    ]
+
+    # Generate text output using labels
+    info_text = html.Div(
+        [
+            html.H4(
+                f"Selected Node: {node_id_to_label.get(selected_node_id, selected_node_id)} (ID: {selected_node_id})"
+            ),
+            html.P(
+                f"Primary Connections ({len(primary_neighbor_labels)}): {', '.join(primary_neighbor_labels) if primary_neighbor_labels else 'None'}"
+            ),
+            html.P(
+                f"Secondary Connections ({len(secondary_neighbor_labels)}): {', '.join(secondary_neighbor_labels) if secondary_neighbor_labels else 'None'}"
+            ),
+        ],
+        style={
+            "margin": "20px",
+            "padding": "10px",
+            "border": "1px solid #ccc",
+            "border-radius": "8px",
+        },
+    )
+
+    # --- Apply the custom pyramid layout ---
+    subgraph_elements_with_positions = calculate_pyramid_layout(
+        selected_node_id, primary_neighbors, secondary_neighbors, subgraph_elements
+    )
+    # --- End of custom layout application ---
+
+    # For a manually positioned layout, we use the 'preset' layout
+    subgraph_layout = {"name": "preset"}
+
+    return subgraph_elements_with_positions, subgraph_layout, info_text
 
 
 if __name__ == "__main__":
