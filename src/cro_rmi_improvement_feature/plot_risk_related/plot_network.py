@@ -204,9 +204,11 @@ def generate_network_from_real_data(data_list, selected_checklist_values=None):
                     "id": f"risk_{idx}",
                     "label": data["risk"],
                     "raw_size": raw_size,
+                    "size_level": level,
                     "size": display_size,
                     "color": risk_cat_color,
                     "risk_level": data["risk_level"],
+                    "story": data.get("story", ""),
                 },
                 "position": {
                     "x": random.uniform(100, 700),
@@ -376,7 +378,7 @@ def generate_dynamic_stylesheet(
 
 # Capture total_edges in the initial call
 elements, line_weights, total_edges = get_elements_for_company(
-    default_company, []
+    default_company, ["risk_desc"]
 )  # Initial call with empty checklist
 
 
@@ -599,8 +601,8 @@ app.layout = html.Div(
         dcc.Checklist(
             id="filter-checklist",
             options=CHECKLIST_OPTIONS,
-            # value=([CHECKLIST_OPTIONS[0]["value"]] if CHECKLIST_OPTIONS else []),
-            value=([]),
+            value=([CHECKLIST_OPTIONS[0]["value"]] if CHECKLIST_OPTIONS else []),
+            # value=([]),
             inline=True,
         ),
         html.Div(id="checklist-output-container"),
@@ -614,7 +616,9 @@ app.layout = html.Div(
                     min=0,
                     max=total_edges,  # Set max to total edges
                     step=1,
-                    value=total_edges,  # Default to showing all edges
+                    value=math.ceil(
+                        total_edges * 0.10
+                    ),  # Default to 10% of total edges, rounded up
                     # Marks will be generated dynamically in the callback
                     # marks={i: str(i) for i in range(0, total_edges + 1, max(1, total_edges // 10))},
                     tooltip={"placement": "bottom", "always_visible": False},
@@ -1037,20 +1041,33 @@ def update_subgraph_and_info(selected_node_id, main_graph_elements):
     secondary_neighbor_labels = [
         node_id_to_label.get(node_id, node_id) for node_id in secondary_neighbors
     ]
-
+    selected_node_full_data = None
+    for el in elements:
+        if "id" in el.get("data", {}) and el["data"]["id"] == selected_node_id:
+            selected_node_full_data = el["data"]
+            break
     # Generate text output using labels
+    info_text_elements = [
+        html.H4(
+            f"Selected Node: {node_id_to_label.get(selected_node_id, selected_node_id)} (ID: {selected_node_id})"
+        ),
+        html.P(
+            f"Primary Connections ({len(primary_neighbor_labels)}): {', '.join(primary_neighbor_labels) if primary_neighbor_labels else 'None'}"
+        ),
+        html.P(
+            f"Secondary Connections ({len(secondary_neighbor_labels)}): {', '.join(secondary_neighbor_labels) if secondary_neighbor_labels else 'None'}"
+        ),
+    ]
+    print(f"{selected_node_full_data=}")
+
+    # Add the story if it exists and is not empty
+    if selected_node_full_data and "story" in selected_node_full_data:
+        node_story = selected_node_full_data["story"]
+        if node_story:  # Check if the story is not an empty string
+            info_text_elements.append(html.P(f"Story: {node_story}"))
+
     info_text = html.Div(
-        [
-            html.H4(
-                f"Selected Node: {node_id_to_label.get(selected_node_id, selected_node_id)} (ID: {selected_node_id})"
-            ),
-            html.P(
-                f"Primary Connections ({len(primary_neighbor_labels)}): {', '.join(primary_neighbor_labels) if primary_neighbor_labels else 'None'}"
-            ),
-            html.P(
-                f"Secondary Connections ({len(secondary_neighbor_labels)}): {', '.join(secondary_neighbor_labels) if secondary_neighbor_labels else 'None'}"
-            ),
-        ],
+        info_text_elements,
         style={
             "margin": "20px",
             "padding": "10px",
@@ -1058,7 +1075,6 @@ def update_subgraph_and_info(selected_node_id, main_graph_elements):
             "border-radius": "8px",
         },
     )
-
     # --- Apply the custom pyramid layout ---
     subgraph_elements_with_positions = calculate_pyramid_layout(
         selected_node_id, primary_neighbors, secondary_neighbors, subgraph_elements
