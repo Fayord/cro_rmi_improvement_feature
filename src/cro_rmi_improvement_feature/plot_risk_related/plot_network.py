@@ -4,225 +4,37 @@ from dash import html
 from dash import dcc  # Dash Core Components for Slider
 from dash.dependencies import Input, Output  # For callbacks
 import random
-import string
+import pickle
+import os
 import math
 import numpy as np
 from utils import (
-    find_equal_count_boundaries,
     get_level_from_boundaries,
     find_proportional_count_boundaries,
+    get_elements_for_company,
+    generate_dynamic_stylesheet,
+    calculate_pyramid_layout,
+    find_neighbors,
 )
 import argparse
 from collections import Counter
 
-FONT_SIZE = 5
+from plot_network_defaut_value import (
+    EDGE_SIZE_MULTIPLIER,
+    CHECKLIST_OPTIONS,
+    edge_rgb_color_list,
+    node_highlight_selector_risk_level4,
+    node_highlight_selector_risk_level3,
+    node_highlight_selector_risk_level2,
+    node_highlight_selector_risk_level1,
+    layout_list,
+    bezier_stylesheet,
+    round_segment_stylesheet,
+    taxi_stylesheet,
+)
+
 cyto.load_extra_layouts()
-EDGE_SIZE_MULTIPLIER = 2
-CHECKLIST_OPTIONS = [
-    {"label": "risk_desc_label", "value": "risk_desc"},
-    {"label": "rootcause_label", "value": "rootcause"},
-    {"label": "process_label", "value": "process"},
-]
 
-
-node_highlight_selector_risk_level4 = {
-    "selector": "node[risk_level = 4]",
-    "style": {
-        "border-width": "3px",
-        "border-color": "#FF7F7F",  # dim red
-        "border-style": "solid",
-    },
-}
-node_highlight_selector_risk_level3 = {
-    "selector": "node[risk_level = 3]",
-    "style": {
-        "border-width": "3px",
-        "border-color": "#FFB17F",  # dim orange
-        "border-style": "solid",
-    },
-}
-node_highlight_selector_risk_level2 = {
-    "selector": "node[risk_level = 2]",
-    "style": {
-        "border-width": "3px",
-        "border-color": "#FFFF7F",  # dim yellow
-        "border-style": "solid",
-    },
-}
-node_highlight_selector_risk_level1 = {
-    "selector": "node[risk_level = 1]",
-    "style": {
-        "border-width": "3px",
-        "border-color": "#7FFF7F",  # dim green
-        "border-style": "solid",
-    },
-}
-
-
-rgb_color_list = [
-    "rgb(255, 99, 132)",  # Red
-    "rgb(54, 162, 235)",  # Blue
-    "rgb(255, 206, 86)",  # Yellow
-    "rgb(75, 192, 192)",  # Green
-    "rgb(153, 102, 255)",  # Purple
-    "rgb(255, 159, 64)",  # Orange
-    "rgb(201, 203, 207)",  # Grey
-    "rgb(255, 99, 71)",  # Tomato
-    "rgb(60, 179, 113)",  # MediumSeaGreen
-    "rgb(218, 112, 214)",  # Orchid
-    "rgb(0, 255, 255)",  # Aqua
-    "rgb(240, 230, 140)",  # Khaki
-]
-edge_rgb_color_list = [
-    # very light grey
-    "rgb(201, 203, 207)",
-    # light grey
-    # "rgb(211, 211, 211)",
-    # grey
-    "rgb(169, 169, 169)",
-    # dark grey
-    "rgb(128, 128, 128)",
-    # very dark grey
-    "rgb(80, 80, 80)",
-    # black
-    "rgb(0, 0, 0)",
-]
-
-
-def generate_network_from_real_data(data_list, selected_checklist_values=None):
-    """
-    data_list: list of dicts, each dict contains:
-        - "risk": str
-        - "embedding_risk": list or np.array
-        - "risk_desc": str
-        - "embedding_risk_desc": list or np.array
-    """
-    node_size_multiplier = 10
-    number_of_scales = 3
-    node_proportion_list = [65, 30, 5]
-    node_size_counter = Counter()
-    assert len(node_proportion_list) == number_of_scales
-    # node_size_list = [1, 30, 60]
-
-    node_size_list = [1, 50, 120]
-    assert len(node_size_list) == number_of_scales
-    nodes = []
-    edges = []
-    line_weight_list = []
-    # print checkbox value in this function
-    selected_checkbox_value_list = []
-    if selected_checklist_values is None:
-        selected_checklist_values = []
-    for selected_checklist_value in selected_checklist_values:
-        selected_checkbox_value_list.append(selected_checklist_value)
-
-    # Create edges based on embedding distance (Euclidean)
-    # cal the distance between each pair of risks first
-    stored_distances = {}
-    for i in range(len(data_list)):
-        for j in range(i + 1, len(data_list)):
-            emb1 = np.array(
-                data_list[i][
-                    tuple(sorted(["risk", "embedding"] + selected_checkbox_value_list))
-                ]
-            )
-            emb2 = np.array(
-                data_list[j][
-                    tuple(sorted(["risk", "embedding"] + selected_checkbox_value_list))
-                ]
-            )
-            distance = np.linalg.norm(emb1 - emb2)
-            distance = 1 / distance * 100
-            line_weight_list.append(distance)
-            stored_distances[(i, j)] = distance
-
-    min_dist = min(line_weight_list)
-    max_dist = max(line_weight_list)
-    avg_dist = np.mean(line_weight_list)
-    print(f"{avg_dist=}")
-
-    edge_boudaries = find_equal_count_boundaries(line_weight_list, number_of_scales)
-    # then create edges
-    for i in range(len(data_list)):
-        for j in range(i + 1, len(data_list)):
-            raw_weight = stored_distances[(i, j)]
-            # display_weight is seperated into 3 scales based on the min_dist and max_dist
-            level = get_level_from_boundaries(edge_boudaries, raw_weight)
-            display_weight = level * EDGE_SIZE_MULTIPLIER
-            edge_color = edge_rgb_color_list[level - 1]
-            edges.append(
-                {
-                    "data": {
-                        "source": f"risk_{i}",
-                        "target": f"risk_{j}",
-                        "weight": display_weight,
-                        "raw_weight": raw_weight,
-                        "color": edge_color,
-                    }
-                }
-            )
-
-    # Calculate raw_size for each node (sum of all connected edge weights)
-    node_raw_sizes = [0.0 for _ in range(len(data_list))]
-
-    for edge in edges:
-        src = int(edge["data"]["source"].split("_")[1])
-        tgt = int(edge["data"]["target"].split("_")[1])
-        w = edge["data"]["raw_weight"]
-        node_raw_sizes[src] += w
-        node_raw_sizes[tgt] += w
-
-    node_boudaries = find_proportional_count_boundaries(
-        node_raw_sizes, node_proportion_list
-    )
-    # Scale node sizes for display (between 20 and 100)
-    min_raw = min(node_raw_sizes)
-    max_raw = max(node_raw_sizes)
-
-    def scale_size(raw):
-        if max_raw == min_raw:
-            return 60  # fallback if all are equal
-        return 20 + (raw - min_raw) / (max_raw - min_raw) * (100 - 20)
-
-    all_risk_cat = []
-    for data in data_list:
-        risk_cat = data["risk_cat"]
-        if risk_cat not in all_risk_cat:
-            all_risk_cat.append(risk_cat)
-    all_risk_cat.sort()
-    # Create nodes for each risk
-    for idx, data in enumerate(data_list):
-        raw_size = node_raw_sizes[idx]
-        level = get_level_from_boundaries(node_boudaries, raw_size)
-        node_size_counter[level] += 1
-        display_size = node_size_list[level - 1]
-        risk_cat = data["risk_cat"]
-        risk_cat_color = rgb_color_list[all_risk_cat.index(risk_cat)]
-        nodes.append(
-            {
-                "data": {
-                    "id": f"risk_{idx}",
-                    "label": data["risk"],
-                    "raw_size": raw_size,
-                    "size_level": level,
-                    "size": display_size,
-                    "color": risk_cat_color,
-                    "risk_level": data["risk_level"],
-                    "story": data.get("story", ""),
-                },
-                "position": {
-                    "x": random.uniform(100, 700),
-                    "y": random.uniform(100, 700),
-                },
-            }
-        )
-    print(f"{node_size_counter=}")
-    # Return nodes, edges, line_weight_list, and total number of edges
-    return nodes + edges, line_weight_list, len(edges)
-
-
-import pickle
-import os
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
@@ -236,19 +48,6 @@ companys = sorted({item["company"] for item in real_data})
 
 # Set default company
 default_company = companys[0] if companys else None
-
-
-# Initial elements for the default company
-def get_elements_for_company(company, selected_checklist_values):
-    filtered = [item for item in real_data if item["company"] == company]
-    if filtered:
-        # Capture total_edges from the return value
-        elements, line_weights, total_edges = generate_network_from_real_data(
-            filtered, selected_checklist_values
-        )
-        return elements, line_weights, total_edges
-    else:
-        return [], [], 0  # Return 0 total edges if no data
 
 
 # New function to filter elements by weight and recalculate edge properties
@@ -337,224 +136,14 @@ def filter_elements_by_weight_and_recalculate_edges(
     return filtered_elements, node_edge_counter
 
 
-# New function to generate dynamic stylesheet
-def generate_dynamic_stylesheet(
-    bezier_stylesheet,
-    bezier_step_size,
-    bezier_weight,
-    node_highlight_selector_risk_level1,
-    node_highlight_selector_risk_level2,
-    node_highlight_selector_risk_level3,
-    node_highlight_selector_risk_level4,
-):
-    dynamic_bezier_stylesheet = [
-        {
-            "selector": "node",
-            "style": bezier_stylesheet[0]["style"],
-        },
-        node_highlight_selector_risk_level1,
-        node_highlight_selector_risk_level2,
-        node_highlight_selector_risk_level3,
-        node_highlight_selector_risk_level4,
-        {
-            "selector": "edge",
-            "style": {
-                "curve-style": "unbundled-bezier",
-                "control-point-step-size": bezier_step_size,
-                "control-point-weight": bezier_weight,
-                "opacity": 0.6,
-                "line-color": "data(color)",
-                "width": "mapData(weight, 0, 20, 1, 8)",
-                "overlay-padding": "3px",
-                "content": "data(weight)",
-                "font-size": "0px",
-                "text-valign": "center",
-                "text-halign": "center",
-            },
-        },
-    ]
-    return dynamic_bezier_stylesheet
-
-
 # Capture total_edges in the initial call
 elements, line_weights, total_edges = get_elements_for_company(
-    default_company, ["risk_desc"]
+    real_data, default_company, ["risk_desc"]
 )  # Initial call with empty checklist
 
 
 app = dash.Dash(__name__, url_base_pathname="/plot_network/")
 
-# Generate elements and line weights
-
-
-# Calculate slider range (This is for the old weight slider, can be removed or ignored)
-# if line_weights:  # Ensure list is not empty
-#     min_weight = min(line_weights)
-#     max_weight = max(line_weights)
-#     weight_diff = max_weight - min_weight
-#     slider_min = min_weight - 0.25 * weight_diff
-#     slider_max = max_weight + 0.25 * weight_diff
-#     initial_slider_value = (
-#         5 * max_weight + min_weight
-#     ) / 6  # Or any other appropriate initial value
-# else:  # Default values if no weights (e.g., no edges)
-#     slider_min = 0
-#     slider_max = 10
-#     initial_slider_value = 5
-
-
-default_stylesheet = [
-    {
-        "selector": "node",
-        "style": {
-            "width": "mapData(size, 0, 100, 20, 60)",
-            "height": "mapData(size, 0, 100, 20, 60)",
-            "content": "data(label)",
-            "font-size": f"{FONT_SIZE}px",
-            "text-valign": "center",
-            "text-halign": "center",
-            "background-color": "data(color)",  # Use the color data property
-        },
-    },
-    {
-        "selector": "edge",
-        "style": {
-            "curve-style": "haystack",
-            "haystack-radius": "0",
-            "opacity": "0.4",
-            "line-color": "data(color)",  # Use the color data property for edges
-            "width": "mapData(weight, 0, 20, 1, 8)",
-            "overlay-padding": "3px",
-            "content": "data(weight)",
-            "font-size": "0px",  # set to 0px to hide the label
-            "text-valign": "center",
-            "text-halign": "center",
-        },
-    },
-]
-
-# *** Bezier Curve Style with Edge Bundling ***
-bezier_stylesheet = [
-    {
-        "selector": "node",
-        "style": {
-            "width": "mapData(size, 0, 100, 20, 60)",
-            "height": "mapData(size, 0, 100, 20, 60)",
-            "content": "data(label)",
-            "font-size": f"{FONT_SIZE}px",
-            "text-valign": "center",
-            "text-halign": "center",
-            "background-color": "data(color)",
-        },
-    },
-    # Add this new selector for large nodes
-    node_highlight_selector_risk_level1,
-    node_highlight_selector_risk_level2,
-    node_highlight_selector_risk_level3,
-    node_highlight_selector_risk_level4,
-    {
-        "selector": "edge",
-        "style": {
-            "curve-style": "unbundled-bezier",
-            "control-point-step-size": 10,  # Adjust for bundling strength
-            "control-point-weight": 0.5,  # Adjust for bundling shape
-            "opacity": 0.6,
-            "line-color": "data(color)",
-            "width": "mapData(weight, 0, 20, 1, 8)",
-            "overlay-padding": "3px",
-            "content": "data(weight)",
-            "font-size": "0px",
-            "text-valign": "center",
-            "text-halign": "center",
-        },
-    },
-]
-
-
-# *** Round-Segment Style ***
-round_segment_stylesheet = [
-    {
-        "selector": "node",
-        "style": {
-            "width": "mapData(size, 0, 100, 20, 60)",
-            "height": "mapData(size, 0, 100, 20, 60)",
-            "content": "data(label)",
-            "font-size": f"{FONT_SIZE}px",
-            "text-valign": "center",
-            "text-halign": "center",
-            "background-color": "data(color)",
-        },
-    },
-    node_highlight_selector_risk_level1,
-    node_highlight_selector_risk_level2,
-    node_highlight_selector_risk_level3,
-    node_highlight_selector_risk_level4,
-    {
-        "selector": "edge",
-        "style": {
-            "curve-style": "segments",
-            "segment-distances": "20 80",  # Adjust for segment positioning (percentage along the direct line)
-            "segment-weights": "0.3 0.7",  # Adjust for segment positioning (weight towards source/target)
-            "line-style": "solid",
-            "line-color": "data(color)",
-            "width": "mapData(weight, 0, 20, 1, 8)",
-            "overlay-padding": "3px",
-            "content": "data(weight)",
-            "font-size": "0px",
-            "text-valign": "center",
-            "text-halign": "center",
-            "border-width": 1,
-            "border-color": "data(color)",
-            "border-style": "solid",
-            "line-cap": "round",  # Make the ends of segments round
-            "line-join": "round",  # Make the corners where segments meet round
-        },
-    },
-]
-
-# *** Taxi Curve Style with Potential for Bundling Effect ***
-taxi_stylesheet = [
-    {
-        "selector": "node",
-        "style": {
-            "width": "mapData(size, 0, 100, 20, 60)",
-            "height": "mapData(size, 0, 100, 20, 60)",
-            "content": "data(label)",
-            "font-size": f"{FONT_SIZE}px",
-            "text-valign": "center",
-            "text-halign": "center",
-            "background-color": "data(color)",
-        },
-    },
-    node_highlight_selector_risk_level1,
-    node_highlight_selector_risk_level2,
-    node_highlight_selector_risk_level3,
-    node_highlight_selector_risk_level4,
-    {
-        "selector": "edge",
-        "style": {
-            "curve-style": "taxi",
-            "taxi-direction": "vertical",  # Or 'horizontal' depending on layout
-            "taxi-turn": 20,  # Adjust for the number of turns and bundling
-            "opacity": 0.6,
-            "line-color": "data(color)",
-            "width": "mapData(weight, 0, 20, 1, 8)",
-            "overlay-padding": "3px",
-            "content": "data(weight)",
-            "font-size": "0px",
-            "text-valign": "center",
-            "text-halign": "center",
-        },
-    },
-]
-layout_list = [
-    "fcose",
-    "circle",
-    "concentric",
-    # "cose",
-    "euler",
-    "spread",
-]
 
 app.layout = html.Div(
     [
@@ -724,12 +313,6 @@ def update_checklist_output(selected_values):
     [
         Output("cytospace", "elements"),
         Output("slider-output-container", "children"),
-        # Removed outputs for the old weight-slider
-        # Output("weight-slider", "min"),
-        # Output("weight-slider", "max"),
-        # Output("weight-slider", "value"),
-        # Output("weight-slider", "marks"),
-        # Add outputs for the new number of edges slider
         Output("num-edges-slider", "min"),
         Output("num-edges-slider", "max"),
         Output("num-edges-slider", "value"),
@@ -762,7 +345,7 @@ def update_graph_and_output(
 ):
     # Regenerate elements based on company and checklist selection
     elements, line_weights, total_edges = get_elements_for_company(
-        company, selected_checklist_values
+        real_data, company, selected_checklist_values
     )
 
     # --- New logic to calculate slider_value (weight threshold) based on num_edges_to_show ---
@@ -884,123 +467,6 @@ def update_graph_and_output(
         {"name": layout_name},
         dynamic_stylesheet,
     )
-
-
-# --- Helper function to find primary and secondary neighbors ---
-def find_neighbors(selected_node_id, all_elements):
-    primary_neighbors = set()
-    secondary_neighbors = set()
-    edges_to_primary = []
-
-    # Find primary neighbors and edges
-    for el in all_elements:
-        if "source" in el.get("data", {}):  # It's an edge
-            source = el["data"]["source"]
-            target = el["data"]["target"]
-            if source == selected_node_id:
-                primary_neighbors.add(target)
-                edges_to_primary.append(el)
-            elif target == selected_node_id:
-                primary_neighbors.add(source)
-                edges_to_primary.append(el)
-
-    # Find secondary neighbors
-    for el in all_elements:
-        if "source" in el.get("data", {}):  # It's an edge
-            source = el["data"]["source"]
-            target = el["data"]["target"]
-            # If the edge connects a primary neighbor to another node
-            if (
-                source in primary_neighbors
-                and target != selected_node_id
-                and target not in primary_neighbors
-            ):
-                secondary_neighbors.add(target)
-            elif (
-                target in primary_neighbors
-                and source != selected_node_id
-                and source not in primary_neighbors
-            ):
-                secondary_neighbors.add(source)
-
-    # Get node elements for selected, primary, and secondary neighbors
-    subgraph_nodes = []
-    all_neighbor_ids = primary_neighbors.union(secondary_neighbors)
-    all_neighbor_ids.add(selected_node_id)  # Include the selected node itself
-
-    for el in all_elements:
-        if "source" not in el.get("data", {}):  # It's a node
-            if el["data"]["id"] in all_neighbor_ids:
-                subgraph_nodes.append(el)
-
-    # Get edges within the subgraph (between selected, primary, and secondary nodes)
-    subgraph_edges = []
-    for el in all_elements:
-        if "source" in el.get("data", {}):  # It's an edge
-            source = el["data"]["source"]
-            target = el["data"]["target"]
-            if source in all_neighbor_ids and target in all_neighbor_ids:
-                subgraph_edges.append(el)
-
-    return (
-        list(primary_neighbors),
-        list(secondary_neighbors),
-        subgraph_nodes + subgraph_edges,
-    )
-
-
-# --- New function to calculate custom pyramid layout positions ---
-def calculate_pyramid_layout(
-    selected_node_id, primary_neighbors, secondary_neighbors, subgraph_elements
-):
-    # Define base positions and spacing
-    center_x = 500
-    top_y = 100
-    primary_y_base = 175
-    secondary_y_base = 250
-    horizontal_spacing = 150
-    vertical_zigzag_offset = 10  # How much to offset vertically for zigzag
-
-    # Create a dictionary to store calculated positions by node ID
-    positions = {}
-
-    # Position the selected node at the top center
-    positions[selected_node_id] = {"x": center_x, "y": top_y}
-
-    # Position primary neighbors
-    num_primary = len(primary_neighbors)
-    if num_primary > 0:
-        # Calculate starting x position to center the primary nodes
-        primary_start_x = center_x - (num_primary - 1) * horizontal_spacing / 2
-        for i, node_id in enumerate(primary_neighbors):
-            x = primary_start_x + i * horizontal_spacing
-            # Apply zigzag vertical offset
-            y = primary_y_base + (vertical_zigzag_offset if i % 2 == 1 else 0)
-            positions[node_id] = {"x": x, "y": y}
-
-    # Position secondary neighbors
-    num_secondary = len(secondary_neighbors)
-    if num_secondary > 0:
-        # Calculate starting x position to center the secondary nodes
-        secondary_start_x = center_x - (num_secondary - 1) * horizontal_spacing / 2
-        for i, node_id in enumerate(secondary_neighbors):
-            x = secondary_start_x + i * horizontal_spacing
-            # Apply zigzag vertical offset (use a different offset or pattern if desired)
-            y = secondary_y_base + (
-                vertical_zigzag_offset if i % 2 == 0 else 0
-            )  # Alternate zigzag pattern
-            positions[node_id] = {"x": x, "y": y}
-
-    # Update the position data for each node in the subgraph elements
-    updated_elements = []
-    for el in subgraph_elements:
-        if "source" not in el.get("data", {}):  # It's a node
-            node_id = el["data"]["id"]
-            if node_id in positions:
-                el["position"] = positions[node_id]
-        updated_elements.append(el)
-
-    return updated_elements
 
 
 # --- New callback to update the subgraph plot and info ---

@@ -6,6 +6,13 @@ from langchain.prompts.chat import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from langchain.llms import LlamaCpp
 from langchain.cache import SQLiteCache
+from plot_network_defaut_value import (
+    EDGE_SIZE_MULTIPLIER,
+    edge_rgb_color_list,
+    rgb_color_list,
+)
+import numpy as np
+from collections import Counter
 
 # import re
 from langchain.globals import set_llm_cache
@@ -235,6 +242,305 @@ def get_level_from_boundaries(boundaries: list[int], test_number: float):
             return i + 1
     raise ValueError(f"Number {test_number} is outside the range of boundaries.")
 
+
+def generate_network_from_real_data(data_list, selected_checklist_values=None):
+    """
+    data_list: list of dicts, each dict contains:
+        - "risk": str
+        - "embedding_risk": list or np.array
+        - "risk_desc": str
+        - "embedding_risk_desc": list or np.array
+    """
+    node_size_multiplier = 10
+    number_of_scales = 3
+    node_proportion_list = [65, 30, 5]
+    node_size_counter = Counter()
+    assert len(node_proportion_list) == number_of_scales
+    # node_size_list = [1, 30, 60]
+
+    node_size_list = [1, 50, 120]
+    assert len(node_size_list) == number_of_scales
+    nodes = []
+    edges = []
+    line_weight_list = []
+    # print checkbox value in this function
+    selected_checkbox_value_list = []
+    if selected_checklist_values is None:
+        selected_checklist_values = []
+    for selected_checklist_value in selected_checklist_values:
+        selected_checkbox_value_list.append(selected_checklist_value)
+
+    # Create edges based on embedding distance (Euclidean)
+    # cal the distance between each pair of risks first
+    stored_distances = {}
+    for i in range(len(data_list)):
+        for j in range(i + 1, len(data_list)):
+            emb1 = np.array(
+                data_list[i][
+                    tuple(sorted(["risk", "embedding"] + selected_checkbox_value_list))
+                ]
+            )
+            emb2 = np.array(
+                data_list[j][
+                    tuple(sorted(["risk", "embedding"] + selected_checkbox_value_list))
+                ]
+            )
+            distance = np.linalg.norm(emb1 - emb2)
+            distance = 1 / distance * 100
+            line_weight_list.append(distance)
+            stored_distances[(i, j)] = distance
+
+    min_dist = min(line_weight_list)
+    max_dist = max(line_weight_list)
+    avg_dist = np.mean(line_weight_list)
+    print(f"{avg_dist=}")
+
+    edge_boudaries = find_equal_count_boundaries(line_weight_list, number_of_scales)
+    # then create edges
+    for i in range(len(data_list)):
+        for j in range(i + 1, len(data_list)):
+            raw_weight = stored_distances[(i, j)]
+            # display_weight is seperated into 3 scales based on the min_dist and max_dist
+            level = get_level_from_boundaries(edge_boudaries, raw_weight)
+            display_weight = level * EDGE_SIZE_MULTIPLIER
+            edge_color = edge_rgb_color_list[level - 1]
+            edges.append(
+                {
+                    "data": {
+                        "source": f"risk_{i}",
+                        "target": f"risk_{j}",
+                        "weight": display_weight,
+                        "raw_weight": raw_weight,
+                        "color": edge_color,
+                    }
+                }
+            )
+
+    # Calculate raw_size for each node (sum of all connected edge weights)
+    node_raw_sizes = [0.0 for _ in range(len(data_list))]
+
+    for edge in edges:
+        src = int(edge["data"]["source"].split("_")[1])
+        tgt = int(edge["data"]["target"].split("_")[1])
+        w = edge["data"]["raw_weight"]
+        node_raw_sizes[src] += w
+        node_raw_sizes[tgt] += w
+
+    node_boudaries = find_proportional_count_boundaries(
+        node_raw_sizes, node_proportion_list
+    )
+    # Scale node sizes for display (between 20 and 100)
+    min_raw = min(node_raw_sizes)
+    max_raw = max(node_raw_sizes)
+
+    def scale_size(raw):
+        if max_raw == min_raw:
+            return 60  # fallback if all are equal
+        return 20 + (raw - min_raw) / (max_raw - min_raw) * (100 - 20)
+
+    all_risk_cat = []
+    for data in data_list:
+        risk_cat = data["risk_cat"]
+        if risk_cat not in all_risk_cat:
+            all_risk_cat.append(risk_cat)
+    all_risk_cat.sort()
+    # Create nodes for each risk
+    for idx, data in enumerate(data_list):
+        raw_size = node_raw_sizes[idx]
+        level = get_level_from_boundaries(node_boudaries, raw_size)
+        node_size_counter[level] += 1
+        display_size = node_size_list[level - 1]
+        risk_cat = data["risk_cat"]
+        risk_cat_color = rgb_color_list[all_risk_cat.index(risk_cat)]
+        nodes.append(
+            {
+                "data": {
+                    "id": f"risk_{idx}",
+                    "label": data["risk"],
+                    "raw_size": raw_size,
+                    "size_level": level,
+                    "size": display_size,
+                    "color": risk_cat_color,
+                    "risk_level": data["risk_level"],
+                    "story": data.get("story", ""),
+                },
+                "position": {
+                    "x": random.uniform(100, 700),
+                    "y": random.uniform(100, 700),
+                },
+            }
+        )
+    print(f"{node_size_counter=}")
+    # Return nodes, edges, line_weight_list, and total number of edges
+    return nodes + edges, line_weight_list, len(edges)
+
+
+# Initial elements for the default company
+def get_elements_for_company(data, company, selected_checklist_values):
+    filtered = [item for item in data if item["company"] == company]
+    if filtered:
+        # Capture total_edges from the return value
+        elements, line_weights, total_edges = generate_network_from_real_data(
+            filtered, selected_checklist_values
+        )
+        return elements, line_weights, total_edges
+    else:
+        return [], [], 0  # Return 0 total edges if no data
+
+
+# --- New function to calculate custom pyramid layout positions ---
+def calculate_pyramid_layout(
+    selected_node_id, primary_neighbors, secondary_neighbors, subgraph_elements
+):
+    # Define base positions and spacing
+    center_x = 500
+    top_y = 100
+    primary_y_base = 175
+    secondary_y_base = 250
+    horizontal_spacing = 150
+    vertical_zigzag_offset = 10  # How much to offset vertically for zigzag
+
+    # Create a dictionary to store calculated positions by node ID
+    positions = {}
+
+    # Position the selected node at the top center
+    positions[selected_node_id] = {"x": center_x, "y": top_y}
+
+    # Position primary neighbors
+    num_primary = len(primary_neighbors)
+    if num_primary > 0:
+        # Calculate starting x position to center the primary nodes
+        primary_start_x = center_x - (num_primary - 1) * horizontal_spacing / 2
+        for i, node_id in enumerate(primary_neighbors):
+            x = primary_start_x + i * horizontal_spacing
+            # Apply zigzag vertical offset
+            y = primary_y_base + (vertical_zigzag_offset if i % 2 == 1 else 0)
+            positions[node_id] = {"x": x, "y": y}
+
+    # Position secondary neighbors
+    num_secondary = len(secondary_neighbors)
+    if num_secondary > 0:
+        # Calculate starting x position to center the secondary nodes
+        secondary_start_x = center_x - (num_secondary - 1) * horizontal_spacing / 2
+        for i, node_id in enumerate(secondary_neighbors):
+            x = secondary_start_x + i * horizontal_spacing
+            # Apply zigzag vertical offset (use a different offset or pattern if desired)
+            y = secondary_y_base + (
+                vertical_zigzag_offset if i % 2 == 0 else 0
+            )  # Alternate zigzag pattern
+            positions[node_id] = {"x": x, "y": y}
+
+    # Update the position data for each node in the subgraph elements
+    updated_elements = []
+    for el in subgraph_elements:
+        if "source" not in el.get("data", {}):  # It's a node
+            node_id = el["data"]["id"]
+            if node_id in positions:
+                el["position"] = positions[node_id]
+        updated_elements.append(el)
+
+    return updated_elements
+
+
+# New function to generate dynamic stylesheet
+def generate_dynamic_stylesheet(
+    bezier_stylesheet,
+    bezier_step_size,
+    bezier_weight,
+    node_highlight_selector_risk_level1,
+    node_highlight_selector_risk_level2,
+    node_highlight_selector_risk_level3,
+    node_highlight_selector_risk_level4,
+):
+    dynamic_bezier_stylesheet = [
+        {
+            "selector": "node",
+            "style": bezier_stylesheet[0]["style"],
+        },
+        node_highlight_selector_risk_level1,
+        node_highlight_selector_risk_level2,
+        node_highlight_selector_risk_level3,
+        node_highlight_selector_risk_level4,
+        {
+            "selector": "edge",
+            "style": {
+                "curve-style": "unbundled-bezier",
+                "control-point-step-size": bezier_step_size,
+                "control-point-weight": bezier_weight,
+                "opacity": 0.6,
+                "line-color": "data(color)",
+                "width": "mapData(weight, 0, 20, 1, 8)",
+                "overlay-padding": "3px",
+                "content": "data(weight)",
+                "font-size": "0px",
+                "text-valign": "center",
+                "text-halign": "center",
+            },
+        },
+    ]
+    return dynamic_bezier_stylesheet
+
+# --- Helper function to find primary and secondary neighbors ---
+def find_neighbors(selected_node_id, all_elements):
+    primary_neighbors = set()
+    secondary_neighbors = set()
+    edges_to_primary = []
+
+    # Find primary neighbors and edges
+    for el in all_elements:
+        if "source" in el.get("data", {}):  # It's an edge
+            source = el["data"]["source"]
+            target = el["data"]["target"]
+            if source == selected_node_id:
+                primary_neighbors.add(target)
+                edges_to_primary.append(el)
+            elif target == selected_node_id:
+                primary_neighbors.add(source)
+                edges_to_primary.append(el)
+
+    # Find secondary neighbors
+    for el in all_elements:
+        if "source" in el.get("data", {}):  # It's an edge
+            source = el["data"]["source"]
+            target = el["data"]["target"]
+            # If the edge connects a primary neighbor to another node
+            if (
+                source in primary_neighbors
+                and target != selected_node_id
+                and target not in primary_neighbors
+            ):
+                secondary_neighbors.add(target)
+            elif (
+                target in primary_neighbors
+                and source != selected_node_id
+                and source not in primary_neighbors
+            ):
+                secondary_neighbors.add(source)
+
+    # Get node elements for selected, primary, and secondary neighbors
+    subgraph_nodes = []
+    all_neighbor_ids = primary_neighbors.union(secondary_neighbors)
+    all_neighbor_ids.add(selected_node_id)  # Include the selected node itself
+
+    for el in all_elements:
+        if "source" not in el.get("data", {}):  # It's a node
+            if el["data"]["id"] in all_neighbor_ids:
+                subgraph_nodes.append(el)
+
+    # Get edges within the subgraph (between selected, primary, and secondary nodes)
+    subgraph_edges = []
+    for el in all_elements:
+        if "source" in el.get("data", {}):  # It's an edge
+            source = el["data"]["source"]
+            target = el["data"]["target"]
+            if source in all_neighbor_ids and target in all_neighbor_ids:
+                subgraph_edges.append(el)
+
+    return (
+        list(primary_neighbors),
+        list(secondary_neighbors),
+        subgraph_nodes + subgraph_edges,
+    )
 
 if __name__ == "__main__":
 
