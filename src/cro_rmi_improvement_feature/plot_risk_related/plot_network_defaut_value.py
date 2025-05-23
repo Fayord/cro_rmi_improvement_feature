@@ -96,6 +96,13 @@ default_stylesheet = [
             "font-size": "0px",  # set to 0px to hide the label
             "text-valign": "center",
             "text-halign": "center",
+            # --- Add arrow properties here ---
+            "target-arrow-shape": "data(arrow_weight)",  # Add a triangle arrow at the target end
+            "target-arrow-color": "data(color)",  # Make the arrow color match the edge color
+            "arrow-scale": "1",  # Adjust arrow size if needed (default is 1)
+            # "source-arrow-shape": "circle", # Example for source arrow
+            # "source-arrow-color": "blue",
+            # --- End of arrow properties ---
         },
     },
 ]
@@ -133,6 +140,13 @@ bezier_stylesheet = [
             "font-size": "0px",
             "text-valign": "center",
             "text-halign": "center",
+            # --- Add arrow properties here ---
+            "target-arrow-shape": "data(arrow_weight)",  # Add a triangle arrow at the target end
+            "target-arrow-color": "data(color)",  # Make the arrow color match the edge color
+            "arrow-scale": "1",  # Adjust arrow size if needed (default is 1)
+            # "source-arrow-shape": "circle", # Example for source arrow
+            # "source-arrow-color": "blue",
+            # --- End of arrow properties ---
         },
     },
 ]
@@ -175,6 +189,11 @@ round_segment_stylesheet = [
             "border-style": "solid",
             "line-cap": "round",  # Make the ends of segments round
             "line-join": "round",  # Make the corners where segments meet round
+            # --- Add arrow properties here ---
+            "target-arrow-shape": "data(arrow_weight)",  # Add a triangle arrow at the target end
+            "target-arrow-color": "data(color)",  # Make the arrow color match the edge color
+            "arrow-scale": "1",  # Adjust arrow size if needed (default is 1)
+            # --- End of arrow properties ---
         },
     },
 ]
@@ -211,6 +230,11 @@ taxi_stylesheet = [
             "font-size": "0px",
             "text-valign": "center",
             "text-halign": "center",
+            # --- Add arrow properties here ---
+            "target-arrow-shape": "data(arrow_weight)",  # Add a triangle arrow at the target end
+            "target-arrow-color": "data(color)",  # Make the arrow color match the edge color
+            "arrow-scale": "1",  # Adjust arrow size if needed (default is 1)
+            # --- End of arrow properties ---
         },
     },
 ]

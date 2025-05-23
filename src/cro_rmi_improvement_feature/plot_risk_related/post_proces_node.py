@@ -4,6 +4,7 @@ import os
 import math
 import pickle
 import pandas as pd
+from collections import Counter
 
 # import function
 from plot_network import (
@@ -11,7 +12,7 @@ from plot_network import (
     filter_elements_by_weight_and_recalculate_edges,
     find_neighbors,
 )
-from utils import tell_a_story_risk_data_grouped
+from utils import tell_a_story_risk_data_grouped, classify_edge_relationship
 
 # import variable
 from plot_network import real_data_path, default_company, edge_rgb_color_list
@@ -20,10 +21,11 @@ from plot_network import real_data_path, default_company, edge_rgb_color_list
 def save_snapshot(real_data_path, default_company):
     # can overried these variable
     print("\n" * 4)
+    real_data = pickle.load(open(real_data_path, "rb"))
     checkbox_values = ["risk_desc"]
     # Capture total_edges in the initial call
     elements, line_weights, total_edges = get_elements_for_company(
-        default_company, checkbox_values
+        real_data, default_company, checkbox_values
     )  # Initial call with empty checklist
 
     # --- Add logic to save initial 10% edges snapshot ---
@@ -75,12 +77,9 @@ def get_risk_data_from_risk_name(risk_name, risk_data_list):
     return None
 
 
-if __name__ == "__main__":
-
-    snapshot_file_path = save_snapshot(real_data_path, default_company)
-    print(f"{real_data_path=}")
-    print(f"{default_company=}")
-    print(f"{snapshot_file_path=}")
+def add_story_to_top_k_node(
+    real_data_path, default_company, snapshot_file_path, top_k=5
+):
     raw_risk_data = pickle.load(open(real_data_path, "rb"))
     snapshot_data_list = pickle.load(open(snapshot_file_path, "rb"))
 
@@ -97,7 +96,7 @@ if __name__ == "__main__":
 
     node_data_list = []
     for node_edge in snapshot_data_list:
-        if node_edge.get("source") is not None:
+        if node_edge["data"].get("source") is not None:
             # it a edge
             continue
         node_data_list.append(node_edge["data"])
@@ -105,7 +104,6 @@ if __name__ == "__main__":
     node_data_df = node_data_df.sort_values(
         by=["risk_level", "size_level"], ascending=False
     )
-    top_k = 5
     top_k_node_data = node_data_df.head(top_k)
     top_k_node_ids = top_k_node_data["id"].tolist()
 
@@ -138,3 +136,132 @@ if __name__ == "__main__":
 
     pickle.dump(raw_risk_data, open(real_data_path, "wb"))
     print("save", real_data_path)
+
+
+def finalize_edge_relationship(
+    edge_relationship_a_b: str, edge_relationship_b_a: str, risk_a: str, risk_b: str
+):
+    def select_final_relationship(
+        edge_relationship_a_b: str, edge_relationship_b_a: str
+    ):
+        # if it the same
+        if edge_relationship_a_b == edge_relationship_b_a:
+            return edge_relationship_a_b
+        # if there is different we will select more relationship
+        if edge_relationship_a_b == "no_relationship":
+            return edge_relationship_b_a
+        if edge_relationship_b_a == "no_relationship":
+            return edge_relationship_a_b
+        if edge_relationship_a_b == "be_a_cause_to_each_other":
+            return edge_relationship_a_b
+        if edge_relationship_b_a == "be_a_cause_to_each_other":
+            return edge_relationship_b_a
+
+        return "be_a_cause_to_each_other"
+
+    def post_process_relationship(final_relationship: str, risk_a: str, risk_b: str):
+        if final_relationship in ["be_a_cause_to_each_other", "no_relationship"]:
+            return final_relationship
+        if final_relationship.find(risk_a) == 0:
+            # risk a_caused_by_risk b
+            # so it mean risk a is effect and risk b is cause
+            return "effect_then_cause"
+        else:
+            return "cause_then_effect"
+
+    final_relationship = select_final_relationship(
+        edge_relationship_a_b, edge_relationship_b_a
+    )
+    return post_process_relationship(final_relationship, risk_a, risk_b)
+
+
+def add_edge_relationship(real_data_path, snapshot_file_path):
+    raw_risk_data = pickle.load(open(real_data_path, "rb"))
+    snapshot_data_list = pickle.load(open(snapshot_file_path, "rb"))
+
+    raw_risk_selected_keys = [
+        "risk",
+        "risk_desc",
+        "rootcause",
+    ]
+    raw_risk_selected_data_list = []
+    for i in raw_risk_data:
+        raw_risk_selected_data_list.append({k: i[k] for k in raw_risk_selected_keys})
+
+    node_data_list = []
+    edge_data_list = []
+    for node_edge in snapshot_data_list:
+        if node_edge["data"].get("source") is not None:
+            # it a edge
+            edge_data_list.append(node_edge["data"])
+        else:
+
+            node_data_list.append(node_edge["data"])
+    node_data_df = pd.DataFrame(node_data_list)
+    relation_counter = Counter()
+    relation_result = {}
+    new_edge_data_dict = {}
+    for edge_data in edge_data_list:
+        source_risk_id = edge_data["source"]
+        target_risk_id = edge_data["target"]
+        source_risk_name = node_data_df[node_data_df["id"] == source_risk_id][
+            "label"
+        ].values[0]
+        target_risk_name = node_data_df[node_data_df["id"] == target_risk_id][
+            "label"
+        ].values[0]
+        print(f"\t{source_risk_name=}")
+        print(f"\t{target_risk_name=}")
+
+        risk_a = get_risk_data_from_risk_name(
+            source_risk_name, raw_risk_selected_data_list
+        )
+        risk_b = get_risk_data_from_risk_name(
+            target_risk_name, raw_risk_selected_data_list
+        )
+        edge_relationship_a_b = classify_edge_relationship(risk_a=risk_a, risk_b=risk_b)
+        edge_relationship_b_a = classify_edge_relationship(risk_a=risk_b, risk_b=risk_a)
+        edge_relationship = finalize_edge_relationship(
+            edge_relationship_a_b, edge_relationship_b_a, risk_a["risk"], risk_b["risk"]
+        )
+        print(f"{type(edge_relationship)=}")
+        print(f"\t{edge_relationship=}")
+        # key = (
+        #     risk_a["risk"],
+        #     risk_b["risk"],
+        # )
+        # sorted_key = tuple(sorted(key))
+        # relation_result[sorted_key] = edge_relationship
+        # relation_counter[edge_relationship] += 1
+        key = tuple((source_risk_name, target_risk_name))
+        if edge_relationship == "cause_then_effect":
+            new_edge_data_dict[key] = [1, 0]
+        elif edge_relationship == "effect_then_cause":
+            new_edge_data_dict[key] = [-1, 0]
+        elif edge_relationship == "no_relationship":
+            new_edge_data_dict[key] = [0, 0]
+        elif edge_relationship == "be_a_cause_to_each_other":
+            new_edge_data_dict[key] = [1, -1]
+        else:
+            raise ValueError(f"Unknown edge_relationship: {edge_relationship}")
+    # save new_edge_data_dict to pickle
+    try:
+        dir_path = os.path.dirname(os.path.realpath(__file__))
+    except Exception:
+        dir_path = os.getcwd()
+
+    pickle.dump(new_edge_data_dict, open(f"{dir_path}/edge_relationships.pkl", "wb"))
+
+
+if __name__ == "__main__":
+
+    snapshot_file_path = save_snapshot(real_data_path, default_company)
+    print(f"{real_data_path=}")
+    print(f"{default_company=}")
+    print(f"{snapshot_file_path=}")
+    # add_story_to_top_k_node(
+    #     real_data_path, default_company, snapshot_file_path, top_k=5
+    # )
+    # relation_counter=Counter({'no_relationship': 27, 'be_a_cause_to_each_other': 18, 'riskA_cause_riskB': 15})
+    #
+    add_edge_relationship(real_data_path, snapshot_file_path)

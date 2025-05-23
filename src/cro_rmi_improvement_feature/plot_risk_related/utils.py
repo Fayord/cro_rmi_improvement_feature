@@ -1,5 +1,5 @@
 import random
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Literal
 import os
 from dotenv import load_dotenv
 from langchain.prompts.chat import ChatPromptTemplate
@@ -11,6 +11,11 @@ from plot_network_defaut_value import (
     edge_rgb_color_list,
     rgb_color_list,
 )
+import pickle
+
+from langchain.output_parsers import PydanticOutputParser
+from pydantic import BaseModel, Field, validator
+from typing import List
 import numpy as np
 from collections import Counter
 
@@ -36,6 +41,127 @@ def get_llm(provider: str = "openai", model_name: Optional[str] = None):
         )
     else:
         raise ValueError(f"Unsupported provider: {provider}")
+
+
+def classify_edge_relationship(risk_a: Dict[str, Any], risk_b: Dict[str, Any]) -> str:
+    try:
+        llm = get_llm()
+        # parser = PydanticOutputParser(pydantic_object=EdgeRelationship)
+
+        # Format input data for the prompt
+        risk_a_str = "\n".join([f"- {k}: {v}" for k, v in risk_a.items()])
+        risk_b_str = "\n".join([f"- {k}: {v}" for k, v in risk_b.items()])
+        risk_a_name = risk_a["risk"]
+        risk_b_name = risk_b["risk"]
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                (
+                    "system",
+                    f"""You are an expert in risk assessment and business analysis. Your task is to classify the relationship between two risks based on their descriptions and context. your analysis will be from the perspective of business owner.
+
+Analyze the provided data for {risk_a_name} and {risk_b_name} and determine the relationship type.
+
+
+Provide the classification and a brief reason in the specified JSON format.
+
+""",
+                ),
+                (
+                    "human",
+                    f"Please classify the relationship between {risk_a_str} and  {risk_b_str}.",
+                ),
+            ]
+        )
+        json_schema = {
+            "properties": {
+                "relationship": {
+                    "description": f"Relationship between two risks. {risk_a_name}_caused_by_{risk_b_name} means {risk_b_name} is the cause and {risk_a_name} is the effect. {risk_b_name}_caused_by_{risk_a_name} means {risk_a_name} is the cause and {risk_b_name} is the effect.  no_relationship means there is no relationship between two risks. be_a_cause_to_each_other means two risks are both cause and effect to each other.",
+                    "enum": [
+                        f"{risk_a_name}_caused_by_{risk_b_name}",
+                        f"{risk_b_name}_caused_by_{risk_a_name}",
+                        "no_relationship",
+                        "be_a_caused_by_each_other",
+                    ],
+                    "title": "Relationship",
+                    "type": "string",
+                },
+                "reason": {
+                    "description": "Brief reason for the relationship classification in 1 sentence",
+                    "title": "Reason",
+                    "type": "string",
+                },
+            },
+            "required": ["relationship", "reason"],
+            "title": "EdgeRelationship",
+            "type": "object",
+        }
+        structured_llm = llm.with_structured_output(json_schema)
+        chain = prompt | structured_llm
+
+        # Invoke the chain
+        result = chain.invoke({})
+        # print(f"{risk_a_str=}")
+        # Return the relationship field from the parsed model
+        return result["relationship"]
+
+    except Exception as e:
+        print(f"Error classifying edge relationship: {str(e)}")
+        # Return a default or error value in case of failure
+        return "no_relationship"  # Default to no relationship on error
+
+
+# def classify_edge_relationship(risk_a: Dict[str, Any], risk_b: Dict[str, Any]) -> str:
+#     """
+#     Classify the relationship between risk_a and risk_b using an LLM.
+#     Result is Literal ["riskA_cause_riskB", "riskB_cause_riskA", "no_relationship", "be_a_cause_to_each_other"]
+#     """
+#     try:
+#         llm = get_llm()
+
+#         # Setup validation parser
+#         # parser = PydanticOutputParser(pydantic_object=EdgeRelationship)
+
+#         # Format input data for the prompt
+#         risk_a_str = "\n".join([f"- {k}: {v}" for k, v in risk_a.items()])
+#         risk_b_str = "\n".join([f"- {k}: {v}" for k, v in risk_b.items()])
+
+#         prompt = ChatPromptTemplate.from_messages(
+#             [
+#                 (
+#                     "system",
+#                     """You are an expert in risk assessment and business analysis. Your task is to classify the relationship between two risks based on their descriptions and context.
+
+# Analyze the provided data for Risk A and Risk B and determine the relationship type.
+
+
+# Provide the classification and a brief reason in the specified JSON format.
+
+# """,
+#                 ),
+#                 (
+#                     "human",
+#                     "Please classify the relationship between Risk A :{riskA} and Risk B : {riskB}.",
+#                 ),
+#             ]
+#         )
+#         structured_llm = llm.with_structured_output(EdgeRelationship)
+#         chain = prompt | structured_llm
+
+#         # Invoke the chain
+#         result: EdgeRelationship = chain.invoke(
+#             {
+#                 "riskA": risk_a_str,
+#                 "riskB": risk_b_str,
+#             }
+#         )
+#         # print(f"{risk_a_str=}")
+#         # Return the relationship field from the parsed model
+#         return result.relationship
+
+#     except Exception as e:
+#         print(f"Error classifying edge relationship: {str(e)}")
+#         # Return a default or error value in case of failure
+#         return "no_relationship"  # Default to no relationship on error
 
 
 def tell_a_story_risk_data(
@@ -251,6 +377,15 @@ def generate_network_from_real_data(data_list, selected_checklist_values=None):
         - "risk_desc": str
         - "embedding_risk_desc": list or np.array
     """
+    try:
+        dir_path = os.path.dirname(os.path.realpath(__file__))
+    except Exception:
+        dir_path = os.getcwd()
+    edge_relationships_data_path = f"{dir_path}/edge_relationships.pkl"
+    if os.path.exists(edge_relationships_data_path):
+        edge_relationships_data = pickle.load(open(edge_relationships_data_path, "rb"))
+    else:
+        edge_relationships_data = {}
     node_size_multiplier = 10
     number_of_scales = 3
     node_proportion_list = [65, 30, 5]
@@ -304,6 +439,30 @@ def generate_network_from_real_data(data_list, selected_checklist_values=None):
             level = get_level_from_boundaries(edge_boudaries, raw_weight)
             display_weight = level * EDGE_SIZE_MULTIPLIER
             edge_color = edge_rgb_color_list[level - 1]
+            edge_relation_i_j = edge_relationships_data.get(
+                tuple((data_list[i]["risk"], data_list[j]["risk"])), None
+            )
+            edge_relation_j_i = edge_relationships_data.get(
+                tuple((data_list[j]["risk"], data_list[i]["risk"])), None
+            )
+            if edge_relation_i_j is None and edge_relation_j_i is None:
+                # no relationship
+                edge_relation = [0, 0]
+            elif edge_relation_i_j is not None and edge_relation_j_i is None:
+                edge_relation = edge_relation_i_j
+                if edge_relation[0] == 1:
+                    i, j = i, j
+                elif edge_relation[0] == -1:
+                    i, j = j, i
+            elif edge_relation_i_j is None and edge_relation_j_i is not None:
+                edge_relation = edge_relation_j_i
+                if edge_relation[0] == 1:
+                    i, j = j, i
+                elif edge_relation[0] == -1:
+                    i, j = i, j
+            else:
+                raise ValueError("it should have 1 None")
+            print(f"{edge_relation_i_j=},{edge_relation_j_i=}")
             edges.append(
                 {
                     "data": {
@@ -312,14 +471,32 @@ def generate_network_from_real_data(data_list, selected_checklist_values=None):
                         "weight": display_weight,
                         "raw_weight": raw_weight,
                         "color": edge_color,
+                        "arrow_weight": "none" if edge_relation[0] == 0 else "triangle",
+                        "do_not_cal_weight": False,
                     }
                 }
             )
+            if edge_relation[1] == -1:
+                edges.append(
+                    {
+                        "data": {
+                            "source": f"risk_{j}",
+                            "target": f"risk_{i}",
+                            "weight": display_weight,
+                            "raw_weight": raw_weight,
+                            "color": edge_color,
+                            "arrow_weight": "triangle",
+                            "do_not_cal_weight": True,
+                        }
+                    }
+                )
 
     # Calculate raw_size for each node (sum of all connected edge weights)
     node_raw_sizes = [0.0 for _ in range(len(data_list))]
 
     for edge in edges:
+        if edge["data"]["do_not_cal_weight"]:
+            continue
         src = int(edge["data"]["source"].split("_")[1])
         tgt = int(edge["data"]["target"].split("_")[1])
         w = edge["data"]["raw_weight"]
@@ -475,10 +652,18 @@ def generate_dynamic_stylesheet(
                 "font-size": "0px",
                 "text-valign": "center",
                 "text-halign": "center",
+                # --- Add arrow properties here ---
+                "target-arrow-shape": "data(arrow_weight)",
+                "target-arrow-color": "data(color)",  # Make the arrow color match the edge color
+                "arrow-scale": "1",  # Adjust arrow size if needed (default is 1)
+                # "source-arrow-shape": "circle", # Example for source arrow
+                # "source-arrow-color": "blue",
+                # --- End of arrow properties ---
             },
         },
     ]
     return dynamic_bezier_stylesheet
+
 
 # --- Helper function to find primary and secondary neighbors ---
 def find_neighbors(selected_node_id, all_elements):
@@ -541,6 +726,7 @@ def find_neighbors(selected_node_id, all_elements):
         list(secondary_neighbors),
         subgraph_nodes + subgraph_edges,
     )
+
 
 if __name__ == "__main__":
 
