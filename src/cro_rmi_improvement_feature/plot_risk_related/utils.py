@@ -23,7 +23,7 @@ from collections import Counter
 from langchain.globals import set_llm_cache
 
 set_llm_cache(SQLiteCache(database_path=".langchain.db"))
-env_path = "/Users/ford/Documents/coding/confidential/.env"
+env_path = "./../confidential/.env"
 load_dotenv(env_path)
 api_key = os.getenv("OPENAI_API_KEY")
 assert api_key, "API key is missing"
