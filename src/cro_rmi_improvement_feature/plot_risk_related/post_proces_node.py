@@ -139,35 +139,50 @@ def add_story_to_top_k_node(
 
 
 def finalize_edge_relationship(
-    edge_relationship_a_b: str, edge_relationship_b_a: str, risk_a: str, risk_b: str
-):
+    edge_relationship_a_b: dict, edge_relationship_b_a: dict, risk_a: str, risk_b: str
+) -> dict:
     def select_final_relationship(
-        edge_relationship_a_b: str, edge_relationship_b_a: str
-    ):
+        edge_relationship_a_b: dict, edge_relationship_b_a: dict
+    ) -> dict:
         # if it the same
-        if edge_relationship_a_b == edge_relationship_b_a:
+        if (
+            edge_relationship_a_b["relationship"]
+            == edge_relationship_b_a["relationship"]
+        ):
             return edge_relationship_a_b
         # if there is different we will select more relationship
-        if edge_relationship_a_b == "no_relationship":
+        if edge_relationship_a_b["relationship"] == "no_relationship":
             return edge_relationship_b_a
-        if edge_relationship_b_a == "no_relationship":
+        if edge_relationship_b_a["relationship"] == "no_relationship":
             return edge_relationship_a_b
-        if edge_relationship_a_b == "be_a_cause_to_each_other":
+        if edge_relationship_a_b["relationship"] == "be_a_cause_to_each_other":
             return edge_relationship_a_b
-        if edge_relationship_b_a == "be_a_cause_to_each_other":
+        if edge_relationship_b_a["relationship"] == "be_a_cause_to_each_other":
             return edge_relationship_b_a
+        edge_relation = {
+            "relationship": "be_a_cause_to_each_other",
+            "reason": edge_relationship_a_b["reason"]
+            + "\n\n"
+            + edge_relationship_b_a["reason"],
+        }
+        return edge_relation
 
-        return "be_a_cause_to_each_other"
-
-    def post_process_relationship(final_relationship: str, risk_a: str, risk_b: str):
-        if final_relationship in ["be_a_cause_to_each_other", "no_relationship"]:
+    def post_process_relationship(
+        final_relationship: dict, risk_a: str, risk_b: str
+    ) -> dict:
+        if final_relationship["relationship"] in [
+            "be_a_cause_to_each_other",
+            "no_relationship",
+        ]:
             return final_relationship
-        if final_relationship.find(risk_a) == 0:
+        if final_relationship["relationship"].find(risk_a) == 0:
             # risk a_caused_by_risk b
             # so it mean risk a is effect and risk b is cause
-            return "effect_then_cause"
+            final_relationship["relationship"] = "effect_then_cause"
+            return final_relationship
         else:
-            return "cause_then_effect"
+            final_relationship["relationship"] = "cause_then_effect"
+            return final_relationship
 
     final_relationship = select_final_relationship(
         edge_relationship_a_b, edge_relationship_b_a
@@ -234,16 +249,18 @@ def add_edge_relationship(real_data_path, snapshot_file_path):
         # relation_result[sorted_key] = edge_relationship
         # relation_counter[edge_relationship] += 1
         key = tuple((source_risk_name, target_risk_name))
-        if edge_relationship == "cause_then_effect":
-            new_edge_data_dict[key] = [1, 0]
-        elif edge_relationship == "effect_then_cause":
-            new_edge_data_dict[key] = [-1, 0]
-        elif edge_relationship == "no_relationship":
-            new_edge_data_dict[key] = [0, 0]
-        elif edge_relationship == "be_a_cause_to_each_other":
-            new_edge_data_dict[key] = [1, -1]
+        new_edge_data_dict[key] = {}
+        if edge_relationship["relationship"] == "cause_then_effect":
+            new_edge_data_dict[key]["direction"] = [1, 0]
+        elif edge_relationship["relationship"] == "effect_then_cause":
+            new_edge_data_dict[key]["direction"] = [-1, 0]
+        elif edge_relationship["relationship"] == "no_relationship":
+            new_edge_data_dict[key]["direction"] = [0, 0]
+        elif edge_relationship["relationship"] == "be_a_cause_to_each_other":
+            new_edge_data_dict[key]["direction"] = [1, -1]
         else:
             raise ValueError(f"Unknown edge_relationship: {edge_relationship}")
+        new_edge_data_dict[key]["reason"] = edge_relationship["reason"]
     # save new_edge_data_dict to pickle
     try:
         dir_path = os.path.dirname(os.path.realpath(__file__))

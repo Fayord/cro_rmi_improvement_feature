@@ -23,10 +23,19 @@ from collections import Counter
 from langchain.globals import set_llm_cache
 
 set_llm_cache(SQLiteCache(database_path=".langchain.db"))
-env_path = "./../confidential/.env"
-load_dotenv(env_path)
-api_key = os.getenv("OPENAI_API_KEY")
-assert api_key, "API key is missing"
+dir_path = os.path.dirname(os.path.realpath(__file__))
+try:
+    env_path = f"{dir_path}/../confidential/.env"
+    load_dotenv(env_path)
+    api_key = os.getenv("OPENAI_API_KEY")
+    assert api_key, "API key is missing"
+except Exception:
+    # /Users/ford/Documents/coding_trae/cro_rmi_improvement_feature/src/cro_rmi_improvement_feature/plot_risk_related/utils.py
+    print(dir_path)
+    env_path = f"{dir_path}/../../../../../coding/confidential/.env"
+    load_dotenv(env_path)
+    api_key = os.getenv("OPENAI_API_KEY")
+    assert api_key, "API key is missing"
 
 
 def get_llm(provider: str = "openai", model_name: Optional[str] = None):
@@ -43,7 +52,7 @@ def get_llm(provider: str = "openai", model_name: Optional[str] = None):
         raise ValueError(f"Unsupported provider: {provider}")
 
 
-def classify_edge_relationship(risk_a: Dict[str, Any], risk_b: Dict[str, Any]) -> str:
+def classify_edge_relationship(risk_a: Dict[str, Any], risk_b: Dict[str, Any]) -> dict:
     try:
         llm = get_llm()
         # parser = PydanticOutputParser(pydantic_object=EdgeRelationship)
@@ -102,66 +111,11 @@ Provide the classification and a brief reason in the specified JSON format.
         result = chain.invoke({})
         # print(f"{risk_a_str=}")
         # Return the relationship field from the parsed model
-        return result["relationship"]
+        return result
 
     except Exception as e:
         print(f"Error classifying edge relationship: {str(e)}")
-        # Return a default or error value in case of failure
-        return "no_relationship"  # Default to no relationship on error
-
-
-# def classify_edge_relationship(risk_a: Dict[str, Any], risk_b: Dict[str, Any]) -> str:
-#     """
-#     Classify the relationship between risk_a and risk_b using an LLM.
-#     Result is Literal ["riskA_cause_riskB", "riskB_cause_riskA", "no_relationship", "be_a_cause_to_each_other"]
-#     """
-#     try:
-#         llm = get_llm()
-
-#         # Setup validation parser
-#         # parser = PydanticOutputParser(pydantic_object=EdgeRelationship)
-
-#         # Format input data for the prompt
-#         risk_a_str = "\n".join([f"- {k}: {v}" for k, v in risk_a.items()])
-#         risk_b_str = "\n".join([f"- {k}: {v}" for k, v in risk_b.items()])
-
-#         prompt = ChatPromptTemplate.from_messages(
-#             [
-#                 (
-#                     "system",
-#                     """You are an expert in risk assessment and business analysis. Your task is to classify the relationship between two risks based on their descriptions and context.
-
-# Analyze the provided data for Risk A and Risk B and determine the relationship type.
-
-
-# Provide the classification and a brief reason in the specified JSON format.
-
-# """,
-#                 ),
-#                 (
-#                     "human",
-#                     "Please classify the relationship between Risk A :{riskA} and Risk B : {riskB}.",
-#                 ),
-#             ]
-#         )
-#         structured_llm = llm.with_structured_output(EdgeRelationship)
-#         chain = prompt | structured_llm
-
-#         # Invoke the chain
-#         result: EdgeRelationship = chain.invoke(
-#             {
-#                 "riskA": risk_a_str,
-#                 "riskB": risk_b_str,
-#             }
-#         )
-#         # print(f"{risk_a_str=}")
-#         # Return the relationship field from the parsed model
-#         return result.relationship
-
-#     except Exception as e:
-#         print(f"Error classifying edge relationship: {str(e)}")
-#         # Return a default or error value in case of failure
-#         return "no_relationship"  # Default to no relationship on error
+        raise Exception(f"Error classifying edge relationship: {str(e)}")
 
 
 def tell_a_story_risk_data(
@@ -448,18 +402,22 @@ def generate_network_from_real_data(data_list, selected_checklist_values=None):
             if edge_relation_i_j is None and edge_relation_j_i is None:
                 # no relationship
                 edge_relation = [0, 0]
+                edge_relation_reason = ""
             elif edge_relation_i_j is not None and edge_relation_j_i is None:
-                edge_relation = edge_relation_i_j
+                edge_relation = edge_relation_i_j["direction"]
+                edge_relation_reason = edge_relation_i_j["reason"]
                 if edge_relation[0] == 1:
                     i, j = i, j
                 elif edge_relation[0] == -1:
                     i, j = j, i
             elif edge_relation_i_j is None and edge_relation_j_i is not None:
-                edge_relation = edge_relation_j_i
+                edge_relation = edge_relation_j_i["direction"]
+                edge_relation_reason = edge_relation_j_i["reason"]
                 if edge_relation[0] == 1:
                     i, j = j, i
                 elif edge_relation[0] == -1:
                     i, j = i, j
+
             else:
                 raise ValueError("it should have 1 None")
             print(f"{edge_relation_i_j=},{edge_relation_j_i=}")
@@ -471,8 +429,11 @@ def generate_network_from_real_data(data_list, selected_checklist_values=None):
                         "weight": display_weight,
                         "raw_weight": raw_weight,
                         "color": edge_color,
-                        "arrow_weight": "none" if edge_relation[0] == 0 else "triangle",
+                        "arrow_weight": (
+                            "none" if edge_relation[0] == 0 else "triangle"
+                        ),
                         "do_not_cal_weight": False,
+                        "edge_relation_reason": edge_relation_reason,
                     }
                 }
             )
@@ -487,6 +448,7 @@ def generate_network_from_real_data(data_list, selected_checklist_values=None):
                             "color": edge_color,
                             "arrow_weight": "triangle",
                             "do_not_cal_weight": True,
+                            "edge_relation_reason": edge_relation_reason,
                         }
                     }
                 )

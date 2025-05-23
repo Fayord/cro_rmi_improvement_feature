@@ -248,6 +248,9 @@ app.layout = html.Div(
                 "padding": "10px",
             },
         ),
+        # --- Add a Div to display clicked edge info ---
+        html.Div(id="edge-info-output", style={"margin": "20px", "padding": "10px"}),
+        # --- End of new Div ---
         # --- Moved dropdown for selecting a node below the main plot ---
         html.Div(
             [
@@ -551,6 +554,51 @@ def update_subgraph_and_info(selected_node_id, main_graph_elements):
     subgraph_layout = {"name": "preset"}
 
     return subgraph_elements_with_positions, subgraph_layout, info_text
+
+
+# --- New callback to display edge information on click ---
+@app.callback(
+    Output("edge-info-output", "children"),
+    [Input("cytospace", "tapEdge")],
+)
+def display_edge_info(edge_data):
+    if edge_data:
+        # Extract relevant data from the clicked edge
+        source_id = edge_data["data"].get("source", "N/A")
+        target_id = edge_data["data"].get("target", "N/A")
+        raw_weight = edge_data["data"].get("raw_weight", "N/A")
+        display_weight = edge_data["data"].get("weight", "N/A")
+        color = edge_data["data"].get("color", "N/A")
+        arrow_weight = edge_data["data"].get("arrow_weight", "N/A")
+        do_not_cal_weight = edge_data["data"].get("do_not_cal_weight", "N/A")
+        edge_relation_reason = edge_data["data"].get("edge_relation_reason", "N/A")
+
+        # You might want to look up the actual node labels here if needed
+        # For simplicity, we'll just use the IDs for now
+
+        return html.Div(
+            [
+                html.H5("Clicked Edge Information:"),
+                html.P(f"Source Node ID: {source_id}"),
+                html.P(f"Target Node ID: {target_id}"),
+                html.P(
+                    f"Raw Weight: {raw_weight:.2f}"
+                    if isinstance(raw_weight, (int, float))
+                    else f"Raw Weight: {raw_weight}"
+                ),
+                html.P(
+                    f"Display Weight: {display_weight:.2f}"
+                    if isinstance(display_weight, (int, float))
+                    else f"Display Weight: {display_weight}"
+                ),
+                html.P(f"Color: {color}"),
+                html.P(f"Arrow Weight: {arrow_weight}"),
+                html.P(f"Do Not Calculate Weight: {do_not_cal_weight}"),
+                html.P(f"Edge Relation Reason: {edge_relation_reason}"),
+                # Add more data fields as needed
+            ]
+        )
+    return ""  # Return empty string if no edge is tapped
 
 
 if __name__ == "__main__":
