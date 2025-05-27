@@ -160,6 +160,7 @@ app.layout = html.Div(
                 html.P(
                     "Arrow on Edge: Indicates a causal relationship. An arrow from Risk A to Risk B means Risk A causes Risk B. For non-arrow edges, it means the risks are not direct dependency but are similar"
                 ),
+                html.P("Node Colors: Represent risk categories"),
                 html.P("Node Highlight/Outline (4 Levels of Risk):"),
                 html.Ul(
                     [
@@ -168,9 +169,6 @@ app.layout = html.Div(
                         html.Li("Level 3: Orange - Description for Level 3 risks."),
                         html.Li("Level 4: Red    - Description for Level 4 risks."),
                     ]
-                ),
-                html.P(
-                    "Edge Colors: Represent different categories or types of relationships."
                 ),
             ],
             style={
