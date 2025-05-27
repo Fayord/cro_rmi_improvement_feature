@@ -579,6 +579,7 @@ def display_edge_info(edge_data):
         return html.Div(
             [
                 html.H5("Clicked Edge Information:"),
+                html.P(f"Edge Relation Reason: {edge_relation_reason}"),
                 html.P(f"Source Node ID: {source_id}"),
                 html.P(f"Target Node ID: {target_id}"),
                 html.P(
@@ -594,7 +595,6 @@ def display_edge_info(edge_data):
                 html.P(f"Color: {color}"),
                 html.P(f"Arrow Weight: {arrow_weight}"),
                 html.P(f"Do Not Calculate Weight: {do_not_cal_weight}"),
-                html.P(f"Edge Relation Reason: {edge_relation_reason}"),
                 # Add more data fields as needed
             ]
         )
