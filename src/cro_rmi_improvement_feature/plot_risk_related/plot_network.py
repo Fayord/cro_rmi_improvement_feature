@@ -147,6 +147,43 @@ app = dash.Dash(__name__, url_base_pathname="/plot_network/")
 
 app.layout = html.Div(
     [
+        # --- Add explanation notes ---
+        html.Div(
+            [
+                html.H4("Graph Explanation:"),
+                html.P(
+                    "Node Size: Represents the influence or centrality of a risk. Larger nodes indicate higher influence."
+                ),
+                html.P(
+                    "Edge Thickness: Represents the similar of risk contents between two risks. Thicker edges indicate higher similarity."
+                ),
+                html.P(
+                    "Arrow on Edge: Indicates a causal relationship. An arrow from Risk A to Risk B means Risk A causes Risk B. For non-arrow edges, it means the risks are not direct dependency but are similar"
+                ),
+                html.P("Node Highlight/Outline (4 Levels of Risk):"),
+                html.Ul(
+                    [
+                        html.Li("Level 1: Green  - Description for Level 1 risks."),
+                        html.Li("Level 2: Yellow - Description for Level 2 risks."),
+                        html.Li("Level 3: Orange - Description for Level 3 risks."),
+                        html.Li("Level 4: Red    - Description for Level 4 risks."),
+                    ]
+                ),
+                html.P(
+                    "Edge Colors: Represent different categories or types of relationships."
+                ),
+            ],
+            style={
+                "margin": "20px",
+                "padding": "15px",
+                "border": "1px solid #e0e0e0",
+                "border-radius": "8px",
+                "background-color": "#f9f9f9",
+                "font-size": "0.9em",
+                "line-height": "1.6",
+            },
+        ),
+        # --- End of explanation notes ---
         dcc.Dropdown(
             id="company-dropdown",
             options=[{"label": name, "value": name} for name in companys],
@@ -641,3 +678,21 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     app.run(debug=True, port=args.port)
+
+
+# Add callback to toggle explanation visibility
+@app.callback(
+    Output("graph-explanation", "style"), [Input("explanation-toggle", "value")]
+)
+def toggle_explanation(show_explanation):
+    if "show" in show_explanation:
+        return {
+            "display": "block",
+            "border": "1px solid #ddd",
+            "border-radius": "5px",
+            "padding": "10px",
+            "margin-bottom": "20px",
+            "background-color": "#f9f9f9",
+        }
+    else:
+        return {"display": "none"}
