@@ -196,6 +196,15 @@ app.layout = html.Div(
         ),
         html.Div(id="checklist-output-container"),
         html.Hr(),
+        # --- New toggle button to hide edges with no arrows ---
+        dcc.Checklist(
+            id="hide-no-arrow-edges-toggle",
+            options=[{"label": "Hide Edges with No Arrows", "value": "hide"}],
+            value=[],  # Default to not hidden
+            inline=True,
+            style={"margin-bottom": "10px"},
+        ),
+        # --- End of new toggle button ---
         # --- New slider for selecting number of edges ---
         html.Div(
             [
@@ -334,6 +343,9 @@ def update_checklist_output(selected_values):
         Input("bezier-weight-slider", "value"),
         Input("filter-checklist", "value"),
         Input("num-edges-slider", "value"),  # <-- Add input for the new slider
+        Input(
+            "hide-no-arrow-edges-toggle", "value"
+        ),  # <-- Add input for the new toggle
     ],
 )
 def update_graph_and_output(
@@ -344,7 +356,8 @@ def update_graph_and_output(
     bezier_step_size,
     bezier_weight,
     selected_checklist_values,
-    num_edges_to_show,  # <-- Add input parameter for the new slider value
+    num_edges_to_show,
+    hide_no_arrow_edges,  # <-- Add parameter for the new toggle value
 ):
     # Regenerate elements based on company and checklist selection
     elements, line_weights, total_edges = get_elements_for_company(
@@ -403,6 +416,24 @@ def update_graph_and_output(
             elements, slider_value, edge_rgb_color_list
         )
     )
+
+    # --- New logic to hide edges with arrow_weight == 0 if toggle is active ---
+    if "hide" in hide_no_arrow_edges:
+        # Create a new list for filtered elements to avoid modifying in place while iterating
+        temp_filtered_elements = []
+        for el in filtered_elements:
+            # Keep nodes and edges that are not hidden
+            if "source" not in el.get("data", {}):  # It's a node
+                temp_filtered_elements.append(el)
+            else:  # It's an edge
+                if el["data"].get("arrow_weight") != "none":
+                    temp_filtered_elements.append(el)
+        filtered_elements = temp_filtered_elements
+        # Update edge count after hiding
+        node_edge_counter["edge"] = sum(
+            1 for el in filtered_elements if "source" in el.get("data", {})
+        )
+    # --- End of new logic ---
 
     # --- Generate options for the node dropdown ---
     node_options = []
