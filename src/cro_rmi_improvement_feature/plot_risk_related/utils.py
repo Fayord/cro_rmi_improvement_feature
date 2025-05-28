@@ -4,8 +4,8 @@ import os
 from dotenv import load_dotenv
 from langchain.prompts.chat import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
-from langchain.llms import LlamaCpp
-from langchain.cache import SQLiteCache
+from langchain_community.llms import LlamaCpp
+from langchain_community.cache import SQLiteCache
 from plot_network_defaut_value import (
     EDGE_SIZE_MULTIPLIER,
     edge_rgb_color_list,
@@ -420,7 +420,7 @@ def generate_network_from_real_data(data_list, selected_checklist_values=None):
 
             else:
                 raise ValueError("it should have 1 None")
-            print(f"{edge_relation_i_j=},{edge_relation_j_i=}")
+            # print(f"{edge_relation_i_j=},{edge_relation_j_i=}")
             edges.append(
                 {
                     "data": {

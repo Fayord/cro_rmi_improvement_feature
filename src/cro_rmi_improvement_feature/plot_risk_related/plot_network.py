@@ -381,6 +381,7 @@ def update_checklist_output(selected_values):
         Input(
             "hide-no-arrow-edges-toggle", "value"
         ),  # <-- Add input for the new toggle
+        Input("cytospace", "layout"),  # <-- Add input to get current layout/positions
     ],
 )
 def update_graph_and_output(
@@ -392,7 +393,8 @@ def update_graph_and_output(
     bezier_weight,
     selected_checklist_values,
     num_edges_to_show,
-    hide_no_arrow_edges,  # <-- Add parameter for the new toggle value
+    hide_no_arrow_edges,
+    current_cytoscape_layout,  # <-- Add parameter for current layout
 ):
     # Regenerate elements based on company and checklist selection
     elements, line_weights, total_edges = get_elements_for_company(
@@ -453,21 +455,29 @@ def update_graph_and_output(
     )
 
     # --- New logic to hide edges with arrow_weight == 0 if toggle is active ---
-    if "hide" in hide_no_arrow_edges:
-        # Create a new list for filtered elements to avoid modifying in place while iterating
-        temp_filtered_elements = []
-        for el in filtered_elements:
-            # Keep nodes and edges that are not hidden
-            if "source" not in el.get("data", {}):  # It's a node
-                temp_filtered_elements.append(el)
-            else:  # It's an edge
-                if el["data"].get("arrow_weight") != "none":
-                    temp_filtered_elements.append(el)
-        filtered_elements = temp_filtered_elements
-        # Update edge count after hiding
-        node_edge_counter["edge"] = sum(
-            1 for el in filtered_elements if "source" in el.get("data", {})
-        )
+    # We will modify the elements in place or create a new list with modified styles
+    modified_elements = []
+    for el in filtered_elements:
+        if "source" in el.get("data", {}):  # It's an edge
+            if (
+                "hide" in hide_no_arrow_edges
+                and el["data"].get("arrow_weight") == "none"
+            ):
+                # Set opacity to 0 for hidden edges
+                el["style"] = {"opacity": 0}
+            else:
+                # Ensure opacity is 1 for visible edges (or default)
+                el["style"] = {"opacity": 1}
+            modified_elements.append(el)
+        else:  # It's a node
+            modified_elements.append(el)
+    filtered_elements = modified_elements
+
+    # Update edge count after potentially hiding (by opacity) edges
+    # The count should still reflect all edges that passed the weight filter, even if their opacity is 0
+    node_edge_counter["edge"] = sum(
+        1 for el in filtered_elements if "source" in el.get("data", {})
+    )
     # --- End of new logic ---
 
     # --- Generate options for the node dropdown ---
