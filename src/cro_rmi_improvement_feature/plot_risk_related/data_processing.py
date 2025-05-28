@@ -211,6 +211,22 @@ def generate_network_from_real_data(data_list, selected_checklist_values=None):
             else:
                 raise ValueError("it should have 1 None")
             # print(f"{edge_relation_i_j=},{edge_relation_j_i=}")
+            source_risk_data = {
+                "risk": data_list[i]["risk"],
+                "risk_desc": data_list[i]["risk_desc"],
+                "risk_level": data_list[i]["risk_level"],
+                "risk_cat": data_list[i]["risk_cat"],
+                "process": data_list[i].get("process", ""),
+                "rootcause": data_list[i].get("rootcause", ""),
+            }
+            target_risk_data = {
+                "risk": data_list[j]["risk"],
+                "risk_desc": data_list[j]["risk_desc"],
+                "risk_level": data_list[j]["risk_level"],
+                "risk_cat": data_list[j]["risk_cat"],
+                "process": data_list[i].get("process", ""),
+                "rootcause": data_list[i].get("rootcause", ""),
+            }
             edges.append(
                 {
                     "data": {
@@ -224,6 +240,8 @@ def generate_network_from_real_data(data_list, selected_checklist_values=None):
                         ),
                         "do_not_cal_weight": False,
                         "edge_relation_reason": edge_relation_reason,
+                        "source_risk_data": source_risk_data,
+                        "target_risk_data": target_risk_data,
                     }
                 }
             )

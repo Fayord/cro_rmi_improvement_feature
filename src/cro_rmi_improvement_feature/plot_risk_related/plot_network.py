@@ -13,6 +13,7 @@ from graph_layout import (
     calculate_pyramid_layout,
     find_neighbors,
 )
+import json
 import argparse
 from collections import Counter
 
@@ -562,14 +563,21 @@ def display_edge_info(edge_data):
         arrow_weight = edge_data["data"].get("arrow_weight", "N/A")
         do_not_cal_weight = edge_data["data"].get("do_not_cal_weight", "N/A")
         edge_relation_reason = edge_data["data"].get("edge_relation_reason", "N/A")
-
+        source_risk_data = edge_data["data"].get("source_risk_data", {})
+        target_risk_data = edge_data["data"].get("target_risk_data", {})
         # You might want to look up the actual node labels here if needed
         # For simplicity, we'll just use the IDs for now
+        source_risk_data = json.dumps(source_risk_data, indent=4, ensure_ascii=False)
+        target_risk_data = json.dumps(target_risk_data, indent=4, ensure_ascii=False)
 
         return html.Div(
             [
                 html.H5("Clicked Edge Information:"),
                 html.P(f"Edge Relation Reason: {edge_relation_reason}"),
+                html.P("Source Risk Data:"),
+                html.Pre(source_risk_data),
+                html.P("Target Risk Data:"),
+                html.Pre(target_risk_data),
                 html.P(f"Source Node ID: {source_id}"),
                 html.P(f"Target Node ID: {target_id}"),
                 html.P(
