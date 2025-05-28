@@ -257,6 +257,8 @@ def generate_network_from_real_data(data_list, selected_checklist_values=None):
                             "arrow_weight": "triangle",
                             "do_not_cal_weight": True,
                             "edge_relation_reason": edge_relation_reason,
+                            "source_risk_data": target_risk_data,
+                            "target_risk_data": source_risk_data,
                         }
                     }
                 )
