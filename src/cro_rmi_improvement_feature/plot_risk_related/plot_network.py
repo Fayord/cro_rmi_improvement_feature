@@ -8,10 +8,7 @@ import pickle
 import os
 import math
 import numpy as np
-from utils import (
-    get_level_from_boundaries,
-    find_proportional_count_boundaries,
-    get_elements_for_company,
+from graph_layout import (
     generate_dynamic_stylesheet,
     calculate_pyramid_layout,
     find_neighbors,
@@ -20,7 +17,6 @@ import argparse
 from collections import Counter
 
 from plot_network_defaut_value import (
-    EDGE_SIZE_MULTIPLIER,
     CHECKLIST_OPTIONS,
     edge_rgb_color_list,
     node_highlight_selector_risk_level4,
@@ -31,6 +27,10 @@ from plot_network_defaut_value import (
     bezier_stylesheet,
     round_segment_stylesheet,
     taxi_stylesheet,
+)
+from data_processing import (
+    filter_elements_by_weight_and_recalculate_edges,
+    get_elements_for_company,
 )
 
 cyto.load_extra_layouts()
@@ -48,92 +48,6 @@ companys = sorted({item["company"] for item in real_data})
 
 # Set default company
 default_company = companys[0] if companys else None
-
-
-# New function to filter elements by weight and recalculate edge properties
-def filter_elements_by_weight_and_recalculate_edges(
-    elements, slider_value, edge_rgb_color_list
-):
-    node_edge_counter = Counter()
-    filtered_elements = []
-    old_line_weights = []
-    nodes_in_filtered = {}  # Store nodes for easy access
-
-    # First pass: Filter edges and collect raw weights of visible edges
-    for el in elements:
-        if "source" in el.get("data", {}):
-            if el["data"]["raw_weight"] >= slider_value:
-                # Append edge for now, will update properties in second pass
-                filtered_elements.append(el)
-                node_edge_counter["edge"] += 1
-                old_line_weights.append(el["data"]["raw_weight"])
-        else:
-            # Keep all nodes and store them
-            filtered_elements.append(el)
-            nodes_in_filtered[el["data"]["id"]] = el
-            node_edge_counter["node"] += 1
-
-    # Recalculate edge boundaries and update edge properties for visible edges
-    if old_line_weights:
-        edge_boudaries = find_proportional_count_boundaries(
-            old_line_weights, [60, 30, 10]
-        )
-        for el in filtered_elements:
-            if "source" in el.get("data", {}):
-                old_line_weight = el["data"]["raw_weight"]
-                level = get_level_from_boundaries(edge_boudaries, old_line_weight)
-                display_weight = level * EDGE_SIZE_MULTIPLIER
-                el["data"]["color"] = edge_rgb_color_list[level - 1]
-                el["data"][
-                    "weight"
-                ] = display_weight  # Update edge weight to display weight
-
-    # --- New logic to recalculate node raw_size based on filtered edge display weights ---
-    # Initialize node raw sizes based on filtered edges
-    node_raw_sizes = {node_id: 0.0 for node_id in nodes_in_filtered.keys()}
-
-    for el in filtered_elements:
-        if "source" in el.get("data", {}):
-            src_id = el["data"]["source"]
-            tgt_id = el["data"]["target"]
-            # Use the updated display weight ('weight')
-            w = el["data"]["weight"]
-            if src_id in node_raw_sizes:
-                node_raw_sizes[src_id] += w
-            if tgt_id in node_raw_sizes:
-                node_raw_sizes[tgt_id] += w
-
-    # Get the list of raw sizes in the same order as nodes were added to filtered_elements
-    current_node_raw_sizes = [
-        node_raw_sizes[el["data"]["id"]]
-        for el in filtered_elements
-        if "source" not in el.get("data", {})
-    ]
-    node_size_counter = Counter()
-    # Recalculate node boundaries and update node sizes for visible nodes
-    if current_node_raw_sizes:
-        # Assuming node_proportion_list and node_size_list are accessible in this scope
-        # (They are defined globally in the provided context)
-        node_proportion_list = [65, 30, 5]  # Define or ensure access to these
-        node_size_list = [1, 50, 120]  # Define or ensure access to these
-        number_of_scales = len(node_proportion_list)  # Or len(node_size_list)
-
-        node_boudaries = find_proportional_count_boundaries(
-            current_node_raw_sizes, node_proportion_list
-        )
-
-        node_idx = 0
-        for el in filtered_elements:
-            if "source" not in el.get("data", {}):
-                raw_size = current_node_raw_sizes[node_idx]
-                level = get_level_from_boundaries(node_boudaries, raw_size)
-                display_size = node_size_list[level - 1]
-                node_size_counter[level] += 1
-                el["data"]["size"] = display_size  # Update node size to display size
-                node_idx += 1
-    # --- End of new logic ---
-    print(f"{node_size_counter=}")
-    return filtered_elements, node_edge_counter
 
 
 # Capture total_edges in the initial call
