@@ -39,7 +39,8 @@ cyto.load_extra_layouts()
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
-real_data_path = f"{dir_path}/250520-company_risk_data_with_embedding.pkl"
+# real_data_path = f"{dir_path}/250520-company_risk_data_with_embedding.pkl"
+real_data_path = f"{dir_path}/merge-company_risk_data_with_embedding.pkl"
 real_data = pickle.load(open(real_data_path, "rb"))
 
 

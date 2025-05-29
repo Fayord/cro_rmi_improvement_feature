@@ -193,14 +193,16 @@ def generate_network_from_real_data(data_list, selected_checklist_values=None):
                 # no relationship
                 edge_relation = [0, 0]
                 edge_relation_reason = ""
-            elif edge_relation_i_j is not None and edge_relation_j_i is None:
+            elif edge_relation_i_j is not None:
+                # and edge_relation_j_i is None
                 edge_relation = edge_relation_i_j["direction"]
                 edge_relation_reason = edge_relation_i_j["reason"]
                 if edge_relation[0] == 1:
                     i, j = i, j
                 elif edge_relation[0] == -1:
                     i, j = j, i
-            elif edge_relation_i_j is None and edge_relation_j_i is not None:
+            elif edge_relation_j_i is not None:
+                # edge_relation_i_j is None and
                 edge_relation = edge_relation_j_i["direction"]
                 edge_relation_reason = edge_relation_j_i["reason"]
                 if edge_relation[0] == 1:
