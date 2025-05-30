@@ -53,7 +53,7 @@ default_company = companys[0] if companys else None
 
 
 # Capture total_edges in the initial call
-elements, line_weights, total_edges = get_elements_for_company(
+elements, line_weights, total_edges, total_nodes = get_elements_for_company(
     real_data,
     default_company,
     edge_relationship_path,
@@ -316,7 +316,7 @@ def update_graph_and_output(
     current_cytoscape_layout,  # <-- Add parameter for current layout
 ):
     # Regenerate elements based on company and checklist selection
-    elements, line_weights, total_edges = get_elements_for_company(
+    elements, line_weights, total_edges, total_nodes = get_elements_for_company(
         real_data,
         company,
         edge_relationship_path,

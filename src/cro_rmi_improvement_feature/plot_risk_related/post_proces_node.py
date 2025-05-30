@@ -27,26 +27,9 @@ from langchain.globals import set_llm_cache
 set_llm_cache(SQLiteCache(database_path=".langchain.db"))
 
 
-# Get elements filtered to 10% edges
-def calculate_initial_percentage(total_edges, min_edge_number, max_edge_number):
-    # Calculate the number of edges to show based on the total number of edges
-    # You can adjust the formula as needed
-    # Adjust these parameters to fine-tune the curve
-    # x_shift moves the curve left/right (center of transition)
-    # k controls the steepness of the curve
-    # min_percentage and max_percentage define the output range
-    x_shift = (min_edge_number + max_edge_number) // 2
-    k = 0.005  # Steepness of the sigmoid
-    min_percentage = 0.05  # 5%
-    max_percentage = 0.10  # 10%
-
-    # Sigmoid function scaled to the desired percentage range
-    sigmoid_val = 1 / (1 + math.exp(-k * (total_edges - x_shift)))
-
-    # Linearly interpolate between max_percentage and min_percentage based on sigmoid_val
-    # When sigmoid_val is 0, result is max_percentage. When sigmoid_val is 1, result is min_percentage.
-    percentage = max_percentage - (sigmoid_val * (max_percentage - min_percentage))
-    return percentage
+def get_number_edges_to_show(total_nodes):
+    # can change later
+    return math.ceil(total_nodes * 2)
 
 
 def save_snapshot(real_data_path):
@@ -67,7 +50,7 @@ def save_snapshot(real_data_path):
         )
         for company in companys:
 
-            elements, line_weights, total_edges = get_elements_for_company(
+            elements, line_weights, total_edges, total_nodes = get_elements_for_company(
                 real_data,
                 company,
                 edge_relationship_path,
@@ -75,8 +58,7 @@ def save_snapshot(real_data_path):
             )  # Initial call with empty checklist
 
             # Calculate initial_num_edges_to_show using the sigmoid function and math.ceil
-            initial_percentage = calculate_initial_percentage(total_edges, 600, 2000)
-            initial_num_edges_to_show = math.ceil(total_edges * initial_percentage)
+            initial_num_edges_to_show = get_number_edges_to_show(total_nodes)
             # if total_edges <= 600  initial_num_edges_to_show set to 10% edges
             # if total_edges > 2000 initial_num_edges_to_show set to 5% edges
 

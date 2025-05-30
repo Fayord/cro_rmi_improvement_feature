@@ -25,14 +25,16 @@ def get_elements_for_company(
     filtered = [item for item in data if item["company"] == company]
     if filtered:
         # Capture total_edges from the return value
-        elements, line_weights, total_edges = generate_network_from_real_data(
-            filtered,
-            edge_relationship_path,
-            selected_checklist_values,
+        elements, line_weights, total_edges, total_nodes = (
+            generate_network_from_real_data(
+                filtered,
+                edge_relationship_path,
+                selected_checklist_values,
+            )
         )
-        return elements, line_weights, total_edges
+        return elements, line_weights, total_edges, total_nodes
     else:
-        return [], [], 0  # Return 0 total edges if no data
+        return [], [], 0, 0  # Return 0 total edges if no data
 
 
 # New function to filter elements by weight and recalculate edge properties
@@ -333,4 +335,4 @@ def generate_network_from_real_data(
         )
     print(f"{node_size_counter=}")
     # Return nodes, edges, line_weight_list, and total number of edges
-    return nodes + edges, line_weight_list, len(edges)
+    return nodes + edges, line_weight_list, len(edges), len(nodes)
