@@ -5,7 +5,6 @@ from dotenv import load_dotenv
 from langchain.prompts.chat import ChatPromptTemplate
 from langchain_openai import ChatOpenAI
 from langchain_community.llms import LlamaCpp
-from langchain_community.cache import SQLiteCache
 
 import pickle
 
@@ -16,6 +15,7 @@ import numpy as np
 from collections import Counter
 
 # import re
+from langchain_community.cache import SQLiteCache
 from langchain.globals import set_llm_cache
 
 set_llm_cache(SQLiteCache(database_path=".langchain.db"))

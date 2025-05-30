@@ -20,6 +20,11 @@ from plot_network import (
     edge_relationship_path,
     edge_rgb_color_list,
 )
+from langchain_community.callbacks import get_openai_callback
+from langchain_community.cache import SQLiteCache
+from langchain.globals import set_llm_cache
+
+set_llm_cache(SQLiteCache(database_path=".langchain.db"))
 
 
 # Get elements filtered to 10% edges
@@ -51,6 +56,8 @@ def save_snapshot(real_data_path):
     checkbox_values = ["risk_desc"]
     # Capture total_edges in the initial call
     companys = sorted({item["company"] for item in real_data})
+    companys = [i for i in companys if not i.startswith("risk_catalog")]
+
     initial_filtered_elements_all_company = []
     # --- Add logic to save initial 10% edges snapshot ---
     snapshot_file_path = f"{real_data_path.replace('.pkl','')}-10percent_edges.pkl"
@@ -185,6 +192,15 @@ def add_story_to_top_k_node(
     print("save", real_data_path)
 
 
+def new_finalize_edge_relationship(
+    edge_relationship_a_b: dict, edge_relationship_b_a: dict, risk_a: str, risk_b: str
+):
+    # because I see many case that reason is good enough and reasonable but
+    # the classify of edge relationship is not going with the reason
+    # so my new idea is to use a->b and b->a 's reason to feed to llm to decide the final relationship
+    ...
+
+
 def finalize_edge_relationship(
     edge_relationship_a_b: dict, edge_relationship_b_a: dict, risk_a: str, risk_b: str
 ) -> dict:
@@ -243,6 +259,9 @@ def add_edge_relationship(
     edge_relationship_path,
 ):
     raw_risk_data = pickle.load(open(real_data_path, "rb"))
+    companys = sorted({item["company"] for item in raw_risk_data})
+    companys = [i for i in companys if not i.startswith("risk_catalog")]
+
     snapshot_data_list = pickle.load(open(snapshot_file_path, "rb"))
 
     raw_risk_selected_keys = [
@@ -323,15 +342,22 @@ if __name__ == "__main__":
     print(f"{real_data_path=}")
     # print(f"{default_company=}")
     print(f"{snapshot_file_path=}")
-    add_story_to_top_k_node(
-        real_data_path,
-        snapshot_file_path,
-        top_k=5,
-    )
+    # add_story_to_top_k_node(
+    #     real_data_path,
+    #     snapshot_file_path,
+    #     top_k=5,
+    # )
     # relation_counter=Counter({'no_relationship': 27, 'be_a_cause_to_each_other': 18, 'riskA_cause_riskB': 15})
     #
-    add_edge_relationship(
-        real_data_path,
-        snapshot_file_path,
-        edge_relationship_path,
-    )
+
+    with get_openai_callback() as cb:
+        add_edge_relationship(
+            real_data_path,
+            snapshot_file_path,
+            edge_relationship_path,
+        )
+
+    print(f"Total Tokens: {cb.total_tokens}")
+    print(f"Prompt Tokens: {cb.prompt_tokens}")
+    print(f"Completion Tokens: {cb.completion_tokens}")
+    print(f"Total Cost (USD): ${cb.total_cost}")
