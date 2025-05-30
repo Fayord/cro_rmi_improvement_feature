@@ -16,12 +16,19 @@ from utils import find_equal_count_boundaries
 
 
 # Initial elements for the default company
-def get_elements_for_company(data, company, selected_checklist_values):
+def get_elements_for_company(
+    data,
+    company,
+    edge_relationship_path,
+    selected_checklist_values,
+):
     filtered = [item for item in data if item["company"] == company]
     if filtered:
         # Capture total_edges from the return value
         elements, line_weights, total_edges = generate_network_from_real_data(
-            filtered, selected_checklist_values
+            filtered,
+            edge_relationship_path,
+            selected_checklist_values,
         )
         return elements, line_weights, total_edges
     else:
@@ -113,7 +120,11 @@ def filter_elements_by_weight_and_recalculate_edges(
     return filtered_elements, node_edge_counter
 
 
-def generate_network_from_real_data(data_list, selected_checklist_values=None):
+def generate_network_from_real_data(
+    data_list,
+    edge_relationships_data_path,
+    selected_checklist_values=None,
+):
     """
     data_list: list of dicts, each dict contains:
         - "risk": str
@@ -121,11 +132,10 @@ def generate_network_from_real_data(data_list, selected_checklist_values=None):
         - "risk_desc": str
         - "embedding_risk_desc": list or np.array
     """
-    try:
-        dir_path = os.path.dirname(os.path.realpath(__file__))
-    except Exception:
-        dir_path = os.getcwd()
-    edge_relationships_data_path = f"{dir_path}/edge_relationships.pkl"
+    # try:
+    #     dir_path = os.path.dirname(os.path.realpath(__file__))
+    # except Exception:
+    #     dir_path = os.getcwd()
     if os.path.exists(edge_relationships_data_path):
         edge_relationships_data = pickle.load(open(edge_relationships_data_path, "rb"))
     else:

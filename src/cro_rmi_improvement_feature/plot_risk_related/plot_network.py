@@ -40,9 +40,9 @@ cyto.load_extra_layouts()
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
 # real_data_path = f"{dir_path}/250520-company_risk_data_with_embedding.pkl"
-real_data_path = f"{dir_path}/merge-company_risk_data_with_embedding.pkl"
+real_data_path = f"{dir_path}/result/merge-company_risk_data_with_embedding.pkl"
 real_data = pickle.load(open(real_data_path, "rb"))
-
+edge_relationship_path = real_data_path.replace(".pkl", "-edge_relationship.json")
 
 print(f"{real_data[0].keys()=}")
 # Extract unique company names from real_data
@@ -54,7 +54,10 @@ default_company = companys[0] if companys else None
 
 # Capture total_edges in the initial call
 elements, line_weights, total_edges = get_elements_for_company(
-    real_data, default_company, ["risk_desc"]
+    real_data,
+    default_company,
+    edge_relationship_path,
+    ["risk_desc"],
 )  # Initial call with empty checklist
 
 
@@ -314,7 +317,10 @@ def update_graph_and_output(
 ):
     # Regenerate elements based on company and checklist selection
     elements, line_weights, total_edges = get_elements_for_company(
-        real_data, company, selected_checklist_values
+        real_data,
+        company,
+        edge_relationship_path,
+        selected_checklist_values,
     )
 
     # --- New logic to calculate slider_value (weight threshold) based on num_edges_to_show ---

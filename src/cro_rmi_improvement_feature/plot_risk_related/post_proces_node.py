@@ -15,50 +15,89 @@ from plot_network import (
 from utils import tell_a_story_risk_data_grouped, classify_edge_relationship
 
 # import variable
-from plot_network import real_data_path, default_company, edge_rgb_color_list
+from plot_network import (
+    real_data_path,
+    edge_relationship_path,
+    edge_rgb_color_list,
+)
 
 
-def save_snapshot(real_data_path, default_company):
+# Get elements filtered to 10% edges
+def calculate_initial_percentage(total_edges, min_edge_number, max_edge_number):
+    # Calculate the number of edges to show based on the total number of edges
+    # You can adjust the formula as needed
+    # Adjust these parameters to fine-tune the curve
+    # x_shift moves the curve left/right (center of transition)
+    # k controls the steepness of the curve
+    # min_percentage and max_percentage define the output range
+    x_shift = (min_edge_number + max_edge_number) // 2
+    k = 0.005  # Steepness of the sigmoid
+    min_percentage = 0.05  # 5%
+    max_percentage = 0.10  # 10%
+
+    # Sigmoid function scaled to the desired percentage range
+    sigmoid_val = 1 / (1 + math.exp(-k * (total_edges - x_shift)))
+
+    # Linearly interpolate between max_percentage and min_percentage based on sigmoid_val
+    # When sigmoid_val is 0, result is max_percentage. When sigmoid_val is 1, result is min_percentage.
+    percentage = max_percentage - (sigmoid_val * (max_percentage - min_percentage))
+    return percentage
+
+
+def save_snapshot(real_data_path):
     # can overried these variable
     print("\n" * 4)
     real_data = pickle.load(open(real_data_path, "rb"))
     checkbox_values = ["risk_desc"]
     # Capture total_edges in the initial call
-    elements, line_weights, total_edges = get_elements_for_company(
-        real_data, default_company, checkbox_values
-    )  # Initial call with empty checklist
-
+    companys = sorted({item["company"] for item in real_data})
+    initial_filtered_elements_all_company = []
     # --- Add logic to save initial 10% edges snapshot ---
     snapshot_file_path = f"{real_data_path.replace('.pkl','')}-10percent_edges.pkl"
-
     if not os.path.exists(snapshot_file_path):
         print(
             f"Snapshot file not found: {snapshot_file_path}. Generating and saving..."
         )
-        # Get elements filtered to 10% edges
-        initial_num_edges_to_show = math.ceil(total_edges * 0.10)
-        # Need to call filter_elements_by_weight_and_recalculate_edges with the initial elements
-        # and the weight threshold corresponding to 10% edges.
-        # First, find the threshold weight for 10% edges from the initial line_weights
-        if total_edges > 0 and initial_num_edges_to_show > 0:
-            sorted_weights = sorted(line_weights, reverse=True)
-            threshold_weight = sorted_weights[initial_num_edges_to_show - 1]
-        elif total_edges == 0 or initial_num_edges_to_show == 0:
-            threshold_weight = float(
-                "inf"
-            )  # Set a high threshold to show 0 edges if needed
-        else:
-            threshold_weight = float(
-                "-inf"
-            )  # Should not happen if total_edges > 0 and num_edges > 0
+        for company in companys:
 
-        initial_filtered_elements, _ = filter_elements_by_weight_and_recalculate_edges(
-            elements, threshold_weight, edge_rgb_color_list
-        )
+            elements, line_weights, total_edges = get_elements_for_company(
+                real_data,
+                company,
+                edge_relationship_path,
+                checkbox_values,
+            )  # Initial call with empty checklist
 
+            # Calculate initial_num_edges_to_show using the sigmoid function and math.ceil
+            initial_percentage = calculate_initial_percentage(total_edges, 600, 2000)
+            initial_num_edges_to_show = math.ceil(total_edges * initial_percentage)
+            # if total_edges <= 600  initial_num_edges_to_show set to 10% edges
+            # if total_edges > 2000 initial_num_edges_to_show set to 5% edges
+
+            # Need to call filter_elements_by_weight_and_recalculate_edges with the initial elements
+            # and the weight threshold corresponding to 10% edges.
+            # First, find the threshold weight for 10% edges from the initial line_weights
+            if total_edges > 0 and initial_num_edges_to_show > 0:
+                sorted_weights = sorted(line_weights, reverse=True)
+                threshold_weight = sorted_weights[initial_num_edges_to_show - 1]
+            elif total_edges == 0 or initial_num_edges_to_show == 0:
+                threshold_weight = float(
+                    "inf"
+                )  # Set a high threshold to show 0 edges if needed
+            else:
+                threshold_weight = float(
+                    "-inf"
+                )  # Should not happen if total_edges > 0 and num_edges > 0
+
+            initial_filtered_elements, _ = (
+                filter_elements_by_weight_and_recalculate_edges(
+                    elements, threshold_weight, edge_rgb_color_list
+                )
+            )
+            initial_filtered_elements_all_company.extend(initial_filtered_elements)
+        print("Success all company")
         try:
             with open(snapshot_file_path, "wb") as f:
-                pickle.dump(initial_filtered_elements, f)
+                pickle.dump(initial_filtered_elements_all_company, f)
             print(
                 f"Successfully saved initial 10% edges snapshot to {snapshot_file_path}"
             )
@@ -67,6 +106,7 @@ def save_snapshot(real_data_path, default_company):
     else:
         print(f"Snapshot file already exists: {snapshot_file_path}. Skipping save.")
     # --- End of snapshot logic ---
+
     return snapshot_file_path
 
 
@@ -78,9 +118,16 @@ def get_risk_data_from_risk_name(risk_name, risk_data_list):
 
 
 def add_story_to_top_k_node(
-    real_data_path, default_company, snapshot_file_path, top_k=5
+    real_data_path,
+    snapshot_file_path,
+    top_k=5,
 ):
+    raise
+    # need to improve this to not use default_company
     raw_risk_data = pickle.load(open(real_data_path, "rb"))
+    companys = sorted({item["company"] for item in raw_risk_data})
+    companys = [i for i in companys if not i.startswith("risk_catalog")]
+    # TODO need to change how we create story
     snapshot_data_list = pickle.load(open(snapshot_file_path, "rb"))
 
     raw_risk_selected_keys = [
@@ -190,7 +237,11 @@ def finalize_edge_relationship(
     return post_process_relationship(final_relationship, risk_a, risk_b)
 
 
-def add_edge_relationship(real_data_path, snapshot_file_path):
+def add_edge_relationship(
+    real_data_path,
+    snapshot_file_path,
+    edge_relationship_path,
+):
     raw_risk_data = pickle.load(open(real_data_path, "rb"))
     snapshot_data_list = pickle.load(open(snapshot_file_path, "rb"))
 
@@ -262,23 +313,25 @@ def add_edge_relationship(real_data_path, snapshot_file_path):
             raise ValueError(f"Unknown edge_relationship: {edge_relationship}")
         new_edge_data_dict[key]["reason"] = edge_relationship["reason"]
     # save new_edge_data_dict to pickle
-    try:
-        dir_path = os.path.dirname(os.path.realpath(__file__))
-    except Exception:
-        dir_path = os.getcwd()
 
-    pickle.dump(new_edge_data_dict, open(f"{dir_path}/edge_relationships.pkl", "wb"))
+    pickle.dump(new_edge_data_dict, open(edge_relationship_path, "wb"))
 
 
 if __name__ == "__main__":
 
-    snapshot_file_path = save_snapshot(real_data_path, default_company)
+    snapshot_file_path = save_snapshot(real_data_path)
     print(f"{real_data_path=}")
-    print(f"{default_company=}")
+    # print(f"{default_company=}")
     print(f"{snapshot_file_path=}")
-    # add_story_to_top_k_node(
-    #     real_data_path, default_company, snapshot_file_path, top_k=5
-    # )
+    add_story_to_top_k_node(
+        real_data_path,
+        snapshot_file_path,
+        top_k=5,
+    )
     # relation_counter=Counter({'no_relationship': 27, 'be_a_cause_to_each_other': 18, 'riskA_cause_riskB': 15})
     #
-    add_edge_relationship(real_data_path, snapshot_file_path)
+    add_edge_relationship(
+        real_data_path,
+        snapshot_file_path,
+        edge_relationship_path,
+    )
