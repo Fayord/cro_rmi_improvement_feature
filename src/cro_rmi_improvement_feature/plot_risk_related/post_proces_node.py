@@ -18,6 +18,8 @@ from utils import (
     classify_final_edge_relationship,
 )
 
+from utils import get_number_edges_to_show
+
 # import variable
 from plot_network import (
     real_data_path,
@@ -29,11 +31,6 @@ from langchain_community.cache import SQLiteCache
 from langchain.globals import set_llm_cache
 
 set_llm_cache(SQLiteCache(database_path=".langchain.db"))
-
-
-def get_number_edges_to_show(total_nodes):
-    # can change later
-    return math.ceil(total_nodes * 2)
 
 
 def save_snapshot(real_data_path):

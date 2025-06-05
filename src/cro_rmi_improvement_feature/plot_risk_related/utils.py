@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field, validator
 from typing import List
 import numpy as np
 from collections import Counter
+import math
 
 # import re
 from langchain_community.cache import SQLiteCache
@@ -32,6 +33,11 @@ except Exception:
     load_dotenv(env_path)
     api_key = os.getenv("OPENAI_API_KEY")
     assert api_key, "API key is missing"
+
+
+def get_number_edges_to_show(total_nodes):
+    # can change later
+    return math.ceil(total_nodes * 2)
 
 
 def get_llm(provider: str = "openai", model_name: Optional[str] = None):

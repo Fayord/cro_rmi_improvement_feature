@@ -29,6 +29,7 @@ from plot_network_defaut_value import (
     round_segment_stylesheet,
     taxi_stylesheet,
 )
+from utils import get_number_edges_to_show
 from data_processing import (
     filter_elements_by_weight_and_recalculate_edges,
     get_elements_for_company,
@@ -169,7 +170,7 @@ app.layout = html.Div(
                     max=total_edges,  # Set max to total edges
                     step=1,
                     value=math.ceil(
-                        total_edges * 0.10
+                        get_number_edges_to_show(total_nodes)
                     ),  # Default to 10% of total edges, rounded up
                     # Marks will be generated dynamically in the callback
                     # marks={i: str(i) for i in range(0, total_edges + 1, max(1, total_edges // 10))},
