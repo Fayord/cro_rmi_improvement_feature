@@ -331,7 +331,7 @@ def update_graph_and_output(
         current_num_edges_shown = 0
     else:
         # Ensure num_edges_to_show is within the valid range [0, total_edges]
-        num_edges_to_show = max(0, min(total_edges, num_edges_to_show))
+        num_edges_to_show = get_number_edges_to_show(total_nodes)
 
         if num_edges_to_show == 0:
             # If showing 0 edges, set threshold higher than max weight
@@ -357,7 +357,7 @@ def update_graph_and_output(
     ):
         num_edges_slider_value = total_edges
     else:
-        num_edges_slider_value = num_edges_to_show
+        num_edges_slider_value = get_number_edges_to_show(total_nodes)
 
     # Generate marks for the number of edges slider
     if total_edges > 0:

@@ -334,17 +334,17 @@ if __name__ == "__main__":
     #
 
     with get_openai_callback() as cb:
-        # add_edge_relationship(
-        #     real_data_path,
-        #     snapshot_file_path,
-        #     edge_relationship_path,
-        # )
-        add_story_to_top_k_node(
+        add_edge_relationship(
             real_data_path,
             snapshot_file_path,
             edge_relationship_path,
-            top_k=5,
         )
+        # add_story_to_top_k_node(
+        #     real_data_path,
+        #     snapshot_file_path,
+        #     edge_relationship_path,
+        #     top_k=5,
+        # )
 
     print(f"Total Tokens: {cb.total_tokens}")
     print(f"Prompt Tokens: {cb.prompt_tokens}")

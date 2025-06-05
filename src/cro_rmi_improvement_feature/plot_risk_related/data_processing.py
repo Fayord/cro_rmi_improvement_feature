@@ -28,6 +28,7 @@ def get_elements_for_company(
         # Capture total_edges from the return value
         elements, line_weights, total_edges, total_nodes = (
             generate_network_from_real_data(
+                company,
                 filtered,
                 edge_relationship_path,
                 selected_checklist_values,
@@ -124,6 +125,7 @@ def filter_elements_by_weight_and_recalculate_edges(
 
 
 def generate_network_from_real_data(
+    company,
     data_list,
     edge_relationships_data_path,
     selected_checklist_values=None,
@@ -248,8 +250,8 @@ def generate_network_from_real_data(
             edges.append(
                 {
                     "data": {
-                        "source": f"risk_{i}",
-                        "target": f"risk_{j}",
+                        "source": f"risk_{company}_{i}",
+                        "target": f"risk_{company}_{j}",
                         "weight": display_weight,
                         "raw_weight": raw_weight,
                         "color": edge_color,
@@ -267,8 +269,8 @@ def generate_network_from_real_data(
                 edges.append(
                     {
                         "data": {
-                            "source": f"risk_{j}",
-                            "target": f"risk_{i}",
+                            "source": f"risk_{company}_{j}",
+                            "target": f"risk_{company}_{i}",
                             "weight": display_weight,
                             "raw_weight": raw_weight,
                             "color": edge_color,
@@ -287,8 +289,8 @@ def generate_network_from_real_data(
     for edge in edges:
         if edge["data"]["do_not_cal_weight"]:
             continue
-        src = int(edge["data"]["source"].split("_")[1])
-        tgt = int(edge["data"]["target"].split("_")[1])
+        src = int(edge["data"]["source"].split("_")[-1])
+        tgt = int(edge["data"]["target"].split("_")[-1])
         w = edge["data"]["raw_weight"]
         node_raw_sizes[src] += w
         node_raw_sizes[tgt] += w
@@ -323,7 +325,7 @@ def generate_network_from_real_data(
         nodes.append(
             {
                 "data": {
-                    "id": f"risk_{idx}",
+                    "id": f"risk_{company}_{idx}",
                     "label": data["risk"],
                     "raw_size": raw_size,
                     "size_level": level,
