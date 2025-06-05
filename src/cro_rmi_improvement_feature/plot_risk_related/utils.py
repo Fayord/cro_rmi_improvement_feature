@@ -48,6 +48,76 @@ def get_llm(provider: str = "openai", model_name: Optional[str] = None):
         raise ValueError(f"Unsupported provider: {provider}")
 
 
+def classify_final_edge_relationship(
+    edge_relationship_a_b: Dict[str, str],
+    edge_relationship_b_a: Dict[str, str],
+    risk_a_name: str,
+    risk_b_name: str,
+) -> dict:
+    # edge_relationship_a_b, edge_relationship_b_a, risk_a["risk"], risk_b["risk"]
+    try:
+        llm = get_llm()
+        # parser = PydanticOutputParser(pydantic_object=EdgeRelationship)
+
+        # Format input data for the prompt
+        edge_relationship_a_b_reason = edge_relationship_a_b["reason"]
+        edge_relationship_b_a_reason = edge_relationship_b_a["reason"]
+
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                (
+                    "system",
+                    f"""You are an expert in risk assessment and business analysis. Your task is to classify the relationship between two risks based on their descriptions and context. your analysis will be from the perspective of business owner.
+
+Analyze the provided data for {risk_a_name} and {risk_b_name} and determine the relationship type.
+
+Provide the classification and a brief reason in the specified JSON format.
+
+""",
+                ),
+                (
+                    "human",
+                    f"Please classify the relationship between risk{risk_a_name} and {risk_b_name} with these two reason: 1.{edge_relationship_a_b_reason} 2. {edge_relationship_b_a_reason}",
+                ),
+            ]
+        )
+        json_schema = {
+            "properties": {
+                "relationship": {
+                    "description": f"Relationship between two risks. {risk_a_name}_caused_by_{risk_b_name} means {risk_b_name} is the cause and {risk_a_name} is the effect. {risk_b_name}_caused_by_{risk_a_name} means {risk_a_name} is the cause and {risk_b_name} is the effect.  no_relationship means there is no relationship between two risks. be_a_cause_to_each_other means two risks are both cause and effect to each other.",
+                    "enum": [
+                        f"{risk_a_name}_caused_by_{risk_b_name}",
+                        f"{risk_b_name}_caused_by_{risk_a_name}",
+                        "no_relationship",
+                        "be_a_caused_by_each_other",
+                    ],
+                    "title": "Relationship",
+                    "type": "string",
+                },
+                "reason": {
+                    "description": "Brief reason for the relationship classification in 1 sentence",
+                    "title": "Reason",
+                    "type": "string",
+                },
+            },
+            "required": ["relationship", "reason"],
+            "title": "EdgeRelationship",
+            "type": "object",
+        }
+        structured_llm = llm.with_structured_output(json_schema)
+        chain = prompt | structured_llm
+
+        # Invoke the chain
+        result = chain.invoke({})
+        # print(f"{risk_a_str=}")
+        # Return the relationship field from the parsed model
+        return result
+
+    except Exception as e:
+        print(f"Error classifying edge relationship: {str(e)}")
+        raise Exception(f"Error classifying edge relationship: {str(e)}")
+
+
 def classify_edge_relationship(risk_a: Dict[str, Any], risk_b: Dict[str, Any]) -> dict:
     try:
         llm = get_llm()

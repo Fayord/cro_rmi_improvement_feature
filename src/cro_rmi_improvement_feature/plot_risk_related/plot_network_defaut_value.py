@@ -55,6 +55,13 @@ rgb_color_list = [
     "rgb(0, 255, 255)",  # Aqua
     "rgb(240, 230, 140)",  # Khaki
 ]
+risk_cat_color_dict = {
+    "Operational Risk": "rgb(255, 248, 222)",
+    "Strategic Risk": "rgb(208, 232, 197)",
+    "Credit Risk": "rgb(197, 211, 232)",
+    "Market Risk": "rgb(166, 174, 191)",
+    "Liquidity Risk": "rgb(192, 219, 234)",
+}
 edge_rgb_color_list = [
     # very light grey
     "rgb(201, 203, 207)",

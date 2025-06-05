@@ -42,7 +42,7 @@ dir_path = os.path.dirname(os.path.realpath(__file__))
 # real_data_path = f"{dir_path}/250520-company_risk_data_with_embedding.pkl"
 real_data_path = f"{dir_path}/result/merge-company_risk_data_with_embedding.pkl"
 real_data = pickle.load(open(real_data_path, "rb"))
-edge_relationship_path = real_data_path.replace(".pkl", "-edge_relationship.json")
+edge_relationship_path = real_data_path.replace(".pkl", "-edge_relationship.pkl")
 
 print(f"{real_data[0].keys()=}")
 # Extract unique company names from real_data
@@ -378,23 +378,24 @@ def update_graph_and_output(
 
     # --- New logic to hide edges with arrow_weight == 0 if toggle is active ---
     # We will modify the elements in place or create a new list with modified styles
-    modified_elements = []
-    for el in filtered_elements:
-        if "source" in el.get("data", {}):  # It's an edge
-            if (
-                "hide" in hide_no_arrow_edges
-                and el["data"].get("arrow_weight") == "none"
-            ):
-                # Set opacity to 0 for hidden edges
-                el["style"] = {"opacity": 0}
-            else:
-                # Ensure opacity is 1 for visible edges (or default)
-                el["style"] = {"opacity": 1}
-            modified_elements.append(el)
-        else:  # It's a node
-            modified_elements.append(el)
-    filtered_elements = modified_elements
+    def filter_hide_no_arrow_edges(filtered_elements):
+        modified_elements = []
+        for el in filtered_elements:
+            if "source" in el.get("data", {}):  # It's an edge
+                if (
+                    "hide" in hide_no_arrow_edges
+                    and el["data"].get("arrow_weight") == "none"
+                ):
+                    pass
+                else:
+                    # Ensure opacity is 1 for visible edges (or default)
+                    el["style"] = {"opacity": 1}
+                    modified_elements.append(el)
+            else:  # It's a node
+                modified_elements.append(el)
+        return modified_elements
 
+    filtered_elements = filter_hide_no_arrow_edges(filtered_elements)
     # Update edge count after potentially hiding (by opacity) edges
     # The count should still reflect all edges that passed the weight filter, even if their opacity is 0
     node_edge_counter["edge"] = sum(

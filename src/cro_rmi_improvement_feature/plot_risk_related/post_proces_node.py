@@ -12,7 +12,11 @@ from plot_network import (
     filter_elements_by_weight_and_recalculate_edges,
     find_neighbors,
 )
-from utils import tell_a_story_risk_data_grouped, classify_edge_relationship
+from utils import (
+    tell_a_story_risk_data_grouped,
+    classify_edge_relationship,
+    classify_final_edge_relationship,
+)
 
 # import variable
 from plot_network import (
@@ -174,53 +178,22 @@ def add_story_to_top_k_node(
     print("save", real_data_path)
 
 
-def new_finalize_edge_relationship(
-    edge_relationship_a_b: dict, edge_relationship_b_a: dict, risk_a: str, risk_b: str
-):
-    # because I see many case that reason is good enough and reasonable but
-    # the classify of edge relationship is not going with the reason
-    # so my new idea is to use a->b and b->a 's reason to feed to llm to decide the final relationship
-    ...
-
-
 def finalize_edge_relationship(
-    edge_relationship_a_b: dict, edge_relationship_b_a: dict, risk_a: str, risk_b: str
-) -> dict:
-    def select_final_relationship(
-        edge_relationship_a_b: dict, edge_relationship_b_a: dict
-    ) -> dict:
-        # if it the same
-        if (
-            edge_relationship_a_b["relationship"]
-            == edge_relationship_b_a["relationship"]
-        ):
-            return edge_relationship_a_b
-        # if there is different we will select more relationship
-        if edge_relationship_a_b["relationship"] == "no_relationship":
-            return edge_relationship_b_a
-        if edge_relationship_b_a["relationship"] == "no_relationship":
-            return edge_relationship_a_b
-        if edge_relationship_a_b["relationship"] == "be_a_cause_to_each_other":
-            return edge_relationship_a_b
-        if edge_relationship_b_a["relationship"] == "be_a_cause_to_each_other":
-            return edge_relationship_b_a
-        edge_relation = {
-            "relationship": "be_a_cause_to_each_other",
-            "reason": edge_relationship_a_b["reason"]
-            + "\n\n"
-            + edge_relationship_b_a["reason"],
-        }
-        return edge_relation
+    edge_relationship_a_b: dict,
+    edge_relationship_b_a: dict,
+    risk_a_name: str,
+    risk_b_name: str,
+):
 
     def post_process_relationship(
-        final_relationship: dict, risk_a: str, risk_b: str
+        final_relationship: dict, risk_a_name: str, risk_b_name: str
     ) -> dict:
         if final_relationship["relationship"] in [
             "be_a_cause_to_each_other",
             "no_relationship",
         ]:
             return final_relationship
-        if final_relationship["relationship"].find(risk_a) == 0:
+        if final_relationship["relationship"].find(risk_a_name) == 0:
             # risk a_caused_by_risk b
             # so it mean risk a is effect and risk b is cause
             final_relationship["relationship"] = "effect_then_cause"
@@ -229,10 +202,14 @@ def finalize_edge_relationship(
             final_relationship["relationship"] = "cause_then_effect"
             return final_relationship
 
-    final_relationship = select_final_relationship(
-        edge_relationship_a_b, edge_relationship_b_a
+    # because I see many case that reason is good enough and reasonable but
+    # the classify of edge relationship is not going with the reason
+    # so my new idea is to use a->b and b->a 's reason to feed to llm to decide the final relationship
+    final_relationship = classify_final_edge_relationship(
+        edge_relationship_a_b, edge_relationship_b_a, risk_a_name, risk_b_name
     )
-    return post_process_relationship(final_relationship, risk_a, risk_b)
+
+    return post_process_relationship(final_relationship, risk_a_name, risk_b_name)
 
 
 def add_edge_relationship(

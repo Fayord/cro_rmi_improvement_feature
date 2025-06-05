@@ -11,6 +11,7 @@ from plot_network_defaut_value import (
     EDGE_SIZE_MULTIPLIER,
     edge_rgb_color_list,
     rgb_color_list,
+    risk_cat_color_dict,
 )
 from utils import find_equal_count_boundaries
 
@@ -205,16 +206,14 @@ def generate_network_from_real_data(
                 # no relationship
                 edge_relation = [0, 0]
                 edge_relation_reason = ""
-            elif edge_relation_i_j is not None:
-                # and edge_relation_j_i is None
+            elif edge_relation_i_j is not None and edge_relation_j_i is None:
                 edge_relation = edge_relation_i_j["direction"]
                 edge_relation_reason = edge_relation_i_j["reason"]
                 if edge_relation[0] == 1:
                     i, j = i, j
                 elif edge_relation[0] == -1:
                     i, j = j, i
-            elif edge_relation_j_i is not None:
-                # edge_relation_i_j is None and
+            elif edge_relation_i_j is None and edge_relation_j_i is not None:
                 edge_relation = edge_relation_j_i["direction"]
                 edge_relation_reason = edge_relation_j_i["reason"]
                 if edge_relation[0] == 1:
@@ -223,6 +222,11 @@ def generate_network_from_real_data(
                     i, j = i, j
 
             else:
+                print("error")
+                print(data_list[i]["risk"])
+                print(data_list[j]["risk"])
+                print(edge_relation_i_j)
+                print(edge_relation_j_i)
                 raise ValueError("it should have 1 None")
             # print(f"{edge_relation_i_j=},{edge_relation_j_i=}")
             source_risk_data = {
@@ -314,7 +318,8 @@ def generate_network_from_real_data(
         node_size_counter[level] += 1
         display_size = node_size_list[level - 1]
         risk_cat = data["risk_cat"]
-        risk_cat_color = rgb_color_list[all_risk_cat.index(risk_cat)]
+        # risk_cat_color = rgb_color_list[all_risk_cat.index(risk_cat)]
+        risk_cat_color = risk_cat_color_dict[risk_cat]
         nodes.append(
             {
                 "data": {
