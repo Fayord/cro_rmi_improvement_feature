@@ -199,10 +199,10 @@ def generate_network_from_real_data(
             display_weight = level * EDGE_SIZE_MULTIPLIER
             edge_color = edge_rgb_color_list[level - 1]
             edge_relation_i_j = edge_relationships_data.get(
-                tuple((data_list[i]["risk"], data_list[j]["risk"])), None
+                tuple((data_list[i]["risk"], data_list[j]["risk"], company)), None
             )
             edge_relation_j_i = edge_relationships_data.get(
-                tuple((data_list[j]["risk"], data_list[i]["risk"])), None
+                tuple((data_list[j]["risk"], data_list[i]["risk"], company)), None
             )
             if edge_relation_i_j is None and edge_relation_j_i is None:
                 # no relationship
@@ -307,12 +307,6 @@ def generate_network_from_real_data(
             return 60  # fallback if all are equal
         return 20 + (raw - min_raw) / (max_raw - min_raw) * (100 - 20)
 
-    all_risk_cat = []
-    for data in data_list:
-        risk_cat = data["risk_cat"]
-        if risk_cat not in all_risk_cat:
-            all_risk_cat.append(risk_cat)
-    all_risk_cat.sort()
     # Create nodes for each risk
     for idx, data in enumerate(data_list):
         raw_size = node_raw_sizes[idx]
@@ -320,7 +314,6 @@ def generate_network_from_real_data(
         node_size_counter[level] += 1
         display_size = node_size_list[level - 1]
         risk_cat = data["risk_cat"]
-        # risk_cat_color = rgb_color_list[all_risk_cat.index(risk_cat)]
         risk_cat_color = risk_cat_color_dict[risk_cat]
         nodes.append(
             {

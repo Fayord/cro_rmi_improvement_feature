@@ -1,5 +1,5 @@
 import random
-from typing import Any, Dict, List, Optional, Literal
+from typing import Any, Dict, List, Optional, Literal, Union
 import os
 from dotenv import load_dotenv
 from langchain.prompts.chat import ChatPromptTemplate
@@ -266,7 +266,7 @@ Generate the story in plain text, focusing on clarity and conciseness.
 def tell_a_story_risk_data_grouped(
     input_risk_data: Dict[str, Any],
     related_risk_data: List[Dict[str, Any]],
-    additional_data: Optional[Dict[str, Any]] = None,
+    additional_data: Optional[Union[Dict[str, Any], List[Dict[str, Any]]]] = None,
 ) -> str:
     """Generate a concise plain text story about cause and effect, grouping related risks.
 
@@ -294,11 +294,21 @@ def tell_a_story_risk_data_grouped(
                 )
 
         additional_data_str = ""
-        if additional_data:
+        # if additional_data is dict
+        if isinstance(additional_data, dict):
             additional_data_str = "\nAdditional Business Context:\n"
             additional_data_str += "\n".join(
                 [f"- {k}: {v}" for k, v in additional_data.items()]
             )
+        elif isinstance(additional_data, list):
+            additional_data_str = "\nAdditional Business Context:\n"
+            for i, item in enumerate(additional_data):
+                additional_data_str += f"Item {i+1}:\n"
+                additional_data_str += (
+                    "\n".join([f"  - {k}: {v}" for k, v in item.items()]) + "\n"
+                )
+        else:
+            raise ValueError(f"Unknown additional data type: {type(additional_data)}")
 
         prompt = ChatPromptTemplate.from_messages(
             [

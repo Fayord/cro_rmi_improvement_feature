@@ -108,24 +108,36 @@ def get_risk_data_from_risk_name(risk_name, risk_data_list):
 
 
 def get_risk_relationship_data_list(
-    input_risk_name, related_risk_name_list, edge_relationship_data
+    input_risk_name, related_risk_name_list, edge_relationship_data, company
 ):
     risk_a_name = input_risk_name
     risk_relationship_data_list = []
     for risk_b_name in related_risk_name_list:
-        key = tuple((risk_a_name, risk_b_name))
-        invert_key = tuple((risk_b_name, risk_a_name))
+        key = tuple((risk_a_name, risk_b_name, company))
+        invert_key = tuple((risk_b_name, risk_a_name, company))
         relation_data = edge_relationship_data.get(key, None)
+        final_key = key
         if relation_data is None:
             relation_data = edge_relationship_data.get(invert_key, None)
+            final_key = invert_key
         if relation_data is None:
             raise ValueError(f"No relationship data found for {key}")
-        print()
-        print(f"{key=}")
-        print(f"{invert_key=}")
-        print(f"{relation_data=}")
+        # print(f"{key=}")
+        # print(f"{invert_key=}")
+        if final_key == (
+            "Poor product quality",
+            "Product-related dissatisfaction",
+            "PCG",
+        ):
+            print("\n\theredebug")
+            print(f"{final_key=}")
+            print(f"{relation_data=}")
+        try:
+            relation_data.pop("direction")
+        except Exception:
+            # it ok to not have direction
+            pass
         risk_relationship_data_list.append(relation_data)
-        raise
     return risk_relationship_data_list
 
 
@@ -152,7 +164,9 @@ def add_story_to_top_k_node(
             "process",
         ]
         raw_risk_selected_data_list = []
-        for i in raw_risk_data:
+        selected_raw_risk_data = [i for i in raw_risk_data if i["company"] == company]
+        # for i in raw_risk_data:
+        for i in selected_raw_risk_data:
             raw_risk_selected_data_list.append(
                 {k: i[k] for k in raw_risk_selected_keys}
             )
@@ -162,7 +176,21 @@ def add_story_to_top_k_node(
             if node_edge["data"].get("source") is not None:
                 # it a edge
                 continue
+            node_company = ("_").join(node_edge["data"]["id"].split("_")[1:-1])
+            if node_company != company:
+                continue
             node_data_list.append(node_edge["data"])
+        company_selected_snapshot_data_list = []
+        for node_edge in company_selected_snapshot_data_list:
+            if node_edge["data"].get("source") is not None:
+                # it a edge
+
+                node_company = ("_").join(node_edge["data"]["source"].split("_")[1:-1])
+            else:
+                node_company = ("_").join(node_edge["data"]["id"].split("_")[1:-1])
+            if node_company != company:
+                continue
+            company_selected_snapshot_data_list.append(node_edge)
         node_data_df = pd.DataFrame(node_data_list)
         node_data_df = node_data_df.sort_values(
             by=["risk_level", "size_level"], ascending=False
@@ -172,7 +200,7 @@ def add_story_to_top_k_node(
 
         for selected_node_id in top_k_node_ids:
             primary_nodes, _, subgraph_elements = find_neighbors(
-                selected_node_id, snapshot_data_list
+                selected_node_id, company_selected_snapshot_data_list
             )
             input_risk_name = node_data_df[node_data_df["id"] == selected_node_id][
                 "label"
@@ -189,16 +217,19 @@ def add_story_to_top_k_node(
                 for i in related_risk_name_list
             ]
             risk_relationship_data_list = get_risk_relationship_data_list(
-                input_risk_name, related_risk_name_list, edge_relationship_data
+                input_risk_name, related_risk_name_list, edge_relationship_data, company
             )
-            raise
+
             story = tell_a_story_risk_data_grouped(
-                input_risk_data, related_risk_data_list
+                input_risk_data, related_risk_data_list, risk_relationship_data_list
             )
 
             for ind in range(len(raw_risk_data)):
                 raw_risk_data_item = raw_risk_data[ind]
-                if raw_risk_data_item["risk"] == input_risk_name:
+                if (
+                    raw_risk_data_item["risk"] == input_risk_name
+                    and raw_risk_data_item["company"] == company
+                ):
                     print(f"{input_risk_name=}")
                     raw_risk_data[ind]["story"] = story
     print("Done")
@@ -217,6 +248,7 @@ def finalize_edge_relationship(
     def post_process_relationship(
         final_relationship: dict, risk_a_name: str, risk_b_name: str
     ) -> dict:
+        final_relationship["ori_relationship"] = final_relationship["relationship"]
         if final_relationship["relationship"] in [
             "be_a_cause_to_each_other",
             "no_relationship",
@@ -251,74 +283,95 @@ def add_edge_relationship(
     companys = [i for i in companys if not i.startswith("risk_catalog")]
 
     snapshot_data_list = pickle.load(open(snapshot_file_path, "rb"))
-
-    raw_risk_selected_keys = [
-        "risk",
-        "risk_desc",
-        "rootcause",
-    ]
-    raw_risk_selected_data_list = []
-    for i in raw_risk_data:
-        raw_risk_selected_data_list.append({k: i[k] for k in raw_risk_selected_keys})
-
-    node_data_list = []
-    edge_data_list = []
-    for node_edge in snapshot_data_list:
-        if node_edge["data"].get("source") is not None:
-            # it a edge
-            edge_data_list.append(node_edge["data"])
-        else:
-
-            node_data_list.append(node_edge["data"])
-    node_data_df = pd.DataFrame(node_data_list)
-    relation_counter = Counter()
-    relation_result = {}
     new_edge_data_dict = {}
-    for edge_data in edge_data_list:
-        source_risk_id = edge_data["source"]
-        target_risk_id = edge_data["target"]
-        source_risk_name = node_data_df[node_data_df["id"] == source_risk_id][
-            "label"
-        ].values[0]
-        target_risk_name = node_data_df[node_data_df["id"] == target_risk_id][
-            "label"
-        ].values[0]
-        print(f"\t{source_risk_name=}")
-        print(f"\t{target_risk_name=}")
 
-        risk_a = get_risk_data_from_risk_name(
-            source_risk_name, raw_risk_selected_data_list
-        )
-        risk_b = get_risk_data_from_risk_name(
-            target_risk_name, raw_risk_selected_data_list
-        )
-        edge_relationship_a_b = classify_edge_relationship(risk_a=risk_a, risk_b=risk_b)
-        edge_relationship_b_a = classify_edge_relationship(risk_a=risk_b, risk_b=risk_a)
-        edge_relationship = finalize_edge_relationship(
-            edge_relationship_a_b, edge_relationship_b_a, risk_a["risk"], risk_b["risk"]
-        )
-        print(f"{type(edge_relationship)=}")
-        print(f"\t{edge_relationship=}")
-        # key = (
-        #     risk_a["risk"],
-        #     risk_b["risk"],
-        # )
-        # sorted_key = tuple(sorted(key))
-        # relation_result[sorted_key] = edge_relationship
-        # relation_counter[edge_relationship] += 1
-        key = tuple((source_risk_name, target_risk_name))
-        new_edge_data_dict[key] = {}
-        if edge_relationship["relationship"] == "cause_then_effect":
-            new_edge_data_dict[key]["direction"] = [1, 0]
-        elif edge_relationship["relationship"] == "effect_then_cause":
-            new_edge_data_dict[key]["direction"] = [-1, 0]
-        elif edge_relationship["relationship"] == "no_relationship":
-            new_edge_data_dict[key]["direction"] = [0, 0]
-        elif edge_relationship["relationship"] == "be_a_cause_to_each_other":
-            new_edge_data_dict[key]["direction"] = [1, -1]
-        else:
-            raise ValueError(f"Unknown edge_relationship: {edge_relationship}")
-        new_edge_data_dict[key]["reason"] = edge_relationship["reason"]
+    for company in companys:
+        raw_risk_selected_keys = [
+            "risk",
+            "risk_desc",
+            "rootcause",
+        ]
+        raw_risk_selected_data_list = []
+        selected_raw_risk_data = [i for i in raw_risk_data if i["company"] == company]
+        for i in selected_raw_risk_data:
+            raw_risk_selected_data_list.append(
+                {k: i[k] for k in raw_risk_selected_keys}
+            )
+
+        node_data_list = []
+        edge_data_list = []
+        for node_edge in snapshot_data_list:
+            if node_edge["data"].get("source") is not None:
+                # it a edge
+                edge_data_list.append(node_edge["data"])
+            else:
+
+                node_data_list.append(node_edge["data"])
+        node_data_df = pd.DataFrame(node_data_list)
+        print(node_data_df.columns)
+        relation_counter = Counter()
+        relation_result = {}
+        for edge_data in edge_data_list:
+            source_risk_id = edge_data["source"]
+            node_company = ("_").join(source_risk_id.split("_")[1:-1])
+            # print(f"{node_company=}")
+            if node_company != company:
+                continue
+            target_risk_id = edge_data["target"]
+            source_risk_name = node_data_df[node_data_df["id"] == source_risk_id][
+                "label"
+            ].values[0]
+            target_risk_name = node_data_df[node_data_df["id"] == target_risk_id][
+                "label"
+            ].values[0]
+            print(f"\t{source_risk_name=}")
+            print(f"\t{target_risk_name=}")
+
+            risk_a = get_risk_data_from_risk_name(
+                source_risk_name, raw_risk_selected_data_list
+            )
+            risk_b = get_risk_data_from_risk_name(
+                target_risk_name, raw_risk_selected_data_list
+            )
+            print("here")
+            print(risk_a, risk_b)
+            edge_relationship_a_b = classify_edge_relationship(
+                risk_a=risk_a, risk_b=risk_b
+            )
+            edge_relationship_b_a = classify_edge_relationship(
+                risk_a=risk_b, risk_b=risk_a
+            )
+            edge_relationship = finalize_edge_relationship(
+                edge_relationship_a_b,
+                edge_relationship_b_a,
+                risk_a["risk"],
+                risk_b["risk"],
+            )
+            print(f"{type(edge_relationship)=}")
+            print(f"\t{edge_relationship=}")
+            # key = (
+            #     risk_a["risk"],
+            #     risk_b["risk"],
+            # )
+            # sorted_key = tuple(sorted(key))
+            # relation_result[sorted_key] = edge_relationship
+            # relation_counter[edge_relationship] += 1
+            key = tuple((source_risk_name, target_risk_name, company))
+            new_edge_data_dict[key] = {}
+            if edge_relationship["relationship"] == "cause_then_effect":
+                new_edge_data_dict[key]["direction"] = [1, 0]
+            elif edge_relationship["relationship"] == "effect_then_cause":
+                new_edge_data_dict[key]["direction"] = [-1, 0]
+            elif edge_relationship["relationship"] == "no_relationship":
+                new_edge_data_dict[key]["direction"] = [0, 0]
+            elif edge_relationship["relationship"] == "be_a_cause_to_each_other":
+                new_edge_data_dict[key]["direction"] = [1, -1]
+            else:
+                raise ValueError(f"Unknown edge_relationship: {edge_relationship}")
+            new_edge_data_dict[key]["ori_relationship"] = edge_relationship[
+                "ori_relationship"
+            ]
+            new_edge_data_dict[key]["reason"] = edge_relationship["reason"]
     # save new_edge_data_dict to pickle
 
     pickle.dump(new_edge_data_dict, open(edge_relationship_path, "wb"))
@@ -339,12 +392,12 @@ if __name__ == "__main__":
             snapshot_file_path,
             edge_relationship_path,
         )
-        # add_story_to_top_k_node(
-        #     real_data_path,
-        #     snapshot_file_path,
-        #     edge_relationship_path,
-        #     top_k=5,
-        # )
+        add_story_to_top_k_node(
+            real_data_path,
+            snapshot_file_path,
+            edge_relationship_path,
+            top_k=5,
+        )
 
     print(f"Total Tokens: {cb.total_tokens}")
     print(f"Prompt Tokens: {cb.prompt_tokens}")

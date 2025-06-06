@@ -417,6 +417,7 @@ def update_graph_and_output(
                     "value": el["data"]["id"],
                 }
             )
+    print(f"\n\t{node_options=}")
     # --- End of node dropdown options generation ---
 
     # Update output text to reflect the number of edges shown and the threshold
@@ -511,7 +512,7 @@ def update_subgraph_and_info(selected_node_id, main_graph_elements):
         node_id_to_label.get(node_id, node_id) for node_id in secondary_neighbors
     ]
     selected_node_full_data = None
-    for el in elements:
+    for el in main_graph_elements:
         if "id" in el.get("data", {}) and el["data"]["id"] == selected_node_id:
             selected_node_full_data = el["data"]
             break
