@@ -335,4 +335,8 @@ def generate_network_from_real_data(
         )
     print(f"{node_size_counter=}")
     # Return nodes, edges, line_weight_list, and total number of edges
+    # save nodes and edges to pickle file
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    with open(f"{dir_path}/result/nodes_and_edges_{company}.pkl", "wb") as f:
+        pickle.dump([nodes, edges], f)
     return nodes + edges, line_weight_list, len(edges), len(nodes)
