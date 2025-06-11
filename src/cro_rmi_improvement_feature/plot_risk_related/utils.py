@@ -20,6 +20,7 @@ from langchain_community.cache import SQLiteCache
 from langchain.globals import set_llm_cache
 
 set_llm_cache(SQLiteCache(database_path=".langchain.db"))
+
 dir_path = os.path.dirname(os.path.realpath(__file__))
 try:
     env_path = f"{dir_path}/../confidential/.env"

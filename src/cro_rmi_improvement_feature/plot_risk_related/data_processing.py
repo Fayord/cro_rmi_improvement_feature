@@ -14,6 +14,10 @@ from plot_network_defaut_value import (
     risk_cat_color_dict,
 )
 from utils import find_equal_count_boundaries
+from langchain_community.cache import SQLiteCache
+from langchain.globals import set_llm_cache
+
+set_llm_cache(SQLiteCache(database_path=".langchain.db"))
 
 
 # Initial elements for the default company

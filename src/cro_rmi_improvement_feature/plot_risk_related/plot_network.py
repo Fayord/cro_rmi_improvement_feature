@@ -34,6 +34,11 @@ from data_processing import (
     filter_elements_by_weight_and_recalculate_edges,
     get_elements_for_company,
 )
+from langchain_community.cache import SQLiteCache
+from langchain.globals import set_llm_cache
+
+set_llm_cache(SQLiteCache(database_path=".langchain.db"))
+
 
 cyto.load_extra_layouts()
 
@@ -323,7 +328,6 @@ def update_graph_and_output(
         edge_relationship_path,
         selected_checklist_values,
     )
-
     # --- New logic to calculate slider_value (weight threshold) based on num_edges_to_show ---
     if total_edges == 0:
         # No edges, threshold doesn't matter for filtering, but set a high value
@@ -332,6 +336,7 @@ def update_graph_and_output(
     else:
         # Ensure num_edges_to_show is within the valid range [0, total_edges]
         num_edges_to_show = get_number_edges_to_show(total_nodes)
+        print(f"{num_edges_to_show=}")
 
         if num_edges_to_show == 0:
             # If showing 0 edges, set threshold higher than max weight
