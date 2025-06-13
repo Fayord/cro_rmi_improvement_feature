@@ -41,12 +41,41 @@ set_llm_cache(SQLiteCache(database_path=".langchain.db"))
 
 
 cyto.load_extra_layouts()
+# fcose_layout_options = {
+#     "name": "cose-bilkent",
+#     # "quality": "default",
+#     # #   // False for random, true for greedy sampling
+#     # "samplingType": True,
+#     # #   // Sample size to construct distance matrix
+#     # "sampleSize": 25,
+#     # #   // Separation amount between nodes
+#     # "nodeSeparation": 4000,
+#     # #   // Power iteration tolerance
+#     # "piTol": 0.0000001,
+#     ## #######
+#     "quality": "proof",  # Often good to use "proof" quality when fine-tuning layout
+#     "nodeRepulsion": 6000,  # Increase for more repulsion (default is node => 4500)
+#     # "idealEdgeLength": 120,  # Increase for longer ideal edge lengths (default is edge => 50)
+#     "idealEdgeLength": 100,  # Increase for longer ideal edge lengths (default is edge => 50)
+#     "randomize": False,
+#     # "edgeElasticity": 1000,
+#     # "gravity": 5,  # Decrease to reduce pull towards center (default is 0.25)
+#     "animate": True,
+#     # "animationDuration": "1000",
+#     "fit": True,
+#     # "padding": "30",
+#     # Add other options as needed
+# }
 
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
 # real_data_path = f"{dir_path}/250520-company_risk_data_with_embedding.pkl"
-real_data_path = f"{dir_path}/result/merge-company_risk_data_with_embedding.pkl"
+# real_data_path = f"{dir_path}/result/merge-company_risk_data_with_embedding.pkl"
+# real_data_path = f"{dir_path}/result/20250604-company_risk_data_with_embedding.pkl"
+real_data_file_name_path = os.getenv("REAL_DATA_FILE_NAME_PATH")
+real_data_path = f"{dir_path}/result/{real_data_file_name_path}"
+
 real_data = pickle.load(open(real_data_path, "rb"))
 edge_relationship_path = real_data_path.replace(".pkl", "-edge_relationship.pkl")
 
