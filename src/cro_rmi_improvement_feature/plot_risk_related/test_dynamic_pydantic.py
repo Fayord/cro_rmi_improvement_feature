@@ -1,5 +1,6 @@
 import pydantic
 from typing import Type, Any, Dict, List, Union, Literal
+import json
 
 
 # 1. Function to create a Pydantic model dynamically
@@ -299,4 +300,86 @@ for risk_a, risk_b in risk_pairs:
         print(f"Data: {instance.model_dump_json(indent=2)}")
     except pydantic.ValidationError as e:
         print("✅ Success: Validation error caught as expected")
+        print(f"Error: {e}")
+
+
+def create_single_label_model() -> Type[pydantic.BaseModel]:
+    """
+    Creates a model with a single_label field that can only be choice_a, choice_b, or choice_c.
+    Each choice has its own specific description.
+
+    Returns:
+        Type[pydantic.BaseModel]: A Pydantic model class for single label selection
+    """
+    schema_definition_dict = {
+        "model_name": "SingleLabelModel",
+        "fields": {
+            "single_label": (
+                Literal["choice_a", "choice_b", "choice_c"],
+                pydantic.Field(
+                    description=f"Select one of the predefined choices{json.dumps({
+                        "choices": {
+                            "choice_a": "This is the first choice, representing option A",
+                            "choice_b": "This is the second choice, representing option B",
+                            "choice_c": "This is the third choice, representing option C",
+                        }
+                    })}",
+                    # json_schema_extra=,
+                ),
+            ),
+        },
+    }
+
+    return create_dynamic_pydantic_model(
+        schema_definition_dict["model_name"],
+        schema_definition_dict["fields"],
+    )
+
+
+# Test the single label model
+print("\n" + "=" * 50)
+print("Testing Single Label Model:")
+
+single_label_model = create_single_label_model()
+
+# Print the model's JSON schema to see the descriptions
+print("\nModel Schema:")
+print(json.dumps(single_label_model.model_json_schema(), indent=2))
+
+# Test 1: Valid choice
+print("\nTest 1: Valid choice")
+valid_data = {"single_label": "choice_a"}
+
+try:
+    instance = single_label_model(**valid_data)
+    print("✅ Success: Valid instance created")
+    print(f"Data: {instance.model_dump_json(indent=2)}")
+except pydantic.ValidationError as e:
+    print("❌ Error: This should not happen with valid data")
+    print(f"Error: {e}")
+
+# Test 2: Invalid choice
+print("\nTest 2: Invalid choice")
+invalid_data = {"single_label": "invalid_choice"}
+
+try:
+    instance = single_label_model(**invalid_data)
+    print("❌ Error: This should not happen with invalid data")
+    print(f"Data: {instance.model_dump_json(indent=2)}")
+except pydantic.ValidationError as e:
+    print("✅ Success: Validation error caught as expected")
+    print(f"Error: {e}")
+
+# Test 3: Try all valid choices
+print("\nTest 3: All valid choices")
+valid_choices = ["choice_a", "choice_b", "choice_c"]
+
+for choice in valid_choices:
+    print(f"\nTrying choice: {choice}")
+    try:
+        instance = single_label_model(single_label=choice)
+        print("✅ Success: Valid instance created")
+        print(f"Data: {instance.model_dump_json(indent=2)}")
+    except pydantic.ValidationError as e:
+        print("❌ Error: This should not happen with valid data")
         print(f"Error: {e}")
