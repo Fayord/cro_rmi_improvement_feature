@@ -10,6 +10,8 @@ from datetime import datetime
 import json
 from dotenv import load_dotenv
 from langchain.cache import SQLiteCache
+
+# import re
 from langchain.globals import set_llm_cache
 
 set_llm_cache(SQLiteCache(database_path=".langchain.db"))
@@ -122,6 +124,7 @@ Return your assessment as a JSON with:
             "additional_information": additional_information,
             "is_valid": result.get("is_valid"),
             "reason": result.get("reason"),
+            "raw_result": result,
             "provider": provider,
             "model": model_name or "default",
         }
@@ -132,6 +135,7 @@ Return your assessment as a JSON with:
             "metric_detail": metric_detail,
             "additional_information": additional_information,
             "is_valid": False,
+            "raw_result": None,
             "reason": f"Error during validation: {str(e)}",
             "provider": provider,
             "model": model_name or "default",
@@ -297,18 +301,32 @@ def _generate_improved_example(
     llm = get_llm()
     parser = JsonOutputParser(pydantic_object=ImprovedExample)
 
+    # Detect if the text contains Thai characters
+    # has_thai = bool(re.search(r"[\u0E00-\u0E7F]", original_text))
+
+    language_instruction = """
+    Important: Your response must match the language of the original text:
+    - If the original text is in Thai (including Thai text with English technical terms), respond in Thai
+    - If the original text is in English, respond in English
+    - Maintain any technical terms in their original form
+    """
+
     prompt = ChatPromptTemplate.from_messages(
         [
             (
                 "system",
-                """You are an expert in risk assessment and validation. Generate three different improved versions of a risk description 
-            that address the validation criteria that were not met in the original text.
+                f"""You are an expert in risk assessment and validation, fluent in both Thai and English. 
+            Generate three different improved versions of a risk description that address the validation 
+            criteria that were not met in the original text.
+
+            {language_instruction}
 
             Each version should:
             1. Maintain the core risk context from the original text
             2. Address all the invalid metrics provided
             3. Be clear, concise, and specific
             4. Be distinctly different from each other
+            5. Match the language style and format of the original text
 
             Return the results in JSON format with keys:
             - choice1: First improved version
@@ -321,7 +339,7 @@ def _generate_improved_example(
                 """Original text: {original_text}
             Failed metrics: {metrics}
             
-            Please provide three improved versions sentences that address these specific aspects.""",
+            Please provide three improved versions that address these specific aspects.""",
             ),
         ]
     )
