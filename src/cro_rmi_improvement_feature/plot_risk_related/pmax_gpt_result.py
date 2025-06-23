@@ -1,11 +1,27 @@
 # risk_interdependency_llm.py
 
 import openai
-from typing import Optional
+from typing import Optional, Literal
 from pydantic import BaseModel, Field, ValidationError
+from langchain_openai import ChatOpenAI
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import JsonOutputParser
+from langchain_community.callbacks import get_openai_callback
+import random
+import json
+from dotenv import load_dotenv
+import os
+from langchain_community.cache import SQLiteCache
+from langchain.globals import set_llm_cache
+import pandas as pd
 
-# Load your OpenAI API key securely
-openai.api_key = "sk-..."  # Replace with your API key or use environment variable
+dir_path = os.path.dirname(os.path.abspath(__file__))
+
+set_llm_cache(SQLiteCache(database_path=f"{dir_path}/.langchain.db"))
+
+env_path = os.path.join(dir_path, "../../.env")
+load_dotenv(env_path)
+
 
 # === Data ===
 
@@ -29,29 +45,83 @@ risk_pairs = [
 
 
 class RiskRelationResult(BaseModel):
-    pair_id: str
-    interdependency_type: str = Field(
-        ...,
-        regex=r"^(Causal|Contingent|Shared Root Cause|Correlated|Temporal/Sequential|None)$",
-    )
-    direction: Optional[str] = Field(None, regex=r"^(A → B|B → A|None)$")
+    interdependency_type: Literal[
+        "Causal",
+        "Contingent",
+        "Correlated",
+        "Temporal/Sequential",
+        "None",
+    ]
+    direction: Optional[Literal["A → B", "B → A", "None", "Both"]] = None
     rationale: str
     confidence: int = Field(..., ge=1, le=5)
 
 
-# === Prompt Generation ===
+class RiskSummary(BaseModel):
+    risk_desc: str
+    rootcause: str
+    process: str
 
 
-def generate_prompt(pair_id, risk_a, risk_b, desc_a, desc_b):
-    return f"""
-You are a risk analysis assistant reviewing pairs of risk statements.
-Analyze the interdependency between the following two risks:
+# === LangChain Setup ===
 
-[Pair ID: {pair_id}]
-Risk A: {desc_a}
-Risk B: {desc_b}
 
-Determine:
+def get_llm(model_name="o3-mini"):
+    if model_name == "gpt-4.1-mini":
+        return ChatOpenAI(
+            model="gpt-4.1-mini",
+            # model="o3-mini",
+            temperature=0.1,
+        )
+    elif model_name == "o3-mini":
+        return ChatOpenAI(
+            model="o3-mini",
+            # temperature=0.1,
+        )
+    else:
+        raise ValueError(f"Invalid model name: {model_name}")
+
+
+# === Call LangChain and Parse ===
+
+
+def summarize_risk(risk_data):
+    llm = get_llm(model_name="gpt-4.1-mini")
+    risk_name = risk_data["risk"]
+    risk_desc = risk_data["risk_desc"]
+    rootcause = risk_data["rootcause"]
+    process = risk_data["process"]
+
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                "You are a risk analysis assistant reviewing pairs of risk statements. then summarize the risk to make it more readable. and concise. and make output in English.",
+            ),
+            (
+                "human",
+                f"Risk: {risk_name} \n Risk Description: {risk_desc} \n Root Cause: {rootcause} \n Process: {process} \n Output in English.",
+            ),
+        ]
+    )
+    structured_llm = llm.with_structured_output(RiskSummary)
+    chain = prompt | structured_llm
+    result = chain.invoke(risk_data)
+    result = result.model_dump()
+    result["risk"] = risk_name
+    return result
+
+
+def analyze_pair(risk_a, risk_b):
+    try:
+        llm = get_llm()
+
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                (
+                    "system",
+                    """You are a risk analysis assistant reviewing pairs of risk statements.
+Analyze the interdependency between two risks and determine:
 1. Interdependency Type
 2. Direction (if directional)
 3. Rationale (1-2 sentences)
@@ -60,63 +130,291 @@ Determine:
 Valid Types:
 - Causal
 - Contingent
-- Shared Root Cause
 - Correlated
 - Temporal/Sequential
 - None
 
-If type is Causal, Contingent, or Temporal/Sequential, include direction:
-A → B or B → A. Otherwise, use "None".
+Valid directions:
+- A → B (A causes/precedes B)
+- B → A (B causes/precedes A) 
+- Both (bidirectional)
+- None (for non-directional types)
 
-Respond in JSON:
-{{
-  "pair_id": "{pair_id}",
-  "interdependency_type": "...",
-  "direction": "...",
-  "rationale": "...",
-  "confidence": ...
-}}
-"""
+Direction is required for Causal, Contingent, and Temporal/Sequential types.
+For other types (Correlated, None), direction should be "None".
 
+Provide the analysis in the specified JSON format.""",
+                ),
+                (
+                    "human",
+                    f"""Analyze the interdependency between the following two risks:
+Risk A: {risk_a['risk']} \n Risk Description: {risk_a['risk_desc']} \n Root Cause: {risk_a['rootcause']} \n Process: {risk_a['process']}
+Risk B: {risk_b['risk']} \n Risk Description: {risk_b['risk_desc']} \n Root Cause: {risk_b['rootcause']} \n Process: {risk_b['process']}""",
+                ),
+            ]
+        )
 
-# === Call OpenAI and Parse ===
+        structured_llm = llm.with_structured_output(RiskRelationResult)
+        chain = prompt | structured_llm
 
+        # Invoke the chain
+        result = chain.invoke({})
 
-def analyze_pair(pair_id, risk_a, risk_b, desc_a, desc_b):
-    prompt = generate_prompt(pair_id, risk_a, risk_b, desc_a, desc_b)
+        # Convert to RiskRelationResult model for validation
+        validated_result = result.model_dump()
+        direction = validated_result["direction"]
+        interdependency_type = validated_result["interdependency_type"]
+        if interdependency_type in ["Causal", "Contingent", "Temporal/Sequential"]:
+            if direction == "None":
+                raise ValueError(f"direction is None for {interdependency_type}")
+        else:
+            if direction != "None":
+                raise ValueError(f"direction is not None for {interdependency_type}")
+        return validated_result
 
-    response = openai.ChatCompletion.create(
-        model="gpt-4",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.2,
-    )
-
-    content = response.choices[0].message["content"].strip()
-
-    try:
-        result = RiskRelationResult.model_validate_json(content)
-        return result
-    except ValidationError as e:
-        print(f"[ERROR] Failed to parse or validate LLM output for {pair_id}: {e}")
-        print("Raw output:", content)
+    except Exception as e:
+        print(f"[ERROR] Failed to analyze pair {str(e)}")
         return None
+
+
+def final_relationship(
+    interdependency_type_a_b,
+    interdependency_type_b_a,
+    direction_a_b,
+    direction_b_a,
+):
+    priority_interdependency_type_list = [
+        "Causal",
+        "Contingent",
+        "Temporal/Sequential",
+        "Correlated",
+        "None",
+    ]
+    priority_direction_list = [
+        "Both",
+        "A → B",
+        "B → A",
+        "None",
+    ]
+
+    ####### preprocess
+    if interdependency_type_b_a in ["Causal", "Contingent", "Temporal/Sequential"]:
+        if direction_b_a == "A → B":
+            direction_b_a = "B → A"
+        elif direction_b_a == "B → A":
+            direction_b_a = "A → B"
+    #######
+    if interdependency_type_a_b == interdependency_type_b_a:
+        final_interdependency_type = interdependency_type_a_b
+        if interdependency_type_a_b in ["Causal", "Contingent", "Temporal/Sequential"]:
+
+            index_direction_a_b = priority_direction_list.index(direction_a_b)
+            index_direction_b_a = priority_direction_list.index(direction_b_a)
+            if (index_direction_a_b, index_direction_b_a) in [
+                ("A → B", "B → A"),
+                ("B → A", "A → B"),
+            ]:
+                final_direction = "Both"
+            elif index_direction_a_b < index_direction_b_a:
+                final_direction = direction_a_b
+            else:
+                final_direction = direction_b_a
+        else:
+            final_direction = "None"
+
+    else:
+        index_interdependency_type_a_b = priority_interdependency_type_list.index(
+            interdependency_type_a_b
+        )
+        index_interdependency_type_b_a = priority_interdependency_type_list.index(
+            interdependency_type_b_a
+        )
+        if index_interdependency_type_a_b < index_interdependency_type_b_a:
+            final_interdependency_type = interdependency_type_a_b
+            final_direction = direction_a_b
+        else:
+            final_interdependency_type = interdependency_type_b_a
+            final_direction = direction_b_a
+
+    return final_interdependency_type, final_direction
 
 
 # === Main Loop ===
 
 if __name__ == "__main__":
-    results = []
+    random.seed(42)
+    # risk_data_path = "/Users/ford/Documents/coding_trae/cro_rmi_improvement_feature/src/cro_rmi_improvement_feature/plot_risk_related/result/250528-company_risk_data.json"
+    risk_data_path = "/Users/ford/Documents/coding_trae/cro_rmi_improvement_feature/src/cro_rmi_improvement_feature/plot_risk_related/result/merge-company_risk_data_with_embedding-10percent_edges.pkl"
+    if risk_data_path.endswith(".pkl"):
+        import pickle
 
-    for ra, rb in risk_pairs:
-        pair_id = f"{ra} & {rb}"
-        desc_a = risk_descriptions.get(ra, "Unknown")
-        desc_b = risk_descriptions.get(rb, "Unknown")
+        with open(risk_data_path, "rb") as f:
+            risk_data = pickle.load(f)
+    else:
+        with open(risk_data_path, "r") as f:
+            risk_data = json.load(f)
+    print(f"{len(risk_data)=}")
+    for node_edge in risk_data:
+        print(f"{node_edge['data'].keys()=}")
+    # random select 5 risk data)
+    edge_data_list = []
+    for risk in risk_data:
+        # print(risk)  # pretty print
+        source = risk["data"].get("source", None)
+        if source == None:
+            risk_id = risk["data"]["id"]
+            continue
+        company = source.split("_")[1]
+        if company != "PCG":
+            continue
+        print(f"{company=}")
 
-        print(f"\n🔎 Analyzing {pair_id}...")
-        result = analyze_pair(pair_id, ra, rb, desc_a, desc_b)
+        edge_data_list.append(risk["data"])
 
-        if result:
-            results.append(result)
-            print(result.model_dump_json(indent=2))
+    # selected_edge_data_list = random.sample(
+    #     edge_data_list, int(len(edge_data_list) * 0.2)
+    # )
+    selected_edge_data_list = edge_data_list
+    print(len(selected_edge_data_list))
+    print(selected_edge_data_list[0])
+    result_list = []
+    with get_openai_callback() as cb_summary:
+        unique_risk_data = []
+        for selected_edge_data in selected_edge_data_list:
+            source_id = selected_edge_data["source"]
+            # pretty print risk_source_data
+            # print(json.dumps(selected_edge_data, indent=4, ensure_ascii=False))
+            risk_a = selected_edge_data["target_risk_data"]
+            risk_b = selected_edge_data["source_risk_data"]
+            if risk_a not in unique_risk_data:
+                unique_risk_data.append(risk_a)
+            if risk_b not in unique_risk_data:
+                unique_risk_data.append(risk_b)
+        for risk_data in unique_risk_data:
+            risk_data_summary = summarize_risk(risk_data)
+    # Wrap the main processing with cost tracking
+    all_cb_analyze = []
+    for selected_edge_data in selected_edge_data_list:
+        source_id = selected_edge_data["source"]
+        # pretty print risk_source_data
+        # print(json.dumps(selected_edge_data, indent=4, ensure_ascii=False))
+        risk_a = selected_edge_data["target_risk_data"]
+        risk_b = selected_edge_data["source_risk_data"]
+        for risk_a, risk_b, direction_risk in [
+            (risk_a, risk_b, "a->b"),
+            (risk_b, risk_a, "b->a"),
+        ]:
+            target_risk_data = risk_a
+            source_risk_data = risk_b
+            target_risk_data_summary = summarize_risk(target_risk_data)
+            source_risk_data_summary = summarize_risk(source_risk_data)
+            # source_risk_data_summary = source_risk_data
+            # target_risk_data_summary = target_risk_data
+            with get_openai_callback() as cb_analyze:
 
-    # TODO: optionally export results to JSON, CSV, or Excel
+                risk_relation_result = analyze_pair(
+                    source_risk_data_summary,
+                    target_risk_data_summary,
+                )
+            all_cb_analyze.append(cb_analyze)
+            # print(json.dumps(risk_relation_result, indent=4, ensure_ascii=False))
+
+            relation_result = {
+                "direction_risk": direction_risk,
+                "target_risk": target_risk_data_summary["risk"],
+                "target_risk_desc": target_risk_data_summary["risk_desc"],
+                "target_rootcause": target_risk_data_summary["rootcause"],
+                "target_process": target_risk_data_summary["process"],
+                "source_risk": source_risk_data_summary["risk"],
+                "source_risk_desc": source_risk_data_summary["risk_desc"],
+                "source_rootcause": source_risk_data_summary["rootcause"],
+                "source_process": source_risk_data_summary["process"],
+                "interdependency_type": risk_relation_result["interdependency_type"],
+                "direction": risk_relation_result["direction"],
+                "rationale": risk_relation_result["rationale"],
+                "confidence": risk_relation_result["confidence"],
+            }
+            result_list.append(relation_result)
+    print(f"total analyze cost: {sum(cb.total_cost for cb in all_cb_analyze)}")
+    print(
+        f"total analyze cost thai: {sum(cb.total_cost for cb in all_cb_analyze) * 35}"
+    )
+    print(f"total analyze tokens: {sum(cb.total_tokens for cb in all_cb_analyze)}")
+    print(
+        f"total analyze prompt tokens: {sum(cb.prompt_tokens for cb in all_cb_analyze)}"
+    )
+    print(
+        f"total analyze completion tokens: {sum(cb.completion_tokens for cb in all_cb_analyze)}"
+    )
+    print(f"total summary cost: {cb_summary.total_cost}")
+    print(f"total summary cost thai: {cb_summary.total_cost * 35}")
+    print(f"total summary tokens: {cb_summary.total_tokens}")
+    print(f"total summary prompt tokens: {cb_summary.prompt_tokens}")
+    print(f"total summary completion tokens: {cb_summary.completion_tokens}")
+    # raise
+    count_same_interdependency_type = 0
+    count_same_direction = 0
+    count_same_both = 0
+
+    # loop every even item in result_list
+    for i in range(0, len(result_list), 2):
+        interdependency_type_a_b = result_list[i]["interdependency_type"]
+        interdependency_type_b_a = result_list[i + 1]["interdependency_type"]
+        direction_a_b = result_list[i]["direction"]
+        direction_b_a = result_list[i + 1]["direction"]
+        final_interdependency_type, final_direction = final_relationship(
+            interdependency_type_a_b,
+            interdependency_type_b_a,
+            direction_a_b,
+            direction_b_a,
+        )
+        result_list[i]["final_interdependency_type"] = final_interdependency_type
+        result_list[i]["final_direction"] = final_direction
+        result_list[i + 1]["final_interdependency_type"] = final_interdependency_type
+        result_list[i + 1]["final_direction"] = final_direction
+        count_possible_missing_direction_relation = None
+        if (
+            final_interdependency_type
+            in ["Causal", "Contingent", "Temporal/Sequential"]
+        ) and (
+            interdependency_type_a_b
+            not in ["Causal", "Contingent", "Temporal/Sequential"]
+        ):
+            count_possible_missing_direction_relation = True
+        if interdependency_type_a_b in ["Causal", "Contingent", "Temporal/Sequential"]:
+            count_possible_missing_direction_relation = False
+        result_list[i][
+            "count_possible_missing_direction_relation"
+        ] = count_possible_missing_direction_relation
+        result_list[i + 1][
+            "count_possible_missing_direction_relation"
+        ] = count_possible_missing_direction_relation
+
+        if interdependency_type_a_b != interdependency_type_b_a:
+            print(f"{interdependency_type_a_b=}")
+            print(f"{interdependency_type_b_a=}")
+            print()
+            # print(f"{result_list[i]=}")
+            # print(f"{result_list[i + 1]=}")
+        if (
+            result_list[i]["interdependency_type"]
+            == result_list[i + 1]["interdependency_type"]
+        ):
+            count_same_interdependency_type += 1
+        if result_list[i]["direction"] == result_list[i + 1]["direction"]:
+            count_same_direction += 1
+        if (
+            result_list[i]["interdependency_type"]
+            == result_list[i + 1]["interdependency_type"]
+            and result_list[i]["direction"] == result_list[i + 1]["direction"]
+        ):
+            count_same_both += 1
+    print(f"total pairs: {len(result_list)/2}")
+    print(f"{count_same_interdependency_type=}")
+    print(f"{count_same_direction=}")
+    print(f"{count_same_both=}")
+
+    # convert result_list to dataframe
+    df = pd.DataFrame(result_list)
+    # save to excel
+    df.to_excel(f"{dir_path}/pmax_gpt_result.xlsx", index=False)
