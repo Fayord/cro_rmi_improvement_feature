@@ -1,0 +1,71 @@
+[project]
+name = "network_analyzer"
+version = "0.1.0"
+description = "Default template for PDM package"
+authors = [
+    {name = "Risk Analysis Team", email = "team@example.com"},
+    {name = "Fayord", email = "fordthanatorn@gmail.com"},
+]
+readme = "README.md"
+requires-python = "==3.12.*"
+dependencies = [
+    "dash>=2.14.0",
+    "dash-cytoscape>=0.3.0",
+    "pandas>=1.5.0",
+    "numpy>=1.24.0",
+    "openpyxl>=3.1.0",
+    "python-dotenv>=1.0.0",
+    "openai>=1.0.0",
+    "langchain>=0.1.0",
+]
+license = {text = "MIT"}
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "black>=23.0.0",
+    "flake8>=6.0.0",
+]
+prod = [
+    "gunicorn>=21.0.0",
+]
+
+[project.scripts]
+risk-analyzer = "main:main"
+
+[tool.pdm]
+package-type = "application"
+source-includes = [
+    "app",
+    "core",
+    "data_processor",
+    "ai",
+    "visualization",
+    "config",
+]
+distribution = false
+
+[tool.pdm.dev-dependencies]
+test = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.0.0",
+]
+lint = [
+    "black>=23.0.0",
+    "flake8>=6.0.0",
+    "isort>=5.12.0",
+]
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"] 

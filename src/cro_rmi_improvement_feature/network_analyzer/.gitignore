@@ -49,4 +49,9 @@ Thumbs.db
 
 # Cache
 .cache/
-.pytest_cache/ 
+.pytest_cache/
+
+# PDM
+.pdm.toml
+__pypackages__/
+.pdm-python 

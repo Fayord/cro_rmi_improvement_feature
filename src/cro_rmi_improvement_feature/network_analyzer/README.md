@@ -15,7 +15,10 @@ network_analyzer/
 │   ├── models.py          # Data models
 │   ├── services.py        # Business services
 │   └── utils.py           # Utility functions
-├── data/                  # Data management
+├── data/                  # Raw data storage
+│   ├── raw/               # Raw Excel files
+│   └── processed/         # Processed data files
+├── data_processor/        # Data processing and management
 │   ├── processing.py      # Data processing
 │   └── storage.py         # Data storage
 ├── ai/                    # AI components (Phase 2)
@@ -32,35 +35,72 @@ network_analyzer/
 
 ## Development Phases
 
-### Phase 1 (MVP) - Current Focus
-- Basic network visualization
-- Company selection
-- Simple filtering
-- Static data
+### Phase 1: Data Preparation - Current Focus
+- Postprocess risk data
+- Create risk network data structures
+- Implement AI-powered risk relationship classification
 
-### Phase 2 (AI Integration) - Future
-- AI-powered relationship classification
-- Dynamic edge generation
-- Subgraph analysis
+### Phase 2: MVP Visualization - Next
+- Create main graph visualization with modular architecture
+- Create subgraph visualization capabilities
+- Implement visualization toggles and controls
 
-### Phase 3 (Enhancement) - Future
-- Advanced layouts
-- Export functionality
-- Performance optimization
+### Phase 3: Polish and Enhancement - Future
+- Enhance main graph styling and interactions
+- Enhance subgraph analysis capabilities
+- Implement click-to-popup data displays and navigation
+
+### Phase 4: Graph Condensation - Future
+- Implement LLM-based graph condensation
+- Add algorithmic graph condensation (Leiden, etc.)
+- Create hybrid condensation approaches
 
 ## Getting Started
 
-1. Install dependencies:
+1. Install PDM (if not already installed):
 ```bash
-pip install -r requirements.txt
+pip install pdm
 ```
 
-2. Run the application:
+2. Install dependencies:
 ```bash
-python main.py
+pdm install
 ```
 
-3. Open browser to `http://localhost:8050`
+3. Run the application:
+```bash
+pdm run python main.py
+```
+
+4. Open browser to `http://localhost:8050`
+
+## Development Workflow
+
+### Install development dependencies:
+```bash
+pdm install -G dev
+```
+
+### Run tests:
+```bash
+pdm run pytest
+```
+
+### Format code:
+```bash
+pdm run black .
+pdm run isort .
+```
+
+### Lint code:
+```bash
+pdm run flake8 .
+```
+
+### Install production dependencies:
+```bash
+pdm install -G prod
+```
 
 ## Growth Strategy
 
