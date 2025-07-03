@@ -112,9 +112,9 @@ def summarize_risk(risk_data):
     return result
 
 
-def analyze_pair(risk_a, risk_b):
+def analyze_pair(risk_a, risk_b, analyze_model_name):
     try:
-        llm = get_llm()
+        llm = get_llm(model_name=analyze_model_name)
 
         prompt = ChatPromptTemplate.from_messages(
             [
@@ -271,10 +271,19 @@ if __name__ == "__main__":
 
         edge_data_list.append(risk["data"])
 
+    # analyze_model_name = "gpt-4o-mini"
+    # analyze_model_name = "gpt-4.1-mini"
+    analyze_model_name = "o3-mini"
+
     # selected_edge_data_list = random.sample(
     #     edge_data_list, int(len(edge_data_list) * 0.2)
     # )
+    # sample runs at 20%
+    # o3-mini 23/26 = 88%
+    # gpt-4.1-mini 18/26 = 69%
     selected_edge_data_list = edge_data_list
+    # full run at 100%
+    # o3-mini 102/132 = 77%
     print(len(selected_edge_data_list))
     print(selected_edge_data_list[0])
     result_list = []
@@ -315,6 +324,7 @@ if __name__ == "__main__":
                 risk_relation_result = analyze_pair(
                     source_risk_data_summary,
                     target_risk_data_summary,
+                    analyze_model_name,
                 )
             all_cb_analyze.append(cb_analyze)
             # print(json.dumps(risk_relation_result, indent=4, ensure_ascii=False))
