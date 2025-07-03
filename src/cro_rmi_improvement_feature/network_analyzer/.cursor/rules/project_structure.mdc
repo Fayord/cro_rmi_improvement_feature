@@ -1,0 +1,256 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Cursor Rule: Risk Network Visualization System - Simple & Flexible Structure
+
+## Project Overview
+This rule defines a simple, scalable folder structure for the Risk Network Visualization System that can grow organically as features are added.
+
+## Core Folder Structure
+
+```
+src/cro_rmi_improvement_feature/network_analyzer/
+├── app/                          # Main Dash application
+│   ├── __init__.py
+│   ├── main.py                   # Dash app entry point
+│   ├── layout.py                 # Main app layout
+│   ├── callbacks.py              # Dash callbacks (can split later)
+│   └── assets/                   # Static assets
+│       ├── styles.css
+│       └── custom.js
+├── core/                         # Core business logic
+│   ├── __init__.py
+│   ├── models.py                 # Data models (can split later)
+│   ├── services.py               # Business logic (can split later)
+│   └── utils.py                  # Utility functions
+├── data/                         # Raw data storage
+│   ├── raw/                      # Raw Excel files and input data
+│   └── processed/                # Processed data files
+├── data_processor/               # Data processing and management
+│   ├── __init__.py
+│   ├── processing.py             # Data processing (can split later)
+│   └── storage.py                # Data storage
+├── ai/                           # AI components (Phase 2)
+│   ├── __init__.py
+│   ├── classifier.py             # Risk relationship classification
+│   └── cache.py                  # AI response caching
+├── visualization/                # Visualization components
+│   ├── __init__.py
+│   ├── layouts.py                # Graph layout algorithms
+│   └── styling.py                # Graph styling
+├── tests/                        # Tests (can expand later)
+│   ├── __init__.py
+│   └── test_basic.py
+├── config/                       # Configuration
+│   ├── __init__.py
+│   └── settings.py
+├── tasks/                        # Task management (existing)
+│   ├── tasks.json
+│   └── PRD.md
+├── .cursor/                      # Cursor rules (existing)
+│   └── rules/
+├── requirements.txt              # Dependencies
+├── README.md                     # Project documentation
+└── main.py                       # Application entry point
+```
+
+## Growth Principles
+
+### 1. Start Simple, Split When Needed
+**✅ DO:**
+- Start with single files for each major component
+- Split files when they exceed 300-500 lines
+- Create subdirectories when you have 3+ related files
+
+**Example Growth Pattern:**
+```
+# Phase 1: Single files
+app/callbacks.py (200 lines) ✅ Keep as is
+
+# Phase 2: Growing complexity
+app/callbacks.py (600 lines) ❌ Split into:
+app/callbacks/
+├── __init__.py
+├── graph_callbacks.py
+├── filter_callbacks.py
+└── company_callbacks.py
+```
+
+### 2. Feature-Based Organization
+**✅ DO:**
+- Group related functionality together
+- Create new top-level folders for major features
+- Keep related files close to each other
+
+**Example:**
+```
+# When adding API features
+api/
+├── __init__.py
+├── routes.py
+└── middleware.py
+
+# When adding deployment
+deployment/
+├── Dockerfile
+└── docker-compose.yml
+```
+
+### 3. Naming Conventions
+**✅ DO:**
+- Use snake_case for files and folders
+- Use descriptive names that indicate purpose
+- Keep names short but clear
+
+**Examples:**
+```
+✅ Good:
+- risk_models.py
+- graph_service.py
+- data_processing.py
+
+❌ Bad:
+- models.py
+- service.py
+- processing.py
+```
+
+### 4. Import Organization
+**✅ DO:**
+- Use relative imports within the project
+- Group imports: standard library, third-party, local
+- Keep imports at the top of files
+
+**Example:**
+```python
+# Standard library imports
+import json
+import os
+from typing import Dict, List
+
+# Third-party imports
+import dash
+import pandas as pd
+
+# Local imports
+from ..core.models import RiskNode
+from ..data.processing import load_data
+```
+
+## Phase-Based Development
+
+### Phase 1 (MVP) - Essential Structure
+```
+network_analyzer/
+├── app/           # Dash application
+├── core/          # Business logic
+├── data/          # Data management
+├── visualization/ # Graph components
+├── config/        # Configuration
+└── tests/         # Basic tests
+```
+
+### Phase 2 (AI Integration) - Add AI
+```
+network_analyzer/
+├── app/           # Dash application
+├── core/          # Business logic
+├── data/          # Data management
+├── ai/            # NEW: AI components
+├── visualization/ # Graph components
+├── config/        # Configuration
+└── tests/         # Tests
+```
+
+### Phase 3 (Enhancement) - Expand as needed
+```
+network_analyzer/
+├── app/           # May split into app/callbacks/, app/components/
+├── core/          # May split into core/models/, core/services/
+├── data/          # May split into data/processing/, data/storage/
+├── ai/            # May split into ai/models/, ai/prompts/
+├── visualization/ # May split into visualization/layouts/, visualization/styling/
+├── api/           # NEW: API endpoints (if needed)
+├── config/        # Configuration
+└── tests/         # May split into tests/unit/, tests/integration/
+```
+
+## File Creation Guidelines
+
+### When to Split Files
+- **File exceeds 500 lines** → Consider splitting
+- **Multiple unrelated classes** → Split into separate files
+- **Different import patterns** → Split based on dependencies
+- **Team collaboration** → Split for parallel development
+
+### When to Create New Folders
+- **3+ related files** → Create subdirectory
+- **New major feature** → Create top-level folder
+- **Different deployment targets** → Create deployment folder
+- **Different test types** → Create test subdirectories
+
+### Template for New Files
+```python
+"""
+[Brief description of the module]
+
+[Detailed description if needed]
+"""
+
+# Standard library imports
+import json
+from typing import Dict, List
+
+# Third-party imports
+import pandas as pd
+
+# Local imports
+from ..core.models import RiskNode
+
+
+def main_function(param: str) -> Dict:
+    """
+    [Function description]
+    
+    Args:
+        param: Parameter description
+        
+    Returns:
+        Return value description
+    """
+    # Implementation
+    pass
+
+
+if __name__ == "__main__":
+    # Test or example usage
+    pass
+```
+
+## Migration Strategy
+
+### When Splitting Files
+1. **Create new files** with focused functionality
+2. **Update imports** in existing files
+3. **Move classes/functions** to appropriate new files
+4. **Update __init__.py** files for clean imports
+5. **Test thoroughly** to ensure nothing breaks
+
+### When Adding Features
+1. **Create new folder** for the feature
+2. **Start with single file** in the new folder
+3. **Split as complexity grows**
+4. **Update documentation** and imports
+
+## Benefits of This Approach
+
+- **Simple to understand** and navigate
+- **Easy to maintain** and modify
+- **Scales naturally** with project growth
+- **Reduces cognitive load** for developers
+- **Prevents over-engineering** early in development
+- **Flexible for different team sizes** and preferences
+
+This structure provides a solid foundation that can grow organically as your project evolves, without the complexity of a rigid enterprise structure from day one.

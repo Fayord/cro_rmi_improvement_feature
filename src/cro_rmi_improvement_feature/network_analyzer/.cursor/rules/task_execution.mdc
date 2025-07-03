@@ -1,0 +1,46 @@
+---
+description: Task management and git workflow guidelines for incremental development
+globs: **/*
+alwaysApply: true
+---
+
+- **Task Execution Workflow:**
+  - **Work on one task at a time** - Complete each task fully before moving to the next
+  - **Commit after each task completion** - Use `git add .` and `git commit` with descriptive one-liner messages
+  - **Keep commits atomic** - Each commit should represent a single logical change or task completion
+
+- **Git Commit Guidelines:**
+  - **Use descriptive commit messages** that explain what was accomplished
+  - **Follow conventional commit format** when possible: `type(scope): description`
+  - **Keep messages concise but informative** - one line summary of changes made
+
+- **Example Workflow:**
+  ```bash
+  # ✅ DO: Complete task, then commit
+  # 1. Work on task implementation
+  # 2. Test the changes
+  # 3. Add all changes
+  git add .
+  
+  # 4. Commit with descriptive message
+  git commit -m "feat: implement user authentication endpoint"
+  git commit -m "fix: resolve database connection timeout issue"
+  git commit -m "refactor: optimize query performance for large datasets"
+  
+  # ❌ DON'T: Batch multiple tasks in one commit
+  git commit -m "various changes and fixes"
+  git commit -m "updates"
+  ```
+
+- **Task Completion Checklist:**
+  - ✅ Task implementation is complete and functional
+  - ✅ Code has been tested and verified
+  - ✅ All related files are included in the commit
+  - ✅ Commit message clearly describes the work done
+  - ✅ Ready to move to the next task
+
+- **Benefits of This Approach:**
+  - **Clear history** - Each commit represents a specific accomplishment
+  - **Easy rollback** - Can revert specific changes without affecting others
+  - **Better collaboration** - Team members can understand changes incrementally
+  - **Progress tracking** - Git history shows task completion timeline 

@@ -1,0 +1,500 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+## Task Management Guidelines (Python Version)
+
+### Tagged Task Lists System
+
+This system employs a **tagged task lists system** for multi-context task management.
+
+* **Data Structure**: Tasks are organized into separate contexts (tags) within a JSON data store.
+    * **Legacy Format Example**: {"tasks": [...]}
+    * **Tagged Format Example**: {"master": {"tasks": [...]}, "feature-branch": {"tasks": [...]}}
+* **Silent Migration**: Older, untagged formats are automatically converted to the tagged format upon first use.
+* **Tag Resolution**: Core functions interact with a layer that resolves the correct task list based on the active tag, ensuring backward compatibility.
+* **Default Tag**: "master" is used for all existing and new tasks unless a different tag is explicitly specified.
+
+### Task Structure Standards
+
+* **Core Task Properties**:
+    * ✅ **DO**: Include all required properties in each task dictionary.
+    * ✅ **DO**: Provide default values for optional properties.
+    * ❌ **DON'T**: Add extra properties not defined in the standard schema.
+
+    ```python
+    # ✅ DO: Follow this structure for task dictionaries
+    task = {
+        "id": next_id,
+        "title": "Task title",
+        "description": "Brief task description",
+        "status": "pending",  # "pending", "in-progress", "done", etc.
+        "dependencies": [],  # List of task IDs
+        "priority": "medium",  # "high", "medium", "low"
+        "details": "Detailed implementation instructions",
+        "testStrategy": "Verification approach",
+        "subtasks": []  # List of subtask dictionaries
+    }
+    ```
+
+* **Tagged Data Structure Interaction**:
+    * ✅ **DO**: Access tasks through a tag resolution layer.
+    * ✅ **DO**: Use dedicated functions to retrieve tasks for a specific tag (e.g., get_tasks_for_tag(data, tag_name)).
+    * ✅ **DO**: Use dedicated functions to update tasks for a specific tag (e.g., set_tasks_for_tag(data, tag_name, tasks)).
+    * ❌ **DON'T**: Directly manipulate the underlying tagged structure within core functions.
+
+    ```python
+    # ✅ DO: Use tag resolution functions
+    import json
+    import os
+
+    def read_json_data(path):
+        if not os.path.exists(path):
+            return {}
+        with open(path, 'r') as f:
+            return json.load(f)
+
+    def write_json_data(path, data):
+        with open(path, 'w') as f:
+            json.dump(data, f, indent=2)
+
+    # Assuming these are defined elsewhere for simplicity
+    def get_current_tag():
+        return os.environ.get('CURRENT_TASK_TAG', 'master')
+
+    def get_tasks_for_tag(data, tag_name):
+        # Implementation details covered in Migration/Compatibility section
+        pass
+
+    def set_tasks_for_tag(data, tag_name, tasks):
+        # Implementation details covered in Migration/Compatibility section
+        pass
+
+
+    tasks_data = read_json_data("tasks.json")
+    current_tag = get_current_tag()
+    tasks = get_tasks_for_tag(tasks_data, current_tag)
+
+    # Manipulate tasks as normal...
+    # For example: tasks.append({"id": 101, "title": "New Task", "status": "pending"})
+
+    # Save back to the tagged structure
+    set_tasks_for_tag(tasks_data, current_tag, tasks)
+    write_json_data("tasks.json", tasks_data)
+    ```
+
+* **Subtask Structure**:
+    * ✅ **DO**: Use consistent properties across subtasks.
+    * ✅ **DO**: Maintain simple numeric IDs unique within their parent task.
+    * ❌ **DON'T**: Duplicate parent task properties in subtasks.
+
+    ```python
+    # ✅ DO: Structure subtasks consistently
+    subtask = {
+        "id": next_subtask_id,  # Simple numeric ID, unique within the parent task
+        "title": "Subtask title",
+        "description": "Brief subtask description",
+        "status": "pending",
+        "dependencies": [],  # Can include numeric IDs (other subtasks) or full task IDs
+        "details": "Detailed implementation instructions"
+    }
+    ```
+
+### Task Creation and Parsing
+
+* **ID Management**:
+    * ✅ **DO**: Assign unique sequential IDs to tasks within each tag context.
+    * ✅ **DO**: Calculate the next ID based on existing tasks in the current tag.
+    * ❌ **DON'T**: Hardcode or reuse IDs within the same tag.
+
+    ```python
+    # ✅ DO: Calculate the next available ID within the current tag
+    tasks_data = read_json_data("tasks.json")
+    current_tag = get_current_tag()
+    tasks = get_tasks_for_tag(tasks_data, current_tag)
+    highest_id = max(t["id"] for t in tasks) if tasks else 0
+    next_task_id = highest_id + 1
+    ```
+
+* **PRD Parsing**:
+    * ✅ **DO**: Extract tasks from Product Requirement Documents (PRDs) using automated methods (e.g., AI).
+    * ✅ **DO**: Create tasks in the current tag context (defaults to "master").
+    * ✅ **DO**: Provide clear instructions/prompts to guide task generation.
+    * ✅ **DO**: Validate and refine generated tasks.
+
+    ```python
+    # ✅ DO: Parse into current tag context
+    # Assume parse_tasks_from_prd is an AI-driven function
+    def parse_tasks_from_prd(prd_content):
+        # Placeholder for AI parsing logic
+        return [{"id": 1, "title": "Parsed Task 1", "status": "pending"}]
+
+    tasks_data = read_json_data("tasks.json") or {}
+    current_tag = get_current_tag()
+
+    # Parse tasks and add to current tag
+    prd_content = "..." # Your PRD content
+    new_tasks = parse_tasks_from_prd(prd_content)
+
+    # Append new tasks, handle ID generation if parse_tasks_from_prd doesn't provide them
+    existing_tasks = get_tasks_for_tag(tasks_data, current_tag)
+    highest_id = max(t["id"] for t in existing_tasks) if existing_tasks else 0
+    for i, task in enumerate(new_tasks):
+        if "id" not in task:
+            task["id"] = highest_id + 1 + i
+        existing_tasks.append(task)
+
+    set_tasks_for_tag(tasks_data, current_tag, existing_tasks)
+    write_json_data("tasks.json", tasks_data)
+    ```
+
+### Task Updates and Modifications
+
+* **Status Management**:
+    * ✅ **DO**: Provide functions for updating task status within the current tag context.
+    * ✅ **DO**: Handle both individual tasks and subtasks.
+    * ✅ **DO**: Consider subtask status when updating parent tasks.
+
+    ```python
+    # ✅ DO: Handle status updates within tagged context
+    def set_task_status(tasks_path, task_id_input, new_status):
+        tasks_data = read_json_data(tasks_path)
+        current_tag = get_current_tag()
+        tasks = get_tasks_for_tag(tasks_data, current_tag)
+
+        # Check if it's a subtask (e.g., "1.2")
+        if isinstance(task_id_input, str) and '.' in task_id_input:
+            parent_id, subtask_id = map(int, task_id_input.split('.'))
+            parent_task = next((t for t in tasks if t["id"] == parent_id), None)
+            if parent_task and "subtasks" in parent_task:
+                subtask = next((st for st in parent_task["subtasks"] if st["id"] == subtask_id), None)
+                if subtask:
+                    subtask["status"] = new_status
+                    if new_status == 'done':
+                        all_subtasks_done = all(st["status"] == 'done' for st in parent_task["subtasks"])
+                        if all_subtasks_done:
+                            print(f"Parent task {parent_task['id']} subtasks are all done. Consider updating parent task status.")
+        else:
+            # Handle regular task
+            task_id = int(task_id_input)
+            task = next((t for t in tasks if t["id"] == task_id), None)
+            if task:
+                task["status"] = new_status
+                # If marking as done, also mark subtasks
+                if new_status == 'done' and "subtasks" in task and task["subtasks"]:
+                    for subtask in task["subtasks"]:
+                        subtask["status"] = new_status
+
+        # Save updated tasks back to tagged structure
+        set_tasks_for_tag(tasks_data, current_tag, tasks)
+        write_json_data(tasks_path, tasks_data)
+
+    # Example usage:
+    # set_task_status("tasks.json", 1, "in-progress")
+    # set_task_status("tasks.json", "1.2", "done")
+    ```
+
+* **Task Expansion**:
+    * ✅ **DO**: Use automated methods (e.g., AI) to generate detailed subtasks within the current tag context.
+    * ✅ **DO**: Consider complexity analysis for determining the number of subtasks.
+    * ✅ **DO**: Ensure proper IDs for newly created subtasks.
+
+    ```python
+    # ✅ DO: Generate appropriate subtasks based on complexity
+    # Assuming CONFIG exists
+    class CONFIG:
+        defaultSubtasks = 3
+
+    # Placeholder for AI subtask generation
+    def generate_subtasks_ai(task_title, num_subtasks):
+        generated = []
+        for i in range(num_subtasks):
+            generated.append({
+                "id": i + 1,
+                "title": f"Subtask {i+1} for {task_title}",
+                "description": "Auto-generated subtask",
+                "status": "pending",
+                "dependencies": []
+            })
+        return generated
+
+    def expand_task_with_subtasks(tasks_path, task_id, num_subtasks=CONFIG.defaultSubtasks, task_analysis=None):
+        tasks_data = read_json_data(tasks_path)
+        current_tag = get_current_tag()
+        tasks = get_tasks_for_tag(tasks_data, current_tag)
+
+        target_task = next((t for t in tasks if t["id"] == task_id), None)
+        if not target_task:
+            print(f"Task with ID {task_id} not found.")
+            return
+
+        if task_analysis:
+            print(f"info: Found complexity analysis for task {task_id}: Score {task_analysis.get('complexityScore', 0)}/10")
+            if task_analysis.get('recommendedSubtasks') and num_subtasks == CONFIG.defaultSubtasks:
+                num_subtasks = task_analysis['recommendedSubtasks']
+                print(f"info: Using recommended number of subtasks: {num_subtasks}")
+
+        # Generate subtasks
+        new_subtasks = generate_subtasks_ai(target_task["title"], num_subtasks)
+
+        # Assign unique IDs within the parent task
+        highest_subtask_id = max(st["id"] for st in target_task.get("subtasks", [])) if target_task.get("subtasks") else 0
+        for subtask in new_subtasks:
+            subtask["id"] += highest_subtask_id
+
+        if "subtasks" not in target_task:
+            target_task["subtasks"] = []
+        target_task["subtasks"].extend(new_subtasks)
+
+        set_tasks_for_tag(tasks_data, current_tag, tasks)
+        write_json_data(tasks_path, tasks_data)
+
+    # Example usage:
+    # expand_task_with_subtasks("tasks.json", 1, task_analysis={"complexityScore": 7, "recommendedSubtasks": 5})
+    ```
+
+### Task File Generation
+
+* **File Formatting**:
+    * ✅ **DO**: Use consistent formatting for generated task files.
+    * ✅ **DO**: Include all relevant task properties in text files.
+    * ✅ **DO**: Format dependencies with their current status indicators.
+
+    ```python
+    # ✅ DO: Use consistent file formatting
+    def format_dependencies_with_status(dependencies, all_tasks):
+        formatted_deps = []
+        for dep_id in dependencies:
+            dep_task = next((t for t in all_tasks if t["id"] == dep_id), None)
+            if dep_task:
+                formatted_deps.append(f"{dep_id} ({dep_task.get('status', 'unknown')})")
+            else:
+                formatted_deps.append(f"{dep_id} (not found)")
+        return ", ".join(formatted_deps)
+
+    def generate_task_file_content(task, tasks_list, current_tag):
+        content = f"# Tag Context: {current_tag}\n"
+        content += f"# Task ID: {task.get('id', 'N/A')}\n"
+        content += f"# Title: {task.get('title', 'No Title')}\n"
+        content += f"# Status: {task.get('status', 'pending')}\n"
+
+        if task.get("dependencies"):
+            content += f"# Dependencies: {format_dependencies_with_status(task['dependencies'], tasks_list)}\n"
+        else:
+            content += "# Dependencies: None\n"
+
+        content += f"\nDescription:\n{task.get('description', 'No description provided.')}\n"
+        content += f"\nDetails:\n{task.get('details', 'No detailed instructions.')}\n"
+        content += f"\nTest Strategy:\n{task.get('testStrategy', 'No test strategy provided.')}\n"
+
+        if task.get("subtasks"):
+            content += "\nSubtasks:\n"
+            for subtask in task["subtasks"]:
+                content += f"  - Subtask ID: {subtask.get('id', 'N/A')}, Title: {subtask.get('title', 'No Title')}, Status: {subtask.get('status', 'pending')}\n"
+                if subtask.get("dependencies"):
+                    content += f"    Dependencies: {format_dependencies_with_status(subtask['dependencies'], tasks_list)}\n"
+                content += f"    Details: {subtask.get('details', 'No details.')}\n"
+        return content
+    ```
+
+* **Tagged Context Awareness**:
+    * ✅ **DO**: Generate task files from the current tag context.
+    * ✅ **DO**: Include tag information in generated files.
+    * ❌ **DON'T**: Mix tasks from different tags in a single file generation.
+
+    ```python
+    # ✅ DO: Generate files for current tag context
+    import os
+
+    def generate_task_files(tasks_path, output_dir="generated_tasks"):
+        tasks_data = read_json_data(tasks_path)
+        current_tag = get_current_tag()
+        tasks = get_tasks_for_tag(tasks_data, current_tag)
+
+        os.makedirs(output_dir, exist_ok=True)
+
+        for task in tasks:
+            file_content = generate_task_file_content(task, tasks, current_tag)
+            filename = os.path.join(output_dir, f"task_{task['id']}_{current_tag}.txt")
+            with open(filename, 'w') as f:
+                f.write(file_content)
+            print(f"Generated: {filename}")
+
+    # Example usage:
+    # generate_task_files("tasks.json")
+    ```
+
+### Task Listing and Display
+
+* **Filtering and Organization**:
+    * ✅ **DO**: Allow filtering tasks by status within the current tag context.
+    * ✅ **DO**: Handle subtask display in lists.
+    * ✅ **DO**: Use consistent table or list formats.
+
+    ```python
+    # ✅ DO: Implement clear filtering within tag context
+    from tabulate import tabulate # You might need to install this: pip install tabulate
+
+    def list_tasks(tasks_path, status_filter=None, show_subtasks=False):
+        tasks_data = read_json_data(tasks_path)
+        current_tag = get_current_tag()
+        tasks = get_tasks_for_tag(tasks_data, current_tag)
+
+        filtered_tasks = [
+            task for task in tasks
+            if not status_filter or (task.get('status') and task['status'].lower() == status_filter.lower())
+        ]
+
+        headers = ["ID", "Title", "Status", "Priority", "Dependencies"]
+        table_data = []
+
+        for task in filtered_tasks:
+            dependencies = ", ".join(map(str, task.get("dependencies", []))) or "None"
+            table_data.append([
+                task.get("id"),
+                task.get("title"),
+                task.get("status"),
+                task.get("priority"),
+                dependencies
+            ])
+            if show_subtasks and task.get("subtasks"):
+                for subtask in task["subtasks"]:
+                    sub_dependencies = ", ".join(map(str, subtask.get("dependencies", []))) or "None"
+                    table_data.append([
+                        f"  {task['id']}.{subtask.get('id')}",
+                        f"  {subtask.get('title')}",
+                        subtask.get("status"),
+                        "", # Subtasks don't typically have their own priority
+                        sub_dependencies
+                    ])
+
+        print(f"\nTasks for Tag: {current_tag} (Filtered by Status: {status_filter or 'All'})")
+        print(tabulate(table_data, headers=headers, tablefmt="grid"))
+
+    # Example usage:
+    # list_tasks("tasks.json", status_filter="pending", show_subtasks=True)
+    ```
+
+* **Progress Tracking**:
+    * ✅ **DO**: Calculate and display completion statistics for the current tag.
+    * ✅ **DO**: Track both task and subtask completion.
+    * ✅ **DO**: Use visual progress indicators.
+
+    ```python
+    # ✅ DO: Track and display progress within tag context
+    def display_progress(tasks_path):
+        tasks_data = read_json_data(tasks_path)
+        current_tag = get_current_tag()
+        tasks = get_tasks_for_tag(tasks_data, current_tag)
+
+        # Calculate completion statistics for main tasks
+        total_tasks = len(tasks)
+        completed_tasks = len([task for task in tasks if task.get('status') in ('done', 'completed')])
+        completion_percentage = (completed_tasks / total_tasks) * 100 if total_tasks > 0 else 0
+
+        # Count subtasks
+        total_subtasks = 0
+        completed_subtasks = 0
+
+        for task in tasks:
+            if task.get("subtasks"):
+                total_subtasks += len(task["subtasks"])
+                completed_subtasks += len([st for st in task["subtasks"] if st.get('status') in ('done', 'completed')])
+
+        subtask_completion_percentage = (completed_subtasks / total_subtasks) * 100 if total_subtasks > 0 else 0
+
+        def progress_bar(percentage, length=20):
+            filled_len = int(length * percentage / 100)
+            bar = '█' * filled_len + '-' * (length - filled_len)
+            return f"[{bar}] {percentage:.2f}%"
+
+        print(f"\n--- Progress for Tag: {current_tag} ---")
+        print(f"Main Tasks: {completed_tasks}/{total_tasks} {progress_bar(completion_percentage)}")
+        print(f"Subtasks:   {completed_subtasks}/{total_subtasks} {progress_bar(subtask_completion_percentage)}")
+        print("----------------------------------")
+
+    # Example usage:
+    # display_progress("tasks.json")
+    ```
+
+### Migration and Compatibility
+
+* **Silent Migration Handling**:
+    * ✅ **DO**: Implement silent migration within the data reading function.
+    * ✅ **DO**: Detect legacy format and convert automatically.
+    * ✅ **DO**: Preserve all existing task data during migration.
+
+    ```python
+    # ✅ DO: Handle silent migration (implemented in utils.py or data_access.py)
+    # This function would be a core utility for reading JSON data
+    def read_json_with_migration(filepath):
+        import json
+        import os
+
+        if not os.path.exists(filepath):
+            return {}
+
+        with open(filepath, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+
+        # Silent migration for tasks.json files
+        # Check if it's a tasks file and in legacy format
+        is_tasks_file = "tasks.json" in filepath # More robust check might be needed
+        if 'tasks' in data and isinstance(data['tasks'], list) and 'master' not in data and is_tasks_file:
+            print(f"Migrating legacy task data in {filepath}...")
+            migrated_data = {
+                "master": {
+                    "tasks": data['tasks']
+                }
+            }
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(migrated_data, f, indent=2)
+            data = migrated_data
+            print("Migration complete.")
+        return data
+
+    # The general read_json_data from above would call this internally.
+    # tasks_data = read_json_with_migration("tasks.json")
+    ```
+
+* **Tag Resolution**:
+    * ✅ **DO**: Use tag resolution functions to maintain backward compatibility.
+    * ✅ **DO**: Return the list of tasks (legacy-like format) to core functions.
+    * ❌ **DON'T**: Expose the full tagged structure to existing core logic.
+
+    ```python
+    # ✅ DO: Use tag resolution layer
+    def get_tasks_for_tag(data, tag_name):
+        """
+        Retrieves the list of tasks for a given tag, handling legacy format.
+        """
+        if 'tasks' in data and isinstance(data['tasks'], list):
+            # Legacy format - return as-is
+            return data['tasks']
+
+        if tag_name in data and 'tasks' in data[tag_name]:
+            # Tagged format - return tasks for specified tag
+            return data[tag_name]['tasks']
+
+        return []
+
+    def set_tasks_for_tag(data, tag_name, tasks):
+        """
+        Sets the list of tasks for a given tag, handling initial tagging if necessary.
+        """
+        if 'tasks' in data and isinstance(data['tasks'], list):
+            # If still in legacy format after read, this implies direct manipulation
+            # or data wasn't saved back through the migration-aware read.
+            # In a real system, the read_json_with_migration would prevent this state
+            # by migrating on load. For direct setting, we'll ensure it becomes tagged.
+            data = {"master": {"tasks": data['tasks']}} # Force migration if not done by read
+            data[tag_name] = {"tasks": tasks}
+        else:
+            if tag_name not in data:
+                data[tag_name] = {}
+            data[tag_name]["tasks"] = tasks
+
+    # These two functions are crucial for the tag resolution layer and should be used
+    # by all core task management operations.
+    ```
