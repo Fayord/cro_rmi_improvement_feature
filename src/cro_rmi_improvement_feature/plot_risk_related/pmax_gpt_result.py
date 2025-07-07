@@ -244,7 +244,10 @@ def final_relationship(
 if __name__ == "__main__":
     random.seed(42)
     # risk_data_path = "/Users/ford/Documents/coding_trae/cro_rmi_improvement_feature/src/cro_rmi_improvement_feature/plot_risk_related/result/250528-company_risk_data.json"
-    risk_data_path = "/Users/ford/Documents/coding_trae/cro_rmi_improvement_feature/src/cro_rmi_improvement_feature/plot_risk_related/result/merge-company_risk_data_with_embedding-10percent_edges.pkl"
+    dir_path = os.path.dirname(os.path.abspath(__file__))
+    risk_data_path = (
+        f"{dir_path}/result/merge-company_risk_data_with_embedding-10percent_edges.pkl"
+    )
     if risk_data_path.endswith(".pkl"):
         import pickle
 
@@ -271,160 +274,154 @@ if __name__ == "__main__":
 
         edge_data_list.append(risk["data"])
 
-    # analyze_model_name = "gpt-4o-mini"
-    # analyze_model_name = "gpt-4.1-mini"
-    analyze_model_name = "o3-mini"
+    analyze_model_name_list = [
+        "gpt-4o-mini",
+        "gpt-4.1-mini",
+        "o3-mini",
+    ]
+    # selected_edge_data_list = edge_data_list
+    # 20% of total edge data
+    selected_edge_data_list = random.sample(
+        edge_data_list, int(len(edge_data_list) * 0.2)
+    )
 
-    # selected_edge_data_list = random.sample(
-    #     edge_data_list, int(len(edge_data_list) * 0.2)
-    # )
-    # sample runs at 20%
-    # o3-mini 23/26 = 88%
-    # gpt-4.1-mini 18/26 = 69%
-    selected_edge_data_list = edge_data_list
-    # full run at 100%
-    # o3-mini 102/132 = 77%
     print(len(selected_edge_data_list))
     print(selected_edge_data_list[0])
-    result_list = []
-    with get_openai_callback() as cb_summary:
-        unique_risk_data = []
+
+    all_results = []
+    for analyze_model_name in analyze_model_name_list:
+        print(f"\n===== Running analysis for model: {analyze_model_name} =====\n")
+        result_list = []
+        with get_openai_callback() as cb_summary:
+            unique_risk_data = []
+            for selected_edge_data in selected_edge_data_list:
+                source_id = selected_edge_data["source"]
+                risk_a = selected_edge_data["target_risk_data"]
+                risk_b = selected_edge_data["source_risk_data"]
+                if risk_a not in unique_risk_data:
+                    unique_risk_data.append(risk_a)
+                if risk_b not in unique_risk_data:
+                    unique_risk_data.append(risk_b)
+            for risk_data in unique_risk_data:
+                risk_data_summary = summarize_risk(risk_data)
+        all_cb_analyze = []
         for selected_edge_data in selected_edge_data_list:
             source_id = selected_edge_data["source"]
-            # pretty print risk_source_data
-            # print(json.dumps(selected_edge_data, indent=4, ensure_ascii=False))
             risk_a = selected_edge_data["target_risk_data"]
             risk_b = selected_edge_data["source_risk_data"]
-            if risk_a not in unique_risk_data:
-                unique_risk_data.append(risk_a)
-            if risk_b not in unique_risk_data:
-                unique_risk_data.append(risk_b)
-        for risk_data in unique_risk_data:
-            risk_data_summary = summarize_risk(risk_data)
-    # Wrap the main processing with cost tracking
-    all_cb_analyze = []
-    for selected_edge_data in selected_edge_data_list:
-        source_id = selected_edge_data["source"]
-        # pretty print risk_source_data
-        # print(json.dumps(selected_edge_data, indent=4, ensure_ascii=False))
-        risk_a = selected_edge_data["target_risk_data"]
-        risk_b = selected_edge_data["source_risk_data"]
-        for risk_a, risk_b, direction_risk in [
-            (risk_a, risk_b, "a->b"),
-            (risk_b, risk_a, "b->a"),
-        ]:
-            target_risk_data = risk_a
-            source_risk_data = risk_b
-            target_risk_data_summary = summarize_risk(target_risk_data)
-            source_risk_data_summary = summarize_risk(source_risk_data)
-            # source_risk_data_summary = source_risk_data
-            # target_risk_data_summary = target_risk_data
-            with get_openai_callback() as cb_analyze:
-
-                risk_relation_result = analyze_pair(
-                    source_risk_data_summary,
-                    target_risk_data_summary,
-                    analyze_model_name,
-                )
-            all_cb_analyze.append(cb_analyze)
-            # print(json.dumps(risk_relation_result, indent=4, ensure_ascii=False))
-
-            relation_result = {
-                "direction_risk": direction_risk,
-                "target_risk": target_risk_data_summary["risk"],
-                "target_risk_desc": target_risk_data_summary["risk_desc"],
-                "target_rootcause": target_risk_data_summary["rootcause"],
-                "target_process": target_risk_data_summary["process"],
-                "source_risk": source_risk_data_summary["risk"],
-                "source_risk_desc": source_risk_data_summary["risk_desc"],
-                "source_rootcause": source_risk_data_summary["rootcause"],
-                "source_process": source_risk_data_summary["process"],
-                "interdependency_type": risk_relation_result["interdependency_type"],
-                "direction": risk_relation_result["direction"],
-                "rationale": risk_relation_result["rationale"],
-                "confidence": risk_relation_result["confidence"],
-            }
-            result_list.append(relation_result)
-    print(f"total analyze cost: {sum(cb.total_cost for cb in all_cb_analyze)}")
-    print(
-        f"total analyze cost thai: {sum(cb.total_cost for cb in all_cb_analyze) * 35}"
-    )
-    print(f"total analyze tokens: {sum(cb.total_tokens for cb in all_cb_analyze)}")
-    print(
-        f"total analyze prompt tokens: {sum(cb.prompt_tokens for cb in all_cb_analyze)}"
-    )
-    print(
-        f"total analyze completion tokens: {sum(cb.completion_tokens for cb in all_cb_analyze)}"
-    )
-    print(f"total summary cost: {cb_summary.total_cost}")
-    print(f"total summary cost thai: {cb_summary.total_cost * 35}")
-    print(f"total summary tokens: {cb_summary.total_tokens}")
-    print(f"total summary prompt tokens: {cb_summary.prompt_tokens}")
-    print(f"total summary completion tokens: {cb_summary.completion_tokens}")
-    # raise
-    count_same_interdependency_type = 0
-    count_same_direction = 0
-    count_same_both = 0
-
-    # loop every even item in result_list
-    for i in range(0, len(result_list), 2):
-        interdependency_type_a_b = result_list[i]["interdependency_type"]
-        interdependency_type_b_a = result_list[i + 1]["interdependency_type"]
-        direction_a_b = result_list[i]["direction"]
-        direction_b_a = result_list[i + 1]["direction"]
-        final_interdependency_type, final_direction = final_relationship(
-            interdependency_type_a_b,
-            interdependency_type_b_a,
-            direction_a_b,
-            direction_b_a,
+            for risk_a, risk_b, direction_risk in [
+                (risk_a, risk_b, "a->b"),
+                (risk_b, risk_a, "b->a"),
+            ]:
+                target_risk_data = risk_a
+                source_risk_data = risk_b
+                target_risk_data_summary = summarize_risk(target_risk_data)
+                source_risk_data_summary = summarize_risk(source_risk_data)
+                with get_openai_callback() as cb_analyze:
+                    risk_relation_result = analyze_pair(
+                        source_risk_data_summary,
+                        target_risk_data_summary,
+                        analyze_model_name,
+                    )
+                all_cb_analyze.append(cb_analyze)
+                relation_result = {
+                    "direction_risk": direction_risk,
+                    "analyze_model_name": analyze_model_name,
+                    "target_risk": target_risk_data_summary["risk"],
+                    "target_risk_desc": target_risk_data_summary["risk_desc"],
+                    "target_rootcause": target_risk_data_summary["rootcause"],
+                    "target_process": target_risk_data_summary["process"],
+                    "source_risk": source_risk_data_summary["risk"],
+                    "source_risk_desc": source_risk_data_summary["risk_desc"],
+                    "source_rootcause": source_risk_data_summary["rootcause"],
+                    "source_process": source_risk_data_summary["process"],
+                    "interdependency_type": risk_relation_result[
+                        "interdependency_type"
+                    ],
+                    "direction": risk_relation_result["direction"],
+                    "rationale": risk_relation_result["rationale"],
+                    "confidence": risk_relation_result["confidence"],
+                }
+                result_list.append(relation_result)
+        print(f"total analyze cost: {sum(cb.total_cost for cb in all_cb_analyze)}")
+        print(
+            f"total analyze cost thai: {sum(cb.total_cost for cb in all_cb_analyze) * 35}"
         )
-        result_list[i]["final_interdependency_type"] = final_interdependency_type
-        result_list[i]["final_direction"] = final_direction
-        result_list[i + 1]["final_interdependency_type"] = final_interdependency_type
-        result_list[i + 1]["final_direction"] = final_direction
-        count_possible_missing_direction_relation = None
-        if (
-            final_interdependency_type
-            in ["Causal", "Contingent", "Temporal/Sequential"]
-        ) and (
-            interdependency_type_a_b
-            not in ["Causal", "Contingent", "Temporal/Sequential"]
-        ):
-            count_possible_missing_direction_relation = True
-        if interdependency_type_a_b in ["Causal", "Contingent", "Temporal/Sequential"]:
-            count_possible_missing_direction_relation = False
-        result_list[i][
-            "count_possible_missing_direction_relation"
-        ] = count_possible_missing_direction_relation
-        result_list[i + 1][
-            "count_possible_missing_direction_relation"
-        ] = count_possible_missing_direction_relation
-
-        if interdependency_type_a_b != interdependency_type_b_a:
-            print(f"{interdependency_type_a_b=}")
-            print(f"{interdependency_type_b_a=}")
-            print()
-            # print(f"{result_list[i]=}")
-            # print(f"{result_list[i + 1]=}")
-        if (
-            result_list[i]["interdependency_type"]
-            == result_list[i + 1]["interdependency_type"]
-        ):
-            count_same_interdependency_type += 1
-        if result_list[i]["direction"] == result_list[i + 1]["direction"]:
-            count_same_direction += 1
-        if (
-            result_list[i]["interdependency_type"]
-            == result_list[i + 1]["interdependency_type"]
-            and result_list[i]["direction"] == result_list[i + 1]["direction"]
-        ):
-            count_same_both += 1
-    print(f"total pairs: {len(result_list)/2}")
-    print(f"{count_same_interdependency_type=}")
-    print(f"{count_same_direction=}")
-    print(f"{count_same_both=}")
-
-    # convert result_list to dataframe
-    df = pd.DataFrame(result_list)
-    # save to excel
-    df.to_excel(f"{dir_path}/pmax_gpt_result.xlsx", index=False)
+        print(f"total analyze tokens: {sum(cb.total_tokens for cb in all_cb_analyze)}")
+        print(
+            f"total analyze prompt tokens: {sum(cb.prompt_tokens for cb in all_cb_analyze)}"
+        )
+        print(
+            f"total analyze completion tokens: {sum(cb.completion_tokens for cb in all_cb_analyze)}"
+        )
+        print(f"total summary cost: {cb_summary.total_cost}")
+        print(f"total summary cost thai: {cb_summary.total_cost * 35}")
+        print(f"total summary tokens: {cb_summary.total_tokens}")
+        print(f"total summary prompt tokens: {cb_summary.prompt_tokens}")
+        print(f"total summary completion tokens: {cb_summary.completion_tokens}")
+        count_same_interdependency_type = 0
+        count_same_direction = 0
+        count_same_both = 0
+        for i in range(0, len(result_list), 2):
+            interdependency_type_a_b = result_list[i]["interdependency_type"]
+            interdependency_type_b_a = result_list[i + 1]["interdependency_type"]
+            direction_a_b = result_list[i]["direction"]
+            direction_b_a = result_list[i + 1]["direction"]
+            final_interdependency_type, final_direction = final_relationship(
+                interdependency_type_a_b,
+                interdependency_type_b_a,
+                direction_a_b,
+                direction_b_a,
+            )
+            result_list[i]["final_interdependency_type"] = final_interdependency_type
+            result_list[i]["final_direction"] = final_direction
+            result_list[i + 1][
+                "final_interdependency_type"
+            ] = final_interdependency_type
+            result_list[i + 1]["final_direction"] = final_direction
+            count_possible_missing_direction_relation = None
+            if (
+                final_interdependency_type
+                in ["Causal", "Contingent", "Temporal/Sequential"]
+            ) and (
+                interdependency_type_a_b
+                not in ["Causal", "Contingent", "Temporal/Sequential"]
+            ):
+                count_possible_missing_direction_relation = True
+            if interdependency_type_a_b in [
+                "Causal",
+                "Contingent",
+                "Temporal/Sequential",
+            ]:
+                count_possible_missing_direction_relation = False
+            result_list[i][
+                "count_possible_missing_direction_relation"
+            ] = count_possible_missing_direction_relation
+            result_list[i + 1][
+                "count_possible_missing_direction_relation"
+            ] = count_possible_missing_direction_relation
+            if interdependency_type_a_b != interdependency_type_b_a:
+                print(f"{interdependency_type_a_b=}")
+                print(f"{interdependency_type_b_a=}")
+                print()
+            if (
+                result_list[i]["interdependency_type"]
+                == result_list[i + 1]["interdependency_type"]
+            ):
+                count_same_interdependency_type += 1
+            if result_list[i]["direction"] == result_list[i + 1]["direction"]:
+                count_same_direction += 1
+            if (
+                result_list[i]["interdependency_type"]
+                == result_list[i + 1]["interdependency_type"]
+                and result_list[i]["direction"] == result_list[i + 1]["direction"]
+            ):
+                count_same_both += 1
+        print(f"total pairs: {len(result_list)/2}")
+        print(f"{count_same_interdependency_type=}")
+        print(f"{count_same_direction=}")
+        print(f"{count_same_both=}")
+        all_results.extend(result_list)
+    # After all models, save to one Excel file
+    df = pd.DataFrame(all_results)
+    df.to_excel(f"{dir_path}/pmax_gpt_result_all_models.xlsx", index=False)
