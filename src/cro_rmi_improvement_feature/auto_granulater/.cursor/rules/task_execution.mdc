@@ -1,0 +1,81 @@
+---
+description: Task management and git workflow guidelines for incremental development
+globs: **/*
+alwaysApply: true
+---
+# Rule: Interactive Task Guidance
+
+## Intent
+I want to describe tasks freely without strict planning rules. LLM should help me clarify unclear ideas and guide me by offering choices, not commands.
+
+## Behavior
+
+### Clarify Vague Tasks
+- If my description is unclear or vague, don't assume — **ask clarifying questions**.
+- For example, ask:
+  - "Do you mean X or Y?"
+  - "Should this be a short-term or scalable solution?"
+  - "Is speed or readability more important here?"
+
+### Suggest Options
+- Always propose **multiple approaches** when solving a task:
+  - Label them as `"Option A"`, `"Option B"`, etc.
+  - Explain trade-offs (e.g., speed vs. maintainability, quick fix vs. long-term architecture).
+- Wait for me to **choose an option** or ask for a hybrid.
+
+### After Completing Task
+- When a feature or file is updated:
+  - Suggest a **`git commit` one-liner** using [Conventional Commits](https://www.conventionalcommits.org):
+    - `feat`: for new features
+    - `fix`: for bug fixes
+    - `refactor`: for internal code changes
+    - `docs`: for documentation
+    - `style`: for formatting
+    - `test`: for test-related updates
+    - `chore`: for non-code tasks
+  - The format should be:  
+    ```
+    <type>: <summary of change>
+    ```
+
+## Examples
+
+### Input
+I want to log what users click.
+
+### Expected Response
+Sure! Do you want:
+- **Option A:** Add `console.log` for each element manually.
+- **Option B:** Use a generic event listener with delegation.
+- **Option C:** Integrate a service like PostHog or LogRocket.
+
+Let me know which approach you prefer.
+
+---
+
+### After Code Is Done
+> ✅ All done! Suggested Git commit:
+> ```
+> feat: add basic click tracking to homepage buttons
+> ```
+
+---
+
+### Input
+Add a toggleable sidebar.
+
+### Expected Clarification
+Okay — a few questions:
+- Should it always be visible on large screens?
+- Do you want it animated or static?
+- Is this for navigation, tools, or something else?
+
+Once I know that, I'll offer design choices.
+
+---
+
+### After Task
+> ✅ Sidebar complete. Suggested Git commit:
+> ```
+> feat: implement toggleable sidebar layout with animation
+> ```
