@@ -70,13 +70,16 @@ def get_llm(model_name="o3-mini"):
     if model_name == "gpt-4.1-mini":
         return ChatOpenAI(
             model="gpt-4.1-mini",
-            # model="o3-mini",
+            temperature=0.1,
+        )
+    elif model_name == "gpt-4o-mini":
+        return ChatOpenAI(
+            model="gpt-4o-mini",
             temperature=0.1,
         )
     elif model_name == "o3-mini":
         return ChatOpenAI(
             model="o3-mini",
-            # temperature=0.1,
         )
     else:
         raise ValueError(f"Invalid model name: {model_name}")
@@ -174,7 +177,7 @@ Risk B: {risk_b['risk']} \n Risk Description: {risk_b['risk_desc']} \n Root Caus
 
     except Exception as e:
         print(f"[ERROR] Failed to analyze pair {str(e)}")
-        return None
+        raise e
 
 
 def final_relationship(
@@ -275,7 +278,7 @@ if __name__ == "__main__":
         edge_data_list.append(risk["data"])
 
     analyze_model_name_list = [
-        "gpt-4o-mini",
+        # "gpt-4o-mini",
         "gpt-4.1-mini",
         "o3-mini",
     ]
@@ -324,24 +327,28 @@ if __name__ == "__main__":
                         analyze_model_name,
                     )
                 all_cb_analyze.append(cb_analyze)
-                relation_result = {
-                    "direction_risk": direction_risk,
-                    "analyze_model_name": analyze_model_name,
-                    "target_risk": target_risk_data_summary["risk"],
-                    "target_risk_desc": target_risk_data_summary["risk_desc"],
-                    "target_rootcause": target_risk_data_summary["rootcause"],
-                    "target_process": target_risk_data_summary["process"],
-                    "source_risk": source_risk_data_summary["risk"],
-                    "source_risk_desc": source_risk_data_summary["risk_desc"],
-                    "source_rootcause": source_risk_data_summary["rootcause"],
-                    "source_process": source_risk_data_summary["process"],
-                    "interdependency_type": risk_relation_result[
-                        "interdependency_type"
-                    ],
-                    "direction": risk_relation_result["direction"],
-                    "rationale": risk_relation_result["rationale"],
-                    "confidence": risk_relation_result["confidence"],
-                }
+
+                try:
+                    target_risk_data_cell = f"risk_name: {target_risk_data_summary['risk']} \n risk_desc: {target_risk_data_summary['risk_desc']} \n rootcause: {target_risk_data_summary['rootcause']} \n process: {target_risk_data_summary['process']}"
+                    source_risk_data_cell = f"risk_name: {source_risk_data_summary['risk']} \n risk_desc: {source_risk_data_summary['risk_desc']} \n rootcause: {source_risk_data_summary['rootcause']} \n process: {source_risk_data_summary['process']}"
+                    relation_result = {
+                        "direction_risk": direction_risk,
+                        "analyze_model_name": analyze_model_name,
+                        "target_risk": target_risk_data_summary["risk"],
+                        "target_risk_data": target_risk_data_cell,
+                        "source_risk": source_risk_data_summary["risk"],
+                        "source_risk_data": source_risk_data_cell,
+                        "interdependency_type": risk_relation_result[
+                            "interdependency_type"
+                        ],
+                        "direction": risk_relation_result["direction"],
+                        "rationale": risk_relation_result["rationale"],
+                        "confidence": risk_relation_result["confidence"],
+                    }
+                except Exception as e:
+                    print(f"Error: {risk_relation_result.keys()}")
+                    print(f"Error: {risk_relation_result}")
+                    raise e
                 result_list.append(relation_result)
         print(f"total analyze cost: {sum(cb.total_cost for cb in all_cb_analyze)}")
         print(
