@@ -3,44 +3,79 @@ description: Task management and git workflow guidelines for incremental develop
 globs: **/*
 alwaysApply: true
 ---
+# Rule: Interactive Task Guidance
 
-- **Task Execution Workflow:**
-  - **Work on one task at a time** - Complete each task fully before moving to the next
-  - **Commit after each task completion** - Use `git add .` and `git commit` with descriptive one-liner messages
-  - **Keep commits atomic** - Each commit should represent a single logical change or task completion
+## Intent
+I want to describe tasks freely without strict planning rules. LLM should help me clarify unclear ideas and guide me by offering choices, not commands.
 
-- **Git Commit Guidelines:**
-  - **Use descriptive commit messages** that explain what was accomplished
-  - **Follow conventional commit format** when possible: `type(scope): description`
-  - **Keep messages concise but informative** - one line summary of changes made
+## Behavior
 
-- **Example Workflow:**
-  ```bash
-  # ✅ DO: Complete task, then commit
-  # 1. Work on task implementation
-  # 2. Test the changes
-  # 3. Add all changes
-  git add .
-  
-  # 4. Commit with descriptive message
-  git commit -m "feat: implement user authentication endpoint"
-  git commit -m "fix: resolve database connection timeout issue"
-  git commit -m "refactor: optimize query performance for large datasets"
-  
-  # ❌ DON'T: Batch multiple tasks in one commit
-  git commit -m "various changes and fixes"
-  git commit -m "updates"
-  ```
+### Clarify Vague Tasks
+- If my description is unclear or vague, don't assume — **ask clarifying questions**.
+- For example, ask:
+  - "Do you mean X or Y?"
+  - "Should this be a short-term or scalable solution?"
+  - "Is speed or readability more important here?"
 
-- **Task Completion Checklist:**
-  - ✅ Task implementation is complete and functional
-  - ✅ Code has been tested and verified
-  - ✅ All related files are included in the commit
-  - ✅ Commit message clearly describes the work done
-  - ✅ Ready to move to the next task
+### Suggest Options
+- Always propose **multiple approaches** when solving a task:
+  - Label them as `"Option A"`, `"Option B"`, etc.
+  - Explain trade-offs (e.g., speed vs. maintainability, quick fix vs. long-term architecture).
+- Wait for me to **choose an option** or ask for a hybrid.
 
-- **Benefits of This Approach:**
-  - **Clear history** - Each commit represents a specific accomplishment
-  - **Easy rollback** - Can revert specific changes without affecting others
-  - **Better collaboration** - Team members can understand changes incrementally
-  - **Progress tracking** - Git history shows task completion timeline 
+### After Completing Task
+- When a feature or file is updated:
+  - Suggest a **`git commit` one-liner** using [Conventional Commits](https://www.conventionalcommits.org):
+    - `feat`: for new features
+    - `fix`: for bug fixes
+    - `refactor`: for internal code changes
+    - `docs`: for documentation
+    - `style`: for formatting
+    - `test`: for test-related updates
+    - `chore`: for non-code tasks
+  - The format should be:  
+    ```
+    <type>: <summary of change>
+    ```
+
+## Examples
+
+### Input
+I want to log what users click.
+
+### Expected Response
+Sure! Do you want:
+- **Option A:** Add `console.log` for each element manually.
+- **Option B:** Use a generic event listener with delegation.
+- **Option C:** Integrate a service like PostHog or LogRocket.
+
+Let me know which approach you prefer.
+
+---
+
+### After Code Is Done
+> ✅ All done! Suggested Git commit:
+> ```
+> feat: add basic click tracking to homepage buttons
+> ```
+
+---
+
+### Input
+Add a toggleable sidebar.
+
+### Expected Clarification
+Okay — a few questions:
+- Should it always be visible on large screens?
+- Do you want it animated or static?
+- Is this for navigation, tools, or something else?
+
+Once I know that, I'll offer design choices.
+
+---
+
+### After Task
+> ✅ Sidebar complete. Suggested Git commit:
+> ```
+> feat: implement toggleable sidebar layout with animation
+> ```

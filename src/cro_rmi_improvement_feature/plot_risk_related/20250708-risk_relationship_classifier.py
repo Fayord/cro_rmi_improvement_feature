@@ -47,9 +47,7 @@ risk_pairs = [
 class RiskRelationResult(BaseModel):
     interdependency_type: Literal[
         "Causal",
-        "Contingent",
         "Correlated",
-        "Temporal/Sequential",
         "None",
     ]
     direction: Optional[Literal["A → B", "B → A", "None", "Both"]] = None
@@ -128,22 +126,21 @@ Analyze the interdependency between two risks and determine:
 1. Interdependency Type
 2. Direction (if directional)
 3. Rationale (1-2 sentences)
-4. Confidence (1-5)
+
 
 Valid Types:
-- Causal
-- Contingent
-- Correlated
-- Temporal/Sequential
-- None
+
+1. **Causal**: One risk directly causes or triggers the other. Can be unidirectional (A→B or B→A) or bidirectional (Both).
+2. **Correlated**: The risks often occur together, but with no clear causal link or order.
+3. **None**: There is no meaningful relationship.
 
 Valid directions:
-- A → B (A causes/precedes B)
-- B → A (B causes/precedes A) 
-- Both (bidirectional)
-- None (for non-directional types)
+- A → B (Risk A leads to Risk B)
+- B → A (Risk B leads to Risk A)
+- Both (Bidirectional causality)
+- None (For non-directional types)
 
-Direction is required for Causal, Contingent, and Temporal/Sequential types.
+Direction is required for Causal types.
 For other types (Correlated, None), direction should be "None".
 
 Provide the analysis in the specified JSON format.""",
@@ -167,7 +164,7 @@ Risk B: {risk_b['risk']} \n Risk Description: {risk_b['risk_desc']} \n Root Caus
         validated_result = result.model_dump()
         direction = validated_result["direction"]
         interdependency_type = validated_result["interdependency_type"]
-        if interdependency_type in ["Causal", "Contingent", "Temporal/Sequential"]:
+        if interdependency_type in ["Causal"]:
             if direction == "None":
                 raise ValueError(f"direction is None for {interdependency_type}")
         else:
@@ -188,8 +185,6 @@ def final_relationship(
 ):
     priority_interdependency_type_list = [
         "Causal",
-        "Contingent",
-        "Temporal/Sequential",
         "Correlated",
         "None",
     ]
@@ -201,7 +196,7 @@ def final_relationship(
     ]
 
     ####### preprocess
-    if interdependency_type_b_a in ["Causal", "Contingent", "Temporal/Sequential"]:
+    if interdependency_type_b_a in ["Causal"]:
         if direction_b_a == "A → B":
             direction_b_a = "B → A"
         elif direction_b_a == "B → A":
@@ -209,7 +204,7 @@ def final_relationship(
     #######
     if interdependency_type_a_b == interdependency_type_b_a:
         final_interdependency_type = interdependency_type_a_b
-        if interdependency_type_a_b in ["Causal", "Contingent", "Temporal/Sequential"]:
+        if interdependency_type_a_b in ["Causal"]:
 
             index_direction_a_b = priority_direction_list.index(direction_a_b)
             index_direction_b_a = priority_direction_list.index(direction_b_a)
@@ -283,10 +278,12 @@ if __name__ == "__main__":
         "o3-mini",
     ]
     # selected_edge_data_list = edge_data_list
+    # label_postfix = ""
     # 20% of total edge data
     selected_edge_data_list = random.sample(
         edge_data_list, int(len(edge_data_list) * 0.2)
     )
+    label_postfix = "-label"
 
     print(len(selected_edge_data_list))
     print(selected_edge_data_list[0])
@@ -387,18 +384,12 @@ if __name__ == "__main__":
             ] = final_interdependency_type
             result_list[i + 1]["final_direction"] = final_direction
             count_possible_missing_direction_relation = None
-            if (
-                final_interdependency_type
-                in ["Causal", "Contingent", "Temporal/Sequential"]
-            ) and (
-                interdependency_type_a_b
-                not in ["Causal", "Contingent", "Temporal/Sequential"]
+            if (final_interdependency_type in ["Causal"]) and (
+                interdependency_type_a_b not in ["Causal"]
             ):
                 count_possible_missing_direction_relation = True
             if interdependency_type_a_b in [
                 "Causal",
-                "Contingent",
-                "Temporal/Sequential",
             ]:
                 count_possible_missing_direction_relation = False
             result_list[i][
@@ -431,4 +422,7 @@ if __name__ == "__main__":
         all_results.extend(result_list)
     # After all models, save to one Excel file
     df = pd.DataFrame(all_results)
-    df.to_excel(f"{dir_path}/pmax_gpt_result_all_models.xlsx", index=False)
+    df.to_excel(
+        f"{dir_path}/risk_relationship_classifier_result_all_models{label_postfix}.xlsx",
+        index=False,
+    )
