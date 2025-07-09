@@ -117,27 +117,30 @@ def add_embeddings_to_data(
             )
 
         # Add risk name
-        if pd.notna(row["risk"]):
+        if row["risk"] is not None and str(row["risk"]).strip() != "":
             text_parts.append(f"Risk: {row['risk']}")
 
         # Add risk description
-        if pd.notna(row["risk_desc"]):
+        if row["risk_desc"] is not None and str(row["risk_desc"]).strip() != "":
             text_parts.append(f"Description: {row['risk_desc']}")
 
         # Add root cause
-        if pd.notna(row["rootcause"]):
+        if row["rootcause"] is not None and str(row["rootcause"]).strip() != "":
             text_parts.append(f"Root Cause: {row['rootcause']}")
 
         # Add root cause description
-        if pd.notna(row["rootcause_desc"]):
+        if (
+            row["rootcause_desc"] is not None
+            and str(row["rootcause_desc"]).strip() != ""
+        ):
             text_parts.append(f"Root Cause Description: {row['rootcause_desc']}")
 
         # Add process
-        if pd.notna(row["process"]):
+        if row["process"] is not None and str(row["process"]).strip() != "":
             text_parts.append(f"Process: {row['process']}")
 
         # Add process description
-        if pd.notna(row["process_desc"]):
+        if row["process_desc"] is not None and str(row["process_desc"]).strip() != "":
             text_parts.append(f"Process Description: {row['process_desc']}")
 
         return " | ".join(text_parts)
@@ -155,15 +158,19 @@ def add_embeddings_to_data(
             )
 
         # Add risk name
-        if pd.notna(row["risk"]):
+        if row["risk"] is not None and str(row["risk"]).strip() != "":
             text_parts.append(f"Risk: {row['risk']}")
 
         # Add risk description
-        if pd.notna(row["risk_desc"]):
+        if row["risk_desc"] is not None and str(row["risk_desc"]).strip() != "":
             text_parts.append(f"Description: {row['risk_desc']}")
 
         # Add catalog risk description if available (optional for v2)
-        if "risk_desc_catalog" in row.index and pd.notna(row["risk_desc_catalog"]):
+        if (
+            "risk_desc_catalog" in row.index
+            and row["risk_desc_catalog"] is not None
+            and str(row["risk_desc_catalog"]).strip() != ""
+        ):
             text_parts.append(f"Catalog Description: {row['risk_desc_catalog']}")
 
         return " | ".join(text_parts)
@@ -213,6 +220,8 @@ def add_embeddings_to_data(
             """Get embedding from OpenAI large model."""
             if max_embeddings and index >= max_embeddings:
                 return None
+            if not text or text.strip() == "":
+                return None
             try:
                 embedding = provider.get_embedding(text)
                 return embedding.tolist()
@@ -237,6 +246,8 @@ def add_embeddings_to_data(
         def get_openai_small_embedding(text: str, index: int) -> List[float]:
             """Get embedding from OpenAI small model."""
             if max_embeddings and index >= max_embeddings:
+                return None
+            if not text or text.strip() == "":
                 return None
             try:
                 embedding = provider.get_embedding(text)
@@ -263,6 +274,8 @@ def add_embeddings_to_data(
             """Get embedding using sentence transformers."""
             if max_embeddings and index >= max_embeddings:
                 return None
+            if not text or text.strip() == "":
+                return None
             try:
                 embedding = provider.get_embedding(text)
                 return embedding.tolist()
@@ -286,7 +299,11 @@ def add_embeddings_to_data(
 
     # Remove rows where embedding generation failed for either version
     initial_count = len(df)
-    df = df[df["embedding_v1"].notna() & df["embedding_v2"].notna()]
+    # Use a more robust filtering approach
+    valid_embeddings = df["embedding_v1"].apply(lambda x: x is not None) & df[
+        "embedding_v2"
+    ].apply(lambda x: x is not None)
+    df = df[valid_embeddings]
     final_count = len(df)
 
     print(f"Embeddings generated: {final_count}/{initial_count} records")
