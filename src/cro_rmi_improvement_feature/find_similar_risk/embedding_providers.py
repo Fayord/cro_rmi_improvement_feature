@@ -11,7 +11,12 @@ import time
 
 
 class BaseEmbeddingProvider:
-    def __init__(self, cache_dir: str = ".cache/embeddings"):
+    def __init__(
+        self,
+        cache_dir: str = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), ".cache/embeddings"
+        ),
+    ):
         self.cache_dir = Path(cache_dir)
         self.cache_dir.mkdir(parents=True, exist_ok=True)
 

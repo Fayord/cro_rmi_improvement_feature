@@ -554,6 +554,10 @@ def process_risk_data(
     # Convert to list of dictionaries
     result_list = df8.to_dict(orient="records")
 
+    # Add date_stamp to each record
+    for record in result_list:
+        record["date_stamp"] = date_stamp
+
     # Save to JSON if output path provided
     if output_path:
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -601,7 +605,7 @@ def process_multiple_datasets():
             "company_name": "PCG",
             "date_stamp": "20250513",
             "output_path": os.path.join(
-                dir_path, "../data/processed/", "20250513-PCG_risk_data.json"
+                dir_path, "../data/standardized/", "20250513-PCG_risk_data.json"
             ),
         },
         {
@@ -616,7 +620,7 @@ def process_multiple_datasets():
             "company_name": "lotus_south",
             "date_stamp": "20250513",
             "output_path": os.path.join(
-                dir_path, "../data/processed/", "20250513-lotus_south_risk_data.json"
+                dir_path, "../data/standardized/", "20250513-lotus_south_risk_data.json"
             ),
         },
     ]
