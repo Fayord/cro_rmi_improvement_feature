@@ -4,6 +4,8 @@ import pandas as pd
 from typing import Union, List, Dict, Any
 import warnings
 
+from torch import set_anomaly_enabled
+
 # Suppress warnings for cleaner output
 warnings.filterwarnings("ignore")
 
@@ -189,9 +191,11 @@ def preprocess_pcg_data(df: pd.DataFrame, company_name: str) -> pd.DataFrame:
             "Root Cause": "rootcause",
             "Process": "process",
             "Control": "control_name",
-            "Control Description": "control_des",
+            "Control Description": "control_desc",
             "EC-Root Cause": "control_rootcause",
             "EC-Process": "control_process",
+            "Design Score": "control_design_score",
+            "Effective Score": "control_effective_score",
         },
         inplace=True,
     )
@@ -199,26 +203,37 @@ def preprocess_pcg_data(df: pd.DataFrame, company_name: str) -> pd.DataFrame:
     return df
 
 
-def preprocess_generic_data(df: pd.DataFrame, company_name: str) -> pd.DataFrame:
+def preprocess_lotus_south_data(df: pd.DataFrame, company_name: str) -> pd.DataFrame:
     """
-    Generic preprocessing for other companies.
-
-    Args:
-        df: Input DataFrame
-        company_name: Name of the company
-
-    Returns:
-        Preprocessed DataFrame
+    Preprocess Lotus South data.
     """
-    # Add company column
     df["company"] = company_name
     df["process_desc"] = ""
     df["rootcause_desc"] = ""
 
-    # Calculate risk score if columns exist
-    if "likelihood_combined" in df.columns and "impact_combined" in df.columns:
-        df["risk_score"] = df["likelihood_combined"] * df["impact_combined"]
-        df["risk_level"] = df.apply(determine_risk_level, type="combined", axis=1)
+    # Calculate risk score
+    df["risk_score"] = df["likelihood_combined"] * df["impact_combined"]
+
+    # Determine risk level
+    df["risk_level"] = df.apply(determine_risk_level, risk_type="combined", axis=1)
+
+    # Rename columns
+    df.rename(
+        columns={
+            "Risk Category": "risk_cat",
+            "Risk Item": "risk",
+            "Risk Description": "risk_desc",
+            "Root Cause": "rootcause",
+            "Process": "process",
+            "Control": "control_name",
+            "Control Description": "control_desc",
+            "EC-Root Cause": "control_rootcause",
+            "EC-Process": "control_process",
+            "Design Score": "control_design_score",
+            "Effective Score": "control_effective_score",
+        },
+        inplace=True,
+    )
 
     return df
 
@@ -246,6 +261,12 @@ def aggregate_risk_data(df: pd.DataFrame, score_method: str = "RMI") -> pd.DataF
                 "risk_level": max,
                 "likelihood_combined": max,
                 "impact_combined": max,
+                "control_name": lambda x: list(x),
+                "control_desc": lambda x: list(x),
+                "control_rootcause": lambda x: list(x),
+                "control_process": lambda x: list(x),
+                "control_design_score": lambda x: list(x),
+                "control_effective_score": lambda x: list(x),
             }
         )
         df2["risk_score"] = df2["impact_combined"] * df2["likelihood_combined"]
@@ -263,15 +284,21 @@ def aggregate_risk_data(df: pd.DataFrame, score_method: str = "RMI") -> pd.DataF
 
         df2 = df2_sorted.groupby(["company", "risk"], as_index=False).agg(
             {
-                "risk_desc": set,
-                "risk_cat": set,
+                "risk_desc": lambda x: list(x),
+                "risk_cat": "first",
                 "impact_combined": "first",
                 "risk_score": "max",
                 "risk_level": "max",
-                "rootcause": set,
-                "rootcause_desc": set,
-                "process": set,
-                "process_desc": set,
+                "rootcause": lambda x: list(x),
+                "rootcause_desc": lambda x: list(x),
+                "process": lambda x: list(x),
+                "process_desc": lambda x: list(x),
+                "control_name": lambda x: list(x),
+                "control_desc": lambda x: list(x),
+                "control_rootcause": lambda x: list(x),
+                "control_process": lambda x: list(x),
+                "control_design_score": lambda x: list(x),
+                "control_effective_score": lambda x: list(x),
             }
         )
 
@@ -300,7 +327,7 @@ def process_catalog_data(
     Returns:
         Processed catalog DataFrame
     """
-    risk_df = pd.read_excel(catalog_path, sheet_name="Risks")
+    risk_df = pd.read_excel(catalog_path, sheet_name="Risk_Translate")
     risk_cause_mapping_df = pd.read_excel(catalog_path, sheet_name="Risk_Cause_mapping")
 
     # Fix category naming
@@ -346,6 +373,15 @@ def process_catalog_data(
             "rootcause": risk_rootcause,
             "process": "",
             "risk_level": 0,
+            "risk_score": 0,
+            "impact_combined": 0,
+            "likelihood_combined": 0,
+            "control_name": [],
+            "control_desc": [],
+            "control_rootcause": [],
+            "control_process": [],
+            "control_design_score": [],
+            "control_effective_score": [],
         }
         new_rows.append(data)
 
@@ -356,6 +392,7 @@ def process_risk_data(
     risk_data_path: str,
     catalog_data_path: str,
     company_name: str,
+    date_stamp: str,
     output_path: str = None,
 ) -> List[Dict[str, Any]]:
     """
@@ -376,12 +413,10 @@ def process_risk_data(
     # Preprocess based on company
     if company_name.upper() == "PCG":
         df = preprocess_pcg_data(ori_df, company_name)
+    elif company_name.upper() == "LOTUS_SOUTH":
+        df = preprocess_lotus_south_data(ori_df, company_name)
     else:
-        df = preprocess_generic_data(ori_df, company_name)
-
-    # Get date stamp from filename
-    file_name = os.path.basename(risk_data_path)
-    date_stamp = file_name.split("_")[0]
+        raise ValueError(f"Invalid company name: {company_name}")
 
     # Define selected risk categories
     selected_risk_cat = [
@@ -394,12 +429,14 @@ def process_risk_data(
 
     # Aggregate data
     df2 = aggregate_risk_data(df, score_method="RMI")
+    print(f"df2 columns: {list(df2.columns)}")
 
     # Filter by company
     df3 = df2[df2["company"].isin([company_name])]
+    print(f"df3 columns: {list(df3.columns)}")
 
     # Select relevant columns
-    select_columns = [
+    base_columns = [
         "company",
         "risk_cat",
         "risk",
@@ -409,32 +446,76 @@ def process_risk_data(
         "process",
         "process_desc",
         "risk_level",
+        "risk_score",
+        "impact_combined",
+        "likelihood_combined",
     ]
-    df4 = df3[select_columns]
 
-    # Convert sets to lists
-    df5 = df4.map(cell_to_list)
+    # Add control columns if they exist
+    control_columns = [
+        "control_name",
+        "control_desc",
+        "control_rootcause",
+        "control_process",
+        "control_design_score",
+        "control_effective_score",
+    ]
 
-    # Convert lists to strings
-    df6 = df5.map(lambda x: ",".join(x) if isinstance(x, list) else x)
+    # Only include control columns that exist in the DataFrame
+    available_columns = [
+        col for col in base_columns + control_columns if col in df3.columns
+    ]
+    print(f"df3 available columns: {available_columns}")
+    df4 = df3[available_columns]
+    print(f"df4 columns: {list(df4.columns)}")
 
-    # Merge rootcause and process columns
+    # Convert sets to lists for specific columns that need it
+    set_columns = [
+        "risk_desc",
+        "rootcause",
+        "rootcause_desc",
+        "process",
+        "process_desc",
+    ]
+    control_columns_present = [
+        col
+        for col in [
+            "control_name",
+            "control_desc",
+            "control_rootcause",
+            "control_process",
+            "control_design_score",
+            "control_effective_score",
+        ]
+        if col in df4.columns
+    ]
+
+    df5 = df4.copy()
+    for col in set_columns + control_columns_present:
+        if col in df5.columns:
+            df5[col] = df5[col].apply(cell_to_list)
+
+    print(f"df5 columns: {list(df5.columns)}")
+
+    # Convert lists to strings, handling mixed types
+    def safe_join(x):
+        if isinstance(x, list):
+            # Convert all items to strings before joining
+            return ",".join(str(item) for item in x)
+        return x
+
+    df6 = df5.apply(safe_join)
+    print(f"df6 columns: {list(df6.columns)}")
+
+    # Keep rootcause and process columns separate (no merging)
     df7 = df6.copy()
-    df7["new_rootcause"] = df7.apply(merge_rootcause, axis=1)
-    df7["new_process"] = df7.apply(merge_process, axis=1)
-
-    # Clean up columns
-    df7.drop(
-        ["rootcause", "rootcause_desc", "process", "process_desc"], axis=1, inplace=True
-    )
-    df7.rename(
-        columns={"new_rootcause": "rootcause", "new_process": "process"}, inplace=True
-    )
+    print(f"df7 columns: {list(df7.columns)}")
 
     # Process catalog data
     catalog_df, risk_to_desc_dict = process_catalog_data(
         catalog_data_path, date_stamp, selected_risk_cat
     )
+    print(f"catalog_df columns: {list(catalog_df.columns)}")
 
     # Merge with catalog descriptions
     df8 = df7.copy()
@@ -443,13 +524,32 @@ def process_risk_data(
     df8["risk_desc_catalog"] = df8["risk_desc_catalog"].fillna("")
     df8["risk_desc_catalog"] = df8["risk_desc_catalog"].str.strip()
 
-    # Combine descriptions
-    df8["risk_desc"] = df8["risk_desc_catalog"] + " " + df8["risk_desc"]
+    # Combine descriptions - handle potential list values
+    def safe_concat(row):
+        catalog_desc = row["risk_desc_catalog"]
+        risk_desc = row["risk_desc"]
+
+        # Convert to strings if they are lists
+        if isinstance(catalog_desc, list):
+            catalog_desc = ",".join(str(item) for item in catalog_desc)
+        if isinstance(risk_desc, list):
+            risk_desc = ",".join(str(item) for item in risk_desc)
+
+        # Handle None/NaN values
+        if pd.isna(catalog_desc) or catalog_desc == "":
+            return str(risk_desc) if not pd.isna(risk_desc) else ""
+        if pd.isna(risk_desc) or risk_desc == "":
+            return str(catalog_desc) if not pd.isna(catalog_desc) else ""
+
+        return str(catalog_desc) + " " + str(risk_desc)
+
+    df8["risk_desc"] = df8.apply(safe_concat, axis=1)
     df8["risk_desc"] = df8["risk_desc"].str.strip()
     df8.drop("risk_desc_catalog", axis=1, inplace=True)
 
     # Add catalog data
     df8 = pd.concat([df8, catalog_df], ignore_index=True)
+    print(f"df8 columns: {list(df8.columns)}")
 
     # Convert to list of dictionaries
     result_list = df8.to_dict(orient="records")
@@ -457,43 +557,94 @@ def process_risk_data(
     # Save to JSON if output path provided
     if output_path:
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+        # Replace NaN values, empty strings, and empty lists with None (null in JSON) before saving
+        def replace_nan(obj):
+            if isinstance(obj, dict):
+                return {k: replace_nan(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                if len(obj) == 0:
+                    return None
+                return [replace_nan(item) for item in obj]
+            elif pd.isna(obj):
+                return None
+            elif isinstance(obj, str) and obj.strip() == "":
+                return None
+            else:
+                return obj
+
+        cleaned_result_list = replace_nan(result_list)
+
         with open(output_path, "w", encoding="utf-8") as f:
-            json.dump(result_list, f, ensure_ascii=False, indent=2)
+            json.dump(cleaned_result_list, f, ensure_ascii=False, indent=2)
 
     return result_list
+
+
+def process_multiple_datasets():
+    """
+    Process multiple datasets for different companies and dates.
+    """
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+
+    # Define datasets to process
+    datasets = [
+        {
+            "risk_data_path": os.path.join(
+                dir_path,
+                "../data/raw/",
+                "250528_PCG_assessment_report_Q1-2025_controlperrow.xlsx",
+            ),
+            "catalog_data_path": os.path.join(
+                dir_path, "../data/raw/", "seed_excel_13May2025 1.xlsx"
+            ),
+            "company_name": "PCG",
+            "date_stamp": "20250513",
+            "output_path": os.path.join(
+                dir_path, "../data/processed/", "20250513-PCG_risk_data.json"
+            ),
+        },
+        {
+            "risk_data_path": os.path.join(
+                dir_path,
+                "../data/raw/",
+                "250520_Retail (Guangdong-Guangxi)_assessment_report_Q1-2025_controlperrow_original.xlsx",
+            ),
+            "catalog_data_path": os.path.join(
+                dir_path, "../data/raw/", "seed_excel_13May2025 1.xlsx"
+            ),
+            "company_name": "lotus_south",
+            "date_stamp": "20250513",
+            "output_path": os.path.join(
+                dir_path, "../data/processed/", "20250513-lotus_south_risk_data.json"
+            ),
+        },
+    ]
+
+    for dataset in datasets:
+        print(f"\nProcessing {dataset['company_name']} dataset...")
+        try:
+            result = process_risk_data(
+                risk_data_path=dataset["risk_data_path"],
+                catalog_data_path=dataset["catalog_data_path"],
+                company_name=dataset["company_name"],
+                output_path=dataset["output_path"],
+                date_stamp=dataset["date_stamp"],
+            )
+            print(
+                f"Successfully processed {len(result)} risk records for {dataset['company_name']}"
+            )
+            print(f"Output saved to: {dataset['output_path']}")
+        except Exception as e:
+            print(f"Error processing {dataset['company_name']} data: {e}")
 
 
 def main():
     """
     Example usage of the risk data processor.
     """
-    # Example usage
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-    risk_data_path = os.path.join(
-        dir_path,
-        "../data/raw/",
-        "250528_PCG_assessment_report_Q1-2025_controlperrow.xlsx",
-    )
-    catalog_data_path = os.path.join(
-        dir_path, "../data/raw/", "RMI-V2-Translate_20250508.xlsx"
-    )
-    company_name = "PCG"
-    output_path = os.path.join(
-        dir_path, "../data/processed/", "250528-company_risk_data.json"
-    )
-
-    try:
-        result = process_risk_data(
-            risk_data_path=risk_data_path,
-            catalog_data_path=catalog_data_path,
-            company_name=company_name,
-            output_path=output_path,
-        )
-        print(f"Successfully processed {len(result)} risk records")
-        print(f"Output saved to: {output_path}")
-
-    except Exception as e:
-        print(f"Error processing risk data: {e}")
+    # Process multiple datasets
+    process_multiple_datasets()
 
 
 if __name__ == "__main__":
