@@ -1,20 +1,26 @@
 # Risk Data Processor
 
-A modular Python script for processing risk assessment data from Excel files and generating structured risk data for analysis and visualization.
+A Python module for processing risk assessment data from Excel files and generating standardized JSON output.
 
 ## Overview
 
-This module was extracted from the Jupyter notebook `etl_data_250528_no_risk_desc.ipynb` and provides a clean, reusable interface for processing risk assessment data. The `RiskDataProcessor` class encapsulates all the functionality into modular methods that can be used independently or as part of a complete workflow.
+This module extracts the data processing logic from the Jupyter notebook `etl_data_250528.ipynb` and provides a functional interface for processing risk assessment data. It supports:
+
+- Loading risk assessment data from Excel files
+- Processing risk catalog data
+- Company-specific preprocessing (currently supports PCG)
+- Risk score calculation and level determination
+- Data aggregation and transformation
+- JSON output generation
 
 ## Features
 
-- **Data Loading**: Load risk assessment data from Excel files
-- **Risk Scoring**: Calculate risk scores and levels based on likelihood and impact
-- **Data Aggregation**: Aggregate risk data using different methods (MAX or RMI)
-- **Data Cleaning**: Process and clean complex data structures
-- **Catalog Integration**: Merge with risk catalog data
-- **Export**: Save processed data to JSON format
-- **Flexible Configuration**: Customize risk categories and processing parameters
+- **Company-specific processing**: Different preprocessing logic for different companies
+- **Flexible input**: Works with various Excel file formats
+- **Risk scoring**: Calculates risk scores and determines risk levels
+- **Data aggregation**: Aggregates risk data using RMI or MAX methods
+- **Catalog integration**: Merges with risk catalog data
+- **JSON output**: Generates standardized JSON output
 
 ## Installation
 
@@ -24,234 +30,187 @@ Ensure you have the required dependencies:
 pip install pandas openpyxl
 ```
 
-## Quick Start
+## Usage
 
 ### Basic Usage
 
 ```python
-from risk_data_processor import RiskDataProcessor
+from risk_data_processor import process_risk_data
 
-# Initialize the processor
-processor = RiskDataProcessor()
-
-# Process data with default settings
-result = processor.process_complete_workflow(
-    assessment_file="data/250528_PCG_assessment_report_Q1-2025_controlperrow.xlsx",
-    catalog_file="data/RMI-V2-Translate_20250508.xlsx",
-    output_file="result/company_risk_data.json",
-    companies=["PCG"],
-    aggregation_method="RMI"
+# Process risk data
+result = process_risk_data(
+    risk_data_path="data/250528_PCG_assessment_report_Q1-2025_controlperrow.xlsx",
+    catalog_data_path="data/RMI-V2-Translate_20250508.xlsx",
+    company_name="PCG",
+    output_path="result/risk_data.json"
 )
 
 print(f"Processed {len(result)} risk records")
 ```
 
-### Custom Configuration
+### Function Parameters
+
+#### `process_risk_data()`
+
+- **risk_data_path** (str): Path to the risk assessment Excel file
+- **catalog_data_path** (str): Path to the risk catalog Excel file
+- **company_name** (str): Name of the company for preprocessing
+- **output_path** (str, optional): Path to save JSON output
+
+#### Returns
+
+- **List[Dict]**: List of processed risk data dictionaries
+
+### Output Format
+
+Each risk record contains:
+
+```json
+{
+  "company": "PCG",
+  "risk_cat": "Operational Risk",
+  "risk": "Business interruption from fire hazards",
+  "risk_desc": "The business interruption due to a fire incident...",
+  "risk_level": 2,
+  "rootcause": "rootcause :Negligence or Human Error in Handling Flammable Materials...",
+  "process": "process :Maintenance: -, Engineering: -, Production: -..."
+}
+```
+
+## Company-Specific Processing
+
+### PCG Company
+
+The module includes specific preprocessing for PCG company data:
+
+- Adds company column
+- Calculates risk scores from likelihood and impact
+- Renames columns to standardized format
+- Determines risk levels
+
+### Generic Companies
+
+For other companies, the module provides generic preprocessing:
+
+- Adds company column
+- Calculates risk scores if required columns exist
+- Basic data structure handling
+
+## Risk Categories
+
+The module processes the following risk categories:
+
+- Operational Risk
+- Strategic Risk
+- Credit Risk
+- Market Risk
+- Liquidity Risk
+
+## Risk Level Calculation
+
+Risk levels are determined based on risk scores:
+
+- **Level 4**: Risk score ≥ 20
+- **Level 3**: Risk score 10-16
+- **Level 2**: Risk score 4-9
+- **Level 1**: Risk score 1-3 or score 4 with impact 2
+- **Level 0**: Risk score 0
+
+## Data Aggregation Methods
+
+### RMI Method (Default)
+
+- Sorts by company, risk, risk score, and impact
+- Takes maximum risk score for each risk
+- Recalculates likelihood from risk score and impact
+
+### MAX Method
+
+- Groups by company and risk
+- Takes maximum values for risk level, likelihood, and impact
+- Recalculates risk score from maximum likelihood and impact
+
+## Example Usage
+
+See `example_usage.py` for complete examples.
+
+### Processing PCG Data
 
 ```python
-# Define custom risk categories
-custom_categories = ["Operational Risk", "Strategic Risk", "Credit Risk"]
+from risk_data_processor import process_risk_data
 
-# Initialize with custom categories
-processor = RiskDataProcessor(selected_risk_categories=custom_categories)
-
-# Process with MAX aggregation method
-result = processor.process_complete_workflow(
-    assessment_file="data/assessment.xlsx",
-    catalog_file="data/catalog.xlsx",
-    output_file="result/output.json",
-    aggregation_method="MAX"
+result = process_risk_data(
+    risk_data_path="data/250528_PCG_assessment_report_Q1-2025_controlperrow.xlsx",
+    catalog_data_path="data/RMI-V2-Translate_20250508.xlsx",
+    company_name="PCG",
+    output_path="result/pcg_risk_data.json"
 )
 ```
 
-## API Reference
-
-### RiskDataProcessor Class
-
-#### Constructor
+### Processing Generic Company Data
 
 ```python
-RiskDataProcessor(selected_risk_categories: Optional[List[str]] = None)
+result = process_risk_data(
+    risk_data_path="data/generic_risk_assessment.xlsx",
+    catalog_data_path="data/RMI-V2-Translate_20250508.xlsx",
+    company_name="GENERIC_COMPANY",
+    output_path="result/generic_risk_data.json"
+)
 ```
 
-**Parameters:**
-- `selected_risk_categories`: List of risk categories to include. Defaults to:
-  - Operational Risk
-  - Strategic Risk
-  - Credit Risk
-  - Market Risk
-  - Liquidity Risk
+## File Structure
 
-#### Methods
+```
+plot_risk_related/
+├── risk_data_processor.py      # Main processing module
+├── example_usage.py            # Usage examples
+├── README_risk_processor.md    # This documentation
+└── etl_data_250528.ipynb      # Original notebook
+```
 
-##### `load_assessment_data(file_path: str, company_name: str = "PCG") -> pd.DataFrame`
+## Input File Requirements
 
-Load risk assessment data from Excel file.
+### Risk Assessment File
 
-**Parameters:**
-- `file_path`: Path to the Excel file
-- `company_name`: Name of the company (default: "PCG")
-
-**Returns:** DataFrame with loaded data
-
-##### `calculate_risk_scores(df: pd.DataFrame) -> pd.DataFrame`
-
-Calculate risk scores and levels for the dataset.
-
-**Parameters:**
-- `df`: Input DataFrame with likelihood and impact columns
-
-**Returns:** DataFrame with calculated risk scores and levels
-
-##### `aggregate_risk_data(df: pd.DataFrame, method: str = "RMI") -> pd.DataFrame`
-
-Aggregate risk data by company and risk name.
-
-**Parameters:**
-- `df`: Input DataFrame
-- `method`: Aggregation method ("MAX" or "RMI")
-
-**Returns:** Aggregated DataFrame
-
-##### `process_complete_workflow(...) -> List[Dict]`
-
-Execute the complete risk data processing workflow.
-
-**Parameters:**
-- `assessment_file`: Path to risk assessment Excel file
-- `catalog_file`: Path to risk catalog Excel file
-- `output_file`: Path to save output JSON file
-- `companies`: List of companies to include (optional)
-- `aggregation_method`: Method for aggregating risk data ("MAX" or "RMI")
-
-**Returns:** List of dictionaries containing processed risk data
-
-## Data Processing Workflow
-
-The complete workflow consists of the following steps:
-
-1. **Load Assessment Data**: Read Excel file and add metadata
-2. **Calculate Risk Scores**: Compute risk scores and levels
-3. **Rename Columns**: Standardize column names
-4. **Aggregate Data**: Group by company and risk name
-5. **Filter Companies**: Select specific companies (optional)
-6. **Select Columns**: Choose output columns
-7. **Process Structures**: Clean complex data structures
-8. **Merge Columns**: Combine rootcause and process data
-9. **Load Catalog**: Read risk catalog data
-10. **Add Catalog Risks**: Include catalog risks in output
-11. **Save Results**: Export to JSON format
-
-## Aggregation Methods
-
-### RMI Method (Default)
-- Sorts data by risk score and impact
-- Takes the maximum risk score for each risk
-- Recalculates likelihood based on max score and impact
-
-### MAX Method
-- Takes maximum values for likelihood, impact, and risk level
-- Recalculates risk score from max likelihood and impact
-
-## Input Data Format
-
-### Assessment Data Excel File
 Should contain columns:
-- `Risk Category`: Risk category (e.g., "Operational Risk")
-- `Risk Item`: Risk name
-- `Risk Description`: Risk description
-- `Root Cause`: Root cause information
-- `Process`: Process information
-- `likelihood_combined`: Likelihood score
-- `impact_combined`: Impact score
+- Risk Category
+- Risk Item
+- Risk Description
+- Root Cause
+- Process
+- likelihood_combined
+- impact_combined
 
-### Risk Catalog Excel File
+### Risk Catalog File
+
 Should contain sheets:
-- `Risks`: Risk definitions with columns:
-  - `Risk-EN`: Risk name in English
-  - `Description-EN`: Risk description
-  - `Risk-category`: Risk category
-- `Risk_Cause_mapping`: Risk-cause mappings with columns:
-  - `RiskName`: Risk name
-  - `RiskCause`: Root cause
-
-## Output Format
-
-The processed data is saved as a JSON file containing a list of dictionaries with the following structure:
-
-```json
-[
-  {
-    "company": "PCG",
-    "risk_cat": "Operational Risk",
-    "risk": "Business interruption from fire hazards",
-    "risk_desc": "เกิดเพลิงไหม้อาคารคลังสินค้า...",
-    "rootcause": "rootcause :Negligence or Human Error...",
-    "process": "process :Distribution Center (DC): -...",
-    "risk_level": 2
-  }
-]
-```
-
-## Examples
-
-See `example_usage.py` for comprehensive examples including:
-
-- Basic usage with default settings
-- Custom risk categories
-- Step-by-step processing
-- Data analysis
-- Error handling
+- **Risks**: Risk definitions and descriptions
+- **Risk_Cause_mapping**: Mapping between risks and root causes
 
 ## Error Handling
 
-The module includes comprehensive error handling for:
+The module includes comprehensive error handling:
 
-- Missing input files
-- Invalid aggregation methods
-- Data processing errors
-- File I/O errors
+- File existence checks
+- Data validation
+- Exception handling with detailed error messages
+- Graceful fallbacks for missing data
 
 ## Dependencies
 
-- `pandas`: Data manipulation and analysis
-- `openpyxl`: Excel file reading
-- `json`: JSON file operations
-- `os`: File system operations
-- `typing`: Type hints
-- `warnings`: Warning suppression
-
-## Notes
-
-- The module suppresses pandas FutureWarning messages about deprecated methods
-- All text processing preserves Unicode characters (Thai, Chinese, etc.)
-- The module automatically creates output directories if they don't exist
-- Risk levels are calculated on a scale of 0-4 based on risk scores
-
-## Troubleshooting
-
-### Common Issues
-
-1. **File Not Found**: Ensure input Excel files exist and paths are correct
-2. **Missing Columns**: Verify that input files contain all required columns
-3. **Memory Issues**: For large datasets, consider processing in chunks
-4. **Encoding Issues**: Ensure Excel files are saved with proper encoding
-
-### Debug Mode
-
-To enable debug output, you can modify the print statements in the code or add logging:
-
-```python
-import logging
-logging.basicConfig(level=logging.DEBUG)
-```
+- pandas: Data manipulation
+- openpyxl: Excel file reading
+- json: JSON output generation
+- os: File path handling
 
 ## Contributing
 
-When modifying the code:
+To add support for new companies:
 
-1. Maintain backward compatibility
-2. Add type hints for new functions
-3. Update documentation for new features
-4. Add tests for new functionality
-5. Follow the existing code style 
+1. Create a new preprocessing function following the pattern of `preprocess_pcg_data()`
+2. Add the company name condition in `process_risk_data()`
+3. Update documentation
+
+## License
+
+This module is part of the CRO RMI Improvement Feature project. 

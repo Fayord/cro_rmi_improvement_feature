@@ -52,3 +52,32 @@ alwaysApply: false
   - Reference actual code over theoretical examples
   - Use consistent formatting across rules
 
+- **Function vs Class Guidelines:**
+  - **Prefer simple functions when:**
+    - Single responsibility with no state
+    - Utility operations (data processing, transformations)
+    - Configuration-based operations
+    - Quick data manipulation tasks
+  - **Use classes when:**
+    - Multiple related methods with shared state
+    - Complex object lifecycle management
+    - Inheritance or polymorphism needed
+    - Heavy configuration or dependency injection
+  - **Examples:**
+    ```python
+    # ✅ DO: Simple function for data processing
+    def process_risk_data(df: pd.DataFrame) -> pd.DataFrame:
+        df['risk_score'] = df['likelihood'] * df['impact']
+        return df
+    
+    # ✅ DO: Class for complex state management
+    class RiskProcessor:
+        def __init__(self, config):
+            self.config = config
+            self.cache = {}
+        
+        def process(self, data):
+            # Complex processing with state
+            pass
+    ```
+
