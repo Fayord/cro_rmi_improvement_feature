@@ -23,6 +23,7 @@ app = FastAPI(
     title="Risk Recommendation API",
     description="API for recommending risks to assess based on existing risks and user context",
     version="1.0.0",
+    root_path="/rmi_graph_based_recommendation",
     docs_url="/docs",
     redoc_url="/redoc",
 )
