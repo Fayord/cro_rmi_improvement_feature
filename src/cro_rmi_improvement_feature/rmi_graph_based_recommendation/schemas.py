@@ -6,19 +6,68 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 
 
+class Process(BaseModel):
+    """Schema for process data."""
+
+    id: int = Field(..., description="Unique identifier for the process")
+    name: str = Field(..., description="Name of the process")
+    description: str = Field(..., description="Description of the process")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "id": 1,
+                "name": "Procurement",
+                "description": "Vendor selection and management process",
+            }
+        }
+
+
+class RootCause(BaseModel):
+    """Schema for root cause data."""
+
+    id: int = Field(..., description="Unique identifier for the root cause")
+    name: str = Field(..., description="Name of the root cause")
+    description: str = Field(..., description="Description of the root cause")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "id": 1,
+                "name": "Single source dependency",
+                "description": "Over-reliance on single supplier",
+            }
+        }
+
+
+class RiskScore(BaseModel):
+    """Schema for risk scoring data."""
+
+    impact: int = Field(..., ge=1, le=5, description="Impact score (1 to 5)")
+    likelihood: int = Field(..., ge=1, le=5, description="Likelihood score (1 to 5)")
+    score: int = Field(..., ge=1, le=25, description="Overall risk score (1 to 25)")
+    risk_level: int = Field(..., ge=1, le=4, description="Risk level (1, 2, 3, 4)")
+
+    class Config:
+        schema_extra = {
+            "example": {"impact": 4, "likelihood": 3, "score": 12, "risk_level": 3}
+        }
+
+
 class ExistingRisk(BaseModel):
     """Schema for existing risk data."""
 
     risk_id: str = Field(..., description="Unique identifier for the risk")
     risk_name: str = Field(..., description="Name of the risk")
     risk_description: str = Field(..., description="Description of the risk")
-    process: str = Field(..., description="Process associated with the risk")
-    process_description: str = Field(..., description="Description of the process")
-    root_cause: str = Field(..., description="Root cause of the risk")
-    root_cause_description: str = Field(
-        ..., description="Description of the root cause"
+    processes: List[Process] = Field(
+        ..., description="List of processes associated with the risk"
+    )
+    root_causes: List[RootCause] = Field(
+        ..., description="List of root causes for the risk"
     )
     risk_category: str = Field(..., description="Category of the risk")
+    score: RiskScore = Field(..., description="Risk scoring information")
 
     class Config:
         schema_extra = {
@@ -26,11 +75,22 @@ class ExistingRisk(BaseModel):
                 "risk_id": "risk_001",
                 "risk_name": "Supply Chain Disruption",
                 "risk_description": "Risk of disruption in supply chain operations",
-                "process": "Procurement",
-                "process_description": "Vendor selection and management process",
-                "root_cause": "Single source dependency",
-                "root_cause_description": "Over-reliance on single supplier",
+                "processes": [
+                    {
+                        "id": 1,
+                        "name": "Procurement",
+                        "description": "Vendor selection and management process",
+                    }
+                ],
+                "root_causes": [
+                    {
+                        "id": 1,
+                        "name": "Single source dependency",
+                        "description": "Over-reliance on single supplier",
+                    }
+                ],
                 "risk_category": "operational",
+                "score": {"impact": 4, "likelihood": 3, "score": 12, "risk_level": 3},
             }
         }
 
@@ -39,7 +99,6 @@ class RiskRecommendationRequest(BaseModel):
     """Request schema for risk recommendations."""
 
     user_id: str = Field(..., description="Unique identifier for the user")
-
     existing_risks: List[ExistingRisk] = Field(
         ..., description="List of existing risks to consider"
     )
@@ -53,11 +112,27 @@ class RiskRecommendationRequest(BaseModel):
                         "risk_id": "risk_001",
                         "risk_name": "Supply Chain Disruption",
                         "risk_description": "Risk of disruption in supply chain operations",
-                        "process": "Procurement",
-                        "process_description": "Vendor selection and management process",
-                        "root_cause": "Single source dependency",
-                        "root_cause_description": "Over-reliance on single supplier",
+                        "processes": [
+                            {
+                                "id": 1,
+                                "name": "Procurement",
+                                "description": "Vendor selection and management process",
+                            }
+                        ],
+                        "root_causes": [
+                            {
+                                "id": 1,
+                                "name": "Single source dependency",
+                                "description": "Over-reliance on single supplier",
+                            }
+                        ],
                         "risk_category": "operational",
+                        "score": {
+                            "impact": 4,
+                            "likelihood": 3,
+                            "score": 12,
+                            "risk_level": 3,
+                        },
                     }
                 ],
             }
