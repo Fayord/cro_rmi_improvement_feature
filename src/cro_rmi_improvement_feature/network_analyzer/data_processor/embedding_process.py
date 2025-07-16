@@ -1,78 +1,71 @@
+"""
+Embedding processing module for the Risk Network Visualization System.
+
+This module handles the generation and management of embeddings for risk data.
+"""
+
 import os
 import json
 import pandas as pd
+import pickle
 from typing import List, Dict, Any, Optional
 import warnings
 from pathlib import Path
 
 # Suppress warnings for cleaner output
 warnings.filterwarnings("ignore")
+import sys
+
+# Import embedding providers
+import sys
+import os
+
+# Add the find_similar_risk directory to the path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+find_similar_risk_path = os.path.join(current_dir, "../../../find_similar_risk")
+sys.path.insert(0, find_similar_risk_path)
+try:
+    from embedding_providers import (
+        OpenAIEmbeddingProvider,
+        SentenceTransformerProvider,
+    )
+except ImportError as e:
+    print(f"Error importing embedding_providers: {e}")
+    print(f"Tried to import from: {find_similar_risk_path}")
+    print(f"Current sys.path: {sys.path}")
+
+    # Try alternative path
+    alt_path = os.path.join(current_dir, "../../find_similar_risk")
+    sys.path.insert(0, alt_path)
+    try:
+        from embedding_providers import (
+            OpenAIEmbeddingProvider,
+            SentenceTransformerProvider,
+        )
+
+        print(f"Successfully imported from alternative path: {alt_path}")
+    except ImportError as e2:
+        print(f"Alternative path also failed: {e2}")
+        raise
 
 
-def load_standardized_data(data_dir: str) -> List[Dict[str, Any]]:
+def load_merged_data(input_path: str) -> pd.DataFrame:
     """
-    Load all standardized JSON files from the data directory.
+    Load merged data from JSON format.
 
     Args:
-        data_dir: Path to the directory containing standardized JSON files
+        input_path: Path to the JSON file
 
     Returns:
-        List of all risk data records from all files
+        DataFrame with merged data
     """
-    all_data = []
-    data_path = Path(data_dir)
+    if not os.path.exists(input_path):
+        raise FileNotFoundError(f"Merged data file not found: {input_path}")
 
-    if not data_path.exists():
-        raise FileNotFoundError(f"Data directory not found: {data_dir}")
-
-    # Find all JSON files in the directory
-    json_files = list(data_path.glob("*.json"))
-
-    if not json_files:
-        raise FileNotFoundError(f"No JSON files found in {data_dir}")
-
-    for json_file in json_files:
-        print(f"Loading data from: {json_file}")
-        try:
-            with open(json_file, "r", encoding="utf-8") as f:
-                file_data = json.load(f)
-                all_data.extend(file_data)
-                print(f"Loaded {len(file_data)} records from {json_file.name}")
-        except Exception as e:
-            print(f"Error loading {json_file}: {e}")
-            continue
-
-    print(f"Total records loaded: {len(all_data)}")
-    return all_data
-
-
-def merge_all_data(standardized_data: List[Dict[str, Any]]) -> pd.DataFrame:
-    """
-    Merge all standardized data into a single DataFrame.
-
-    Args:
-        standardized_data: List of risk data records
-
-    Returns:
-        Merged DataFrame with all data
-    """
-    if not standardized_data:
-        raise ValueError("No data to merge")
-
-    # Convert to DataFrame
-    df = pd.DataFrame(standardized_data)
-
-    # Ensure all records have required fields
-    required_fields = ["company", "risk", "risk_desc", "date_stamp"]
-    missing_fields = [field for field in required_fields if field not in df.columns]
-
-    if missing_fields:
-        raise ValueError(f"Missing required fields: {missing_fields}")
-
-    print(f"Merged data shape: {df.shape}")
-    print(f"Companies in data: {df['company'].unique()}")
-    print(f"Date stamps in data: {df['date_stamp'].unique()}")
-
+    with open(input_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    df = pd.DataFrame(data)
+    print(f"Loaded merged data: {df.shape}")
     return df
 
 
@@ -98,17 +91,15 @@ def add_embeddings_to_data(
 
     # Create text for embedding (combine relevant fields)
     def create_embedding_text_v1(row: pd.Series) -> str:
-        """Create text for embedding version 1: risk, risk_desc, rootcause, rootcause_desc, process, process_desc."""
+        """Create text for embedding version 1: risk, risk_desc, rootcause_data, process_data + summaries."""
         text_parts = []
 
         # Check required columns exist
         required_columns_v1 = [
             "risk",
             "risk_desc",
-            "rootcause",
-            "rootcause_desc",
-            "process",
-            "process_desc",
+            "rootcause_data",
+            "process_data",
         ]
         missing_columns = [col for col in required_columns_v1 if col not in row.index]
         if missing_columns:
@@ -124,29 +115,43 @@ def add_embeddings_to_data(
         if row["risk_desc"] is not None and str(row["risk_desc"]).strip() != "":
             text_parts.append(f"Description: {row['risk_desc']}")
 
-        # Add root cause
-        if row["rootcause"] is not None and str(row["rootcause"]).strip() != "":
-            text_parts.append(f"Root Cause: {row['rootcause']}")
-
-        # Add root cause description
+        # Add root cause data (combined field)
         if (
-            row["rootcause_desc"] is not None
-            and str(row["rootcause_desc"]).strip() != ""
+            row["rootcause_data"] is not None
+            and str(row["rootcause_data"]).strip() != ""
         ):
-            text_parts.append(f"Root Cause Description: {row['rootcause_desc']}")
+            text_parts.append(f"Root Cause: {row['rootcause_data']}")
 
-        # Add process
-        if row["process"] is not None and str(row["process"]).strip() != "":
-            text_parts.append(f"Process: {row['process']}")
+        # Add process data (combined field)
+        if row["process_data"] is not None and str(row["process_data"]).strip() != "":
+            text_parts.append(f"Process: {row['process_data']}")
 
-        # Add process description
-        if row["process_desc"] is not None and str(row["process_desc"]).strip() != "":
-            text_parts.append(f"Process Description: {row['process_desc']}")
+        # Add summary fields if they exist
+        if (
+            "risk_desc_summary" in row.index
+            and row["risk_desc_summary"] is not None
+            and str(row["risk_desc_summary"]).strip() != ""
+        ):
+            text_parts.append(f"Risk Summary: {row['risk_desc_summary']}")
+
+        if (
+            "rootcause_summary" in row.index
+            and row["rootcause_summary"] is not None
+            and str(row["rootcause_summary"]).strip() != ""
+        ):
+            text_parts.append(f"Root Cause Summary: {row['rootcause_summary']}")
+
+        if (
+            "process_summary" in row.index
+            and row["process_summary"] is not None
+            and str(row["process_summary"]).strip() != ""
+        ):
+            text_parts.append(f"Process Summary: {row['process_summary']}")
 
         return " | ".join(text_parts)
 
     def create_embedding_text_v2(row: pd.Series) -> str:
-        """Create text for embedding version 2: risk, risk_desc + catalog risk_desc."""
+        """Create text for embedding version 2: risk, risk_desc + catalog risk_desc + summaries."""
         text_parts = []
 
         # Check required columns exist
@@ -173,44 +178,33 @@ def add_embeddings_to_data(
         ):
             text_parts.append(f"Catalog Description: {row['risk_desc_catalog']}")
 
+        # Add summary fields if they exist
+        if (
+            "risk_desc_summary" in row.index
+            and row["risk_desc_summary"] is not None
+            and str(row["risk_desc_summary"]).strip() != ""
+        ):
+            text_parts.append(f"Risk Summary: {row['risk_desc_summary']}")
+
+        if (
+            "rootcause_summary" in row.index
+            and row["rootcause_summary"] is not None
+            and str(row["rootcause_summary"]).strip() != ""
+        ):
+            text_parts.append(f"Root Cause Summary: {row['rootcause_summary']}")
+
+        if (
+            "process_summary" in row.index
+            and row["process_summary"] is not None
+            and str(row["process_summary"]).strip() != ""
+        ):
+            text_parts.append(f"Process Summary: {row['process_summary']}")
+
         return " | ".join(text_parts)
 
     # Create embedding text for both versions
     df["embedding_text_v1"] = df.apply(create_embedding_text_v1, axis=1)
     df["embedding_text_v2"] = df.apply(create_embedding_text_v2, axis=1)
-
-    # Import embedding providers
-    import sys
-    import os
-
-    # Add the find_similar_risk directory to the path
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    find_similar_risk_path = os.path.join(current_dir, "../../../find_similar_risk")
-    sys.path.insert(0, find_similar_risk_path)
-
-    try:
-        from embedding_providers import (
-            OpenAIEmbeddingProvider,
-            SentenceTransformerProvider,
-        )
-    except ImportError as e:
-        print(f"Error importing embedding_providers: {e}")
-        print(f"Tried to import from: {find_similar_risk_path}")
-        print(f"Current sys.path: {sys.path}")
-
-        # Try alternative path
-        alt_path = os.path.join(current_dir, "../../find_similar_risk")
-        sys.path.insert(0, alt_path)
-        try:
-            from embedding_providers import (
-                OpenAIEmbeddingProvider,
-                SentenceTransformerProvider,
-            )
-
-            print(f"Successfully imported from alternative path: {alt_path}")
-        except ImportError as e2:
-            print(f"Alternative path also failed: {e2}")
-            raise
 
     # Initialize embedding provider
     if embedding_provider == "openai_large":
@@ -311,65 +305,71 @@ def add_embeddings_to_data(
     return df
 
 
-def save_embeddings_data(df: pd.DataFrame, output_path: str):
+def save_embeddings_data(
+    df: pd.DataFrame, output_path: str, is_sample_run: bool = False
+):
     """
-    Save DataFrame with embeddings to JSON file.
+    Save DataFrame with embeddings to pickle format (or JSON for sample runs).
 
     Args:
         df: DataFrame with embeddings
-        output_path: Path to save the JSON file
+        output_path: Path to save the file
+        is_sample_run: If True, save as JSON for easier debugging
     """
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
-    # Convert to list of dictionaries
-    result_list = df.to_dict(orient="records")
+    if is_sample_run:
+        # For sample runs, save as JSON for easier debugging
+        # Convert embeddings to lists for JSON serialization
+        df_copy = df.copy()
 
-    # Convert numpy arrays to lists for JSON serialization
-    def convert_for_json(obj):
-        if hasattr(obj, "tolist"):
-            return obj.tolist()
-        elif isinstance(obj, dict):
-            return {k: convert_for_json(v) for k, v in obj.items()}
-        elif isinstance(obj, list):
-            return [convert_for_json(item) for item in obj]
-        else:
-            return obj
+        # Convert embedding columns to lists if they exist
+        embedding_columns = [
+            col for col in df_copy.columns if col.startswith("embedding_")
+        ]
+        for col in embedding_columns:
+            if col in df_copy.columns:
+                df_copy[col] = df_copy[col].apply(
+                    lambda x: x.tolist() if hasattr(x, "tolist") else x
+                )
 
-    result_json = convert_for_json(result_list)
-
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(result_json, f, ensure_ascii=False, indent=2)
-
-    print(f"Embeddings data saved to: {output_path}")
+        # Save as JSON
+        data_to_save = df_copy.to_dict(orient="records")
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(data_to_save, f, ensure_ascii=False, indent=2)
+        print(f"Sample embeddings data saved to: {output_path} (JSON format)")
+    else:
+        # Save as pickle for better compatibility with mixed data types and embeddings
+        with open(output_path, "wb") as f:
+            pickle.dump(df, f)
+        print(f"Embeddings data saved to: {output_path} (pickle format)")
 
 
 def process_embeddings(
-    standardized_data_dir: str,
-    output_path: str,
+    merged_data_path: str,
+    embeddings_output_path: str,
     embedding_provider: str = "openai_large",
     max_embeddings: Optional[int] = None,
+    is_sample_run: bool = False,
 ) -> pd.DataFrame:
     """
-    Main function to process embeddings and add them to data.
+    Process embeddings and add them to merged data.
 
     Args:
-        standardized_data_dir: Directory containing standardized JSON files
-        output_path: Path to save the embeddings data JSON file
+        merged_data_path: Path to the merged data JSON file
+        embeddings_output_path: Path to save the embeddings data file
         embedding_provider: Provider for embeddings
         max_embeddings: Maximum number of embeddings to generate (None for all)
+        is_sample_run: If True, save embeddings as JSON for easier debugging
 
     Returns:
         DataFrame with both embedding versions added
     """
     print("Starting embedding process...")
 
-    # Load all standardized data
-    print("Loading standardized data...")
-    standardized_data = load_standardized_data(standardized_data_dir)
-
-    # Merge all data
-    print("Merging data...")
-    merged_df = merge_all_data(standardized_data)
+    # Load merged data
+    print("Loading merged data...")
+    merged_df = load_merged_data(merged_data_path)
 
     # Add embeddings for both versions
     print("Adding embeddings for both versions...")
@@ -379,7 +379,9 @@ def process_embeddings(
 
     # Save embeddings data
     print("Saving embeddings data...")
-    save_embeddings_data(df_with_embeddings, output_path)
+    save_embeddings_data(
+        df_with_embeddings, embeddings_output_path, is_sample_run=is_sample_run
+    )
 
     print("Embedding process completed!")
     return df_with_embeddings
@@ -391,53 +393,61 @@ IS_SAMPLE_RUN = True
 
 def main():
     """
-    Example usage of the embedding processor.
+    Example usage of the embedding process module.
     """
     # Get the directory of this file
     dir_path = os.path.dirname(os.path.realpath(__file__))
 
-    # Define paths
-    standardized_data_dir = os.path.join(dir_path, "../data/standardized/")
+    # Hardcode data type as riskview
+    data_type = "riskview"
+    print(f"Processing data type: {data_type}")
 
-    # Set output path based on sample run flag
+    # Define paths - load from summarized data
+    merged_data_path = os.path.join(
+        dir_path, "../data/processed/", f"{data_type}_merged_data_with_summaries.json"
+    )
+
+    # Set output paths based on sample run flag
     if IS_SAMPLE_RUN:
-        output_path = os.path.join(
-            dir_path, "../data/embeddings/", "sample_risk_data_with_embeddings.json"
+        embeddings_output_path = os.path.join(
+            dir_path,
+            "../data/embeddings/",
+            f"{data_type}_sample_data_with_embeddings.json",
         )
         print("Running in SAMPLE MODE - processing first 10 rows only")
     else:
-        output_path = os.path.join(
-            dir_path, "../data/embeddings/", "risk_data_with_embeddings.json"
+        embeddings_output_path = os.path.join(
+            dir_path, "../data/embeddings/", f"{data_type}_data_with_embeddings.pkl"
         )
         print("Running in FULL MODE - processing all data")
-
-    # Load all standardized data
-    print("Loading standardized data...")
-    standardized_data = load_standardized_data(standardized_data_dir)
-
-    # Merge all data
-    print("Merging data...")
-    merged_df = merge_all_data(standardized_data)
 
     # Set max_embeddings for sample run
     max_embeddings = 10 if IS_SAMPLE_RUN else None
     if IS_SAMPLE_RUN:
         print("Running in SAMPLE MODE - limiting to 10 embeddings")
-        print(f"Full data shape: {merged_df.shape}")
 
-    # Add embeddings for both versions
-    print("Adding embeddings for both versions...")
-    df_with_embeddings = add_embeddings_to_data(
-        merged_df, "openai_large", max_embeddings
-    )
+    try:
+        # Process embeddings
+        df_with_embeddings = process_embeddings(
+            merged_data_path,
+            embeddings_output_path,
+            "openai_large",
+            max_embeddings,
+            is_sample_run=IS_SAMPLE_RUN,
+        )
 
-    # Save embeddings data
-    print("Saving embeddings data...")
-    save_embeddings_data(df_with_embeddings, output_path)
+        print(f"Processing completed! Processed {len(df_with_embeddings)} records")
+        print(f"Embeddings data saved to: {embeddings_output_path}")
+        print(f"Each record contains both embedding_v1 and embedding_v2")
+        print("Embeddings include original data + LLM summaries")
 
-    print(f"Processing completed! Processed {len(df_with_embeddings)} records")
-    print(f"Data saved to: {output_path}")
-    print(f"Each record contains both embedding_v1 and embedding_v2")
+    except FileNotFoundError as e:
+        print(f"Error: {e}")
+        print(
+            f"Please run summarize_data.py first to create {data_type}_merged_data_with_summaries.json."
+        )
+    except Exception as e:
+        print(f"Error: {e}")
 
 
 if __name__ == "__main__":
