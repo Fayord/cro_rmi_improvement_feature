@@ -71,7 +71,7 @@ async def health_check():
     },
     tags=["Recommendations"],
 )
-async def recommend_risks_to_assess(request: RiskRecommendationRequest):
+async def recommend_risks_to_assess(request: List[RiskRecommendationRequest]):
     """
     Generate risk recommendations for assessment based on existing risks and user context.
 
@@ -116,7 +116,7 @@ async def recommend_risks_to_assess(request: RiskRecommendationRequest):
     },
     tags=["Recommendations"],
 )
-async def recommend_risks_to_mitigate(request: RiskRecommendationRequest):
+async def recommend_risks_to_mitigate(request: List[RiskRecommendationRequest]):
     """
     Generate risk recommendations for mitigation based on existing risks and user context.
 
@@ -161,7 +161,7 @@ async def recommend_risks_to_mitigate(request: RiskRecommendationRequest):
     },
     tags=["Generate"],
 )
-async def generate_mitigation_plan(request: MitigationPlanRequest):
+async def generate_mitigation_plan(request: List[MitigationPlanRequest]):
     """
     Generate a mitigation plan for a given risk. anything with a dropdown/Literal type eg. priority_level, status, etc. Need to review the schema later
     """
