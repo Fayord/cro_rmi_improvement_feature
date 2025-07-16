@@ -877,7 +877,7 @@ def main():
     # Define paths
     standardized_data_dir = os.path.join(dir_path, "../data/standardized/")
     processed_output_path = os.path.join(
-        dir_path, "../data/processed/", "merged_risk_data.json"
+        dir_path, "../data/processed/", "riskview_merged_data.json"
     )
 
     try:
