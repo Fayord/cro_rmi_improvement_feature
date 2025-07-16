@@ -54,91 +54,6 @@ class RiskScore(BaseModel):
         }
 
 
-class ExistingRisk(BaseModel):
-    """Schema for existing risk data."""
-
-    risk_id: str = Field(..., description="Unique identifier for the risk")
-    risk_name: str = Field(..., description="Name of the risk")
-    risk_description: str = Field(..., description="Description of the risk")
-    processes: List[Process] = Field(
-        ..., description="List of processes associated with the risk"
-    )
-    root_causes: List[RootCause] = Field(
-        ..., description="List of root causes for the risk"
-    )
-    risk_category: str = Field(..., description="Category of the risk")
-    score: RiskScore = Field(..., description="Risk scoring information")
-
-    class Config:
-        schema_extra = {
-            "example": {
-                "risk_id": "risk_001",
-                "risk_name": "Supply Chain Disruption",
-                "risk_description": "Risk of disruption in supply chain operations",
-                "processes": [
-                    {
-                        "id": 1,
-                        "name": "Procurement",
-                        "description": "Vendor selection and management process",
-                    }
-                ],
-                "root_causes": [
-                    {
-                        "id": 1,
-                        "name": "Single source dependency",
-                        "description": "Over-reliance on single supplier",
-                    }
-                ],
-                "risk_category": "operational",
-                "score": {"impact": 4, "likelihood": 3, "score": 12, "risk_level": 3},
-            }
-        }
-
-
-class RiskRecommendationRequest(BaseModel):
-    """Request schema for risk recommendations."""
-
-    user_id: str = Field(..., description="Unique identifier for the user")
-    existing_risks: List[ExistingRisk] = Field(
-        ..., description="List of existing risks to consider"
-    )
-
-    class Config:
-        schema_extra = {
-            "example": {
-                "user_id": "user_123",
-                "existing_risks": [
-                    {
-                        "risk_id": "risk_001",
-                        "risk_name": "Supply Chain Disruption",
-                        "risk_description": "Risk of disruption in supply chain operations",
-                        "processes": [
-                            {
-                                "id": 1,
-                                "name": "Procurement",
-                                "description": "Vendor selection and management process",
-                            }
-                        ],
-                        "root_causes": [
-                            {
-                                "id": 1,
-                                "name": "Single source dependency",
-                                "description": "Over-reliance on single supplier",
-                            }
-                        ],
-                        "risk_category": "operational",
-                        "score": {
-                            "impact": 4,
-                            "likelihood": 3,
-                            "score": 12,
-                            "risk_level": 3,
-                        },
-                    }
-                ],
-            }
-        }
-
-
 class RecommendedRisk(BaseModel):
     """Schema for recommended risk items."""
 
@@ -331,9 +246,93 @@ class ExistingControl(Control): ...
 class MitigationPlanResponse(MitigationPlan): ...
 
 
-class MitigationPlanRequest(RiskRecommendationRequest):
-    """Request schema for mitigation plan generation. include data in RiskRecommendationRequest but have optional data of existing control"""
+class ExistingRisk(BaseModel):
+    """Schema for existing risk data."""
 
+    risk_id: str = Field(..., description="Unique identifier for the risk")
+    risk_name: str = Field(..., description="Name of the risk")
+    risk_description: str = Field(..., description="Description of the risk")
+    processes: List[Process] = Field(
+        ..., description="List of processes associated with the risk"
+    )
+    root_causes: List[RootCause] = Field(
+        ..., description="List of root causes for the risk"
+    )
+    risk_category: str = Field(..., description="Category of the risk")
+    score: RiskScore = Field(..., description="Risk scoring information")
     existing_controls: Optional[List[ExistingControl]] = Field(
         None, description="List of existing controls to consider"
     )
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "risk_id": "risk_001",
+                "risk_name": "Supply Chain Disruption",
+                "risk_description": "Risk of disruption in supply chain operations",
+                "processes": [
+                    {
+                        "id": 1,
+                        "name": "Procurement",
+                        "description": "Vendor selection and management process",
+                    }
+                ],
+                "root_causes": [
+                    {
+                        "id": 1,
+                        "name": "Single source dependency",
+                        "description": "Over-reliance on single supplier",
+                    }
+                ],
+                "risk_category": "operational",
+                "score": {"impact": 4, "likelihood": 3, "score": 12, "risk_level": 3},
+            }
+        }
+
+
+class RiskRecommendationRequest(BaseModel):
+    """Request schema for risk recommendations."""
+
+    user_id: str = Field(..., description="Unique identifier for the user")
+    existing_risks: List[ExistingRisk] = Field(
+        ..., description="List of existing risks to consider"
+    )
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "user_id": "user_123",
+                "existing_risks": [
+                    {
+                        "risk_id": "risk_001",
+                        "risk_name": "Supply Chain Disruption",
+                        "risk_description": "Risk of disruption in supply chain operations",
+                        "processes": [
+                            {
+                                "id": 1,
+                                "name": "Procurement",
+                                "description": "Vendor selection and management process",
+                            }
+                        ],
+                        "root_causes": [
+                            {
+                                "id": 1,
+                                "name": "Single source dependency",
+                                "description": "Over-reliance on single supplier",
+                            }
+                        ],
+                        "risk_category": "operational",
+                        "score": {
+                            "impact": 4,
+                            "likelihood": 3,
+                            "score": 12,
+                            "risk_level": 3,
+                        },
+                    }
+                ],
+            }
+        }
+
+
+class MitigationPlanRequest(RiskRecommendationRequest):
+    """Request schema for mitigation plan generation. include data in RiskRecommendationRequest but have optional data of existing control"""
