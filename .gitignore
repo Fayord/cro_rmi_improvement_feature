@@ -5,7 +5,14 @@ __pycache__/
 
 # custom
 *.csv
-
+*.pdf
+*.json
+*.txt
+*.md
+*.csv
+*.xlsx
+*.xls
+*png
 # C extensions
 *.so
 

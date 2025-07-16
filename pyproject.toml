@@ -25,6 +25,10 @@ dependencies = [
     "google-genai>=1.12.1",
     "fastapi>=0.116.0",
     "uvicorn>=0.35.0",
+    "py-zerox>=0.0.7",
+    "langchain-google-genai>=2.1.7",
+    "pyarrow>=20.0.0",
+    "fastparquet>=2024.11.0",
 ]
 requires-python = "==3.12.*"
 readme = "README.md"
