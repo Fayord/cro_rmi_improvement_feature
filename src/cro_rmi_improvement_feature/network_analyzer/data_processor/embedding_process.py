@@ -11,6 +11,7 @@ import pickle
 from typing import List, Dict, Any, Optional
 import warnings
 from pathlib import Path
+from tqdm import tqdm
 
 # Suppress warnings for cleaner output
 warnings.filterwarnings("ignore")
@@ -90,21 +91,21 @@ def add_embeddings_to_data(
         print(f"Limiting to {max_embeddings} embeddings")
 
     # Create text for embedding (combine relevant fields)
-    def create_embedding_text_v1(row: pd.Series) -> str:
-        """Create text for embedding version 1: risk, risk_desc, rootcause_data, process_data + summaries."""
+    def create_embedding_text_raw_user_data(row: pd.Series) -> str:
+        """Create text for embedding: risk, risk_desc, rootcause_data, process_data (raw user data)."""
         text_parts = []
 
         # Check required columns exist
-        required_columns_v1 = [
+        required_columns = [
             "risk",
             "risk_desc",
             "rootcause_data",
             "process_data",
         ]
-        missing_columns = [col for col in required_columns_v1 if col not in row.index]
+        missing_columns = [col for col in required_columns if col not in row.index]
         if missing_columns:
             raise ValueError(
-                f"Missing required columns for embedding v1: {missing_columns}"
+                f"Missing required columns for raw user data embedding: {missing_columns}"
             )
 
         # Add risk name
@@ -126,40 +127,18 @@ def add_embeddings_to_data(
         if row["process_data"] is not None and str(row["process_data"]).strip() != "":
             text_parts.append(f"Process: {row['process_data']}")
 
-        # Add summary fields if they exist
-        if (
-            "risk_desc_summary" in row.index
-            and row["risk_desc_summary"] is not None
-            and str(row["risk_desc_summary"]).strip() != ""
-        ):
-            text_parts.append(f"Risk Summary: {row['risk_desc_summary']}")
-
-        if (
-            "rootcause_summary" in row.index
-            and row["rootcause_summary"] is not None
-            and str(row["rootcause_summary"]).strip() != ""
-        ):
-            text_parts.append(f"Root Cause Summary: {row['rootcause_summary']}")
-
-        if (
-            "process_summary" in row.index
-            and row["process_summary"] is not None
-            and str(row["process_summary"]).strip() != ""
-        ):
-            text_parts.append(f"Process Summary: {row['process_summary']}")
-
         return " | ".join(text_parts)
 
-    def create_embedding_text_v2(row: pd.Series) -> str:
-        """Create text for embedding version 2: risk, risk_desc + catalog risk_desc + summaries."""
+    def create_embedding_text_risk_desc_catalog(row: pd.Series) -> str:
+        """Create text for embedding: risk, risk_desc + catalog risk_desc."""
         text_parts = []
 
         # Check required columns exist
-        required_columns_v2 = ["risk", "risk_desc"]
-        missing_columns = [col for col in required_columns_v2 if col not in row.index]
+        required_columns = ["risk", "risk_desc"]
+        missing_columns = [col for col in required_columns if col not in row.index]
         if missing_columns:
             raise ValueError(
-                f"Missing required columns for embedding v2: {missing_columns}"
+                f"Missing required columns for risk_desc_catalog embedding: {missing_columns}"
             )
 
         # Add risk name
@@ -170,13 +149,23 @@ def add_embeddings_to_data(
         if row["risk_desc"] is not None and str(row["risk_desc"]).strip() != "":
             text_parts.append(f"Description: {row['risk_desc']}")
 
-        # Add catalog risk description if available (optional for v2)
+        # Add catalog risk description if available
         if (
             "risk_desc_catalog" in row.index
             and row["risk_desc_catalog"] is not None
             and str(row["risk_desc_catalog"]).strip() != ""
         ):
             text_parts.append(f"Catalog Description: {row['risk_desc_catalog']}")
+
+        return " | ".join(text_parts)
+
+    def create_embedding_text_summary_user_data(row: pd.Series) -> str:
+        """Create text for embedding: risk + LLM summaries."""
+        text_parts = []
+
+        # Add risk name
+        if row["risk"] is not None and str(row["risk"]).strip() != "":
+            text_parts.append(f"Risk: {row['risk']}")
 
         # Add summary fields if they exist
         if (
@@ -202,9 +191,16 @@ def add_embeddings_to_data(
 
         return " | ".join(text_parts)
 
-    # Create embedding text for both versions
-    df["embedding_text_v1"] = df.apply(create_embedding_text_v1, axis=1)
-    df["embedding_text_v2"] = df.apply(create_embedding_text_v2, axis=1)
+    # Create embedding text for all three versions
+    df["embedding_text_raw_user_data"] = df.apply(
+        create_embedding_text_raw_user_data, axis=1
+    )
+    df["embedding_text_risk_desc_catalog"] = df.apply(
+        create_embedding_text_risk_desc_catalog, axis=1
+    )
+    df["embedding_text_summary_user_data"] = df.apply(
+        create_embedding_text_summary_user_data, axis=1
+    )
 
     # Initialize embedding provider
     if embedding_provider == "openai_large":
@@ -223,15 +219,36 @@ def add_embeddings_to_data(
                 print(f"Error getting embedding for text: {e}")
                 return None
 
-        # Add embeddings for both versions
+        # Add embeddings for all three versions
         print("Generating embeddings using OpenAI large model...")
-        df["embedding_v1"] = [
+
+        # Generate embeddings with progress bars
+        df["embedding_raw_user_data"] = [
             get_openai_large_embedding(text, idx)
-            for idx, text in enumerate(df["embedding_text_v1"])
+            for idx, text in tqdm(
+                enumerate(df["embedding_text_raw_user_data"]),
+                total=len(df),
+                desc="Raw user data embeddings",
+                unit="embedding",
+            )
         ]
-        df["embedding_v2"] = [
+        df["embedding_risk_desc_catalog"] = [
             get_openai_large_embedding(text, idx)
-            for idx, text in enumerate(df["embedding_text_v2"])
+            for idx, text in tqdm(
+                enumerate(df["embedding_text_risk_desc_catalog"]),
+                total=len(df),
+                desc="Risk desc catalog embeddings",
+                unit="embedding",
+            )
+        ]
+        df["embedding_summary_user_data"] = [
+            get_openai_large_embedding(text, idx)
+            for idx, text in tqdm(
+                enumerate(df["embedding_text_summary_user_data"]),
+                total=len(df),
+                desc="Summary user data embeddings",
+                unit="embedding",
+            )
         ]
 
     elif embedding_provider == "openai_small":
@@ -241,6 +258,7 @@ def add_embeddings_to_data(
             """Get embedding from OpenAI small model."""
             if max_embeddings and index >= max_embeddings:
                 return None
+
             if not text or text.strip() == "":
                 return None
             try:
@@ -250,15 +268,36 @@ def add_embeddings_to_data(
                 print(f"Error getting embedding for text: {e}")
                 return None
 
-        # Add embeddings for both versions
+        # Add embeddings for all three versions
         print("Generating embeddings using OpenAI small model...")
-        df["embedding_v1"] = [
+
+        # Generate embeddings with progress bars
+        df["embedding_raw_user_data"] = [
             get_openai_small_embedding(text, idx)
-            for idx, text in enumerate(df["embedding_text_v1"])
+            for idx, text in tqdm(
+                enumerate(df["embedding_text_raw_user_data"]),
+                total=len(df),
+                desc="Raw user data embeddings",
+                unit="embedding",
+            )
         ]
-        df["embedding_v2"] = [
+        df["embedding_risk_desc_catalog"] = [
             get_openai_small_embedding(text, idx)
-            for idx, text in enumerate(df["embedding_text_v2"])
+            for idx, text in tqdm(
+                enumerate(df["embedding_text_risk_desc_catalog"]),
+                total=len(df),
+                desc="Risk desc catalog embeddings",
+                unit="embedding",
+            )
+        ]
+        df["embedding_summary_user_data"] = [
+            get_openai_small_embedding(text, idx)
+            for idx, text in tqdm(
+                enumerate(df["embedding_text_summary_user_data"]),
+                total=len(df),
+                desc="Summary user data embeddings",
+                unit="embedding",
+            )
         ]
 
     elif embedding_provider == "sentence_transformers":
@@ -277,30 +316,56 @@ def add_embeddings_to_data(
                 print(f"Error getting embedding for text: {e}")
                 return None
 
-        # Add embeddings for both versions
+        # Add embeddings for all three versions
         print("Generating embeddings using sentence transformers...")
-        df["embedding_v1"] = [
+
+        # Generate embeddings with progress bars
+        df["embedding_raw_user_data"] = [
             get_sentence_transformer_embedding(text, idx)
-            for idx, text in enumerate(df["embedding_text_v1"])
+            for idx, text in tqdm(
+                enumerate(df["embedding_text_raw_user_data"]),
+                total=len(df),
+                desc="Raw user data embeddings",
+                unit="embedding",
+            )
         ]
-        df["embedding_v2"] = [
+        df["embedding_risk_desc_catalog"] = [
             get_sentence_transformer_embedding(text, idx)
-            for idx, text in enumerate(df["embedding_text_v2"])
+            for idx, text in tqdm(
+                enumerate(df["embedding_text_risk_desc_catalog"]),
+                total=len(df),
+                desc="Risk desc catalog embeddings",
+                unit="embedding",
+            )
+        ]
+        df["embedding_summary_user_data"] = [
+            get_sentence_transformer_embedding(text, idx)
+            for idx, text in tqdm(
+                enumerate(df["embedding_text_summary_user_data"]),
+                total=len(df),
+                desc="Summary user data embeddings",
+                unit="embedding",
+            )
         ]
 
     else:
         raise ValueError(f"Unsupported embedding provider: {embedding_provider}")
 
-    # Remove rows where embedding generation failed for either version
+    # Remove rows where embedding generation failed for any version
     initial_count = len(df)
     # Use a more robust filtering approach
-    valid_embeddings = df["embedding_v1"].apply(lambda x: x is not None) & df[
-        "embedding_v2"
-    ].apply(lambda x: x is not None)
+    valid_embeddings = (
+        df["embedding_raw_user_data"].apply(lambda x: x is not None)
+        & df["embedding_risk_desc_catalog"].apply(lambda x: x is not None)
+        & df["embedding_summary_user_data"].apply(lambda x: x is not None)
+    )
     df = df[valid_embeddings]
     final_count = len(df)
 
     print(f"Embeddings generated: {final_count}/{initial_count} records")
+    print(
+        "Generated embeddings for: raw_user_data, risk_desc_catalog, summary_user_data"
+    )
 
     return df
 
@@ -388,7 +453,7 @@ def process_embeddings(
 
 
 # Flag to control sample run
-IS_SAMPLE_RUN = True
+IS_SAMPLE_RUN = False
 
 
 def main():
@@ -438,7 +503,9 @@ def main():
 
         print(f"Processing completed! Processed {len(df_with_embeddings)} records")
         print(f"Embeddings data saved to: {embeddings_output_path}")
-        print(f"Each record contains both embedding_v1 and embedding_v2")
+        print(
+            f"Each record contains embeddings for: raw_user_data, risk_desc_catalog, summary_user_data"
+        )
         print("Embeddings include original data + LLM summaries")
 
     except FileNotFoundError as e:
