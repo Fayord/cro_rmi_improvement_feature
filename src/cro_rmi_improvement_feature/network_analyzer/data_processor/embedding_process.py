@@ -25,7 +25,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 find_similar_risk_path = os.path.join(current_dir, "../../../find_similar_risk")
 sys.path.insert(0, find_similar_risk_path)
 try:
-    from embedding_providers import (
+    from embedding_providers import (  # type: ignore
         OpenAIEmbeddingProvider,
         SentenceTransformerProvider,
     )
@@ -38,7 +38,7 @@ except ImportError as e:
     alt_path = os.path.join(current_dir, "../../find_similar_risk")
     sys.path.insert(0, alt_path)
     try:
-        from embedding_providers import (
+        from embedding_providers import (  # type: ignore
             OpenAIEmbeddingProvider,
             SentenceTransformerProvider,
         )
