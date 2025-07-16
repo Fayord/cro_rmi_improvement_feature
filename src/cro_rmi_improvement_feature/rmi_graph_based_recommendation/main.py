@@ -15,6 +15,13 @@ from schemas import (
     RiskRecommendationResponse,
     RecommendedRisk,
     ErrorResponse,
+    MitigationPlanRequest,
+    MitigationPlanResponse,
+    PlanDetailSchema,
+    TimelineBudgetSchema,
+    TargetRiskReductionItemSchema,
+    FileSchema,
+    TaskSchema,
 )
 
 
@@ -142,6 +149,184 @@ async def recommend_risks_to_mitigate(request: RiskRecommendationRequest):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error generating mitigation recommendations: {str(e)}",
         )
+
+
+@app.post(
+    "/generate_mitigation_plan",
+    response_model=MitigationPlanResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        400: {"model": ErrorResponse, "description": "Bad Request"},
+        500: {"model": ErrorResponse, "description": "Internal Server Error"},
+    },
+    tags=["Generate"],
+)
+async def generate_mitigation_plan(request: MitigationPlanRequest):
+    """
+    Generate a mitigation plan for a given risk.
+    """
+    try:
+        # Validate input
+        if not request.risk_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Risk ID must be provided",
+            )
+
+        # TODO: Integrate with your existing risk mitigation logic
+        # For now, returning mock data
+        mitigation_plan = _generate_mock_mitigation_plan(request)
+
+        return mitigation_plan
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error generating mitigation plan: {str(e)}",
+        )
+
+
+def _generate_mock_mitigation_plan(
+    request: MitigationPlanRequest,
+) -> MitigationPlanResponse:
+    """
+    Generate mock mitigation plan for a given risk.
+    """
+    # Extract risk information from request
+    risk_name = (
+        request.existing_risks[0].risk_name
+        if request.existing_risks
+        else "Supply Chain Disruption"
+    )
+    risk_id = (
+        request.existing_risks[0].risk_id if request.existing_risks else "risk_001"
+    )
+
+    # Create Plan Detail
+    plan_detail = PlanDetailSchema(
+        mitigation_plan_name=f"Mitigation Plan for {risk_name}",
+        mitigation_plan_objective=f"Reduce the likelihood and impact of {risk_name} through comprehensive risk management strategies",
+        linked_risks=[risk_name, "Operational Risk", "Financial Risk"],
+        priority_level="High",
+        plan_owner="John Smith",
+        plan_owner_email="john.smith@company.com",
+    )
+
+    # Create Timeline & Budget
+    timeline_budget = TimelineBudgetSchema(
+        start_date="2024-01-15",
+        end_date="2024-06-30",
+        expected_cost=150000.0,
+        expected_financial_benefit=500000.0,
+        expected_non_financial_benefits="Improved operational efficiency, enhanced stakeholder confidence, reduced regulatory exposure",
+    )
+
+    # Create Target Risk Reduction items
+    target_risk_reduction = [
+        TargetRiskReductionItemSchema(
+            risk_name=risk_name,
+            root_cause=[
+                "Single source dependency",
+                "Lack of supplier diversification",
+                "Inadequate risk monitoring",
+            ],
+            related_asset=[
+                "Primary Supplier A",
+                "Secondary Supplier B",
+                "Risk Management System",
+            ],
+            target_risk_likelihood="2: Unlikely",
+            target_risk_impact="2: Moderate",
+        ),
+        TargetRiskReductionItemSchema(
+            risk_name="Operational Risk",
+            root_cause=[
+                "Process inefficiencies",
+                "Manual intervention required",
+                "Lack of automation",
+            ],
+            related_asset=[
+                "Process Management System",
+                "Automation Tools",
+                "Employee Training Program",
+            ],
+            target_risk_likelihood="3: Moderate",
+            target_risk_impact="3: Significant",
+        ),
+    ]
+
+    # Create Support Documents
+    support_documents = [
+        FileSchema(name="Risk Assessment Report.pdf", size="2.5 MB", status="uploaded"),
+        FileSchema(
+            name="Mitigation Strategy Document.docx", size="1.8 MB", status="uploaded"
+        ),
+        FileSchema(name="Budget Analysis.xlsx", size="856 KB", status="uploaded"),
+    ]
+
+    # Create Task Management
+    task_management = [
+        TaskSchema(
+            pre_defined_task="Conduct comprehensive risk assessment",
+            weighted_activity_percent="15",
+            status="In Progress",
+            task_owner_placeholder="Sarah Johnson",
+            task_owner_department="Risk Management",
+            task_owner_email="sarah.johnson@company.com",
+            start_date="2024-01-15",
+            end_date="2024-02-15",
+        ),
+        TaskSchema(
+            pre_defined_task="Develop supplier diversification strategy",
+            weighted_activity_percent="25",
+            status="Not Started",
+            task_owner_placeholder="Mike Chen",
+            task_owner_department="Procurement",
+            task_owner_email="mike.chen@company.com",
+            start_date="2024-02-01",
+            end_date="2024-03-31",
+        ),
+        TaskSchema(
+            pre_defined_task="Implement risk monitoring system",
+            weighted_activity_percent="30",
+            status="Not Started",
+            task_owner_placeholder="Lisa Wang",
+            task_owner_department="IT",
+            task_owner_email="lisa.wang@company.com",
+            start_date="2024-03-01",
+            end_date="2024-05-31",
+        ),
+        TaskSchema(
+            pre_defined_task="Train staff on new procedures",
+            weighted_activity_percent="20",
+            status="Not Started",
+            task_owner_placeholder="David Brown",
+            task_owner_department="HR",
+            task_owner_email="david.brown@company.com",
+            start_date="2024-05-01",
+            end_date="2024-06-15",
+        ),
+        TaskSchema(
+            pre_defined_task="Conduct final review and validation",
+            weighted_activity_percent="10",
+            status="Not Started",
+            task_owner_placeholder="Emily Davis",
+            task_owner_department="Compliance",
+            task_owner_email="emily.davis@company.com",
+            start_date="2024-06-01",
+            end_date="2024-06-30",
+        ),
+    ]
+
+    return MitigationPlanResponse(
+        plan_detail=plan_detail,
+        timeline_budget=timeline_budget,
+        target_risk_reduction=target_risk_reduction,
+        support_documents=support_documents,
+        task_management=task_management,
+    )
 
 
 def _generate_mock_assessment_recommendations(
