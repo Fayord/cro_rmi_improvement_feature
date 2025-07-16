@@ -163,7 +163,7 @@ async def recommend_risks_to_mitigate(request: RiskRecommendationRequest):
 )
 async def generate_mitigation_plan(request: MitigationPlanRequest):
     """
-    Generate a mitigation plan for a given risk.
+    Generate a mitigation plan for a given risk. anything with a dropdown/Literal type eg. priority_level, status, etc. Need to review the schema later
     """
     try:
         # Validate input
