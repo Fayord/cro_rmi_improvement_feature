@@ -153,7 +153,7 @@ async def recommend_risks_to_mitigate(request: List[RiskRecommendationRequest]):
 
 @app.post(
     "/generate_mitigation_plan",
-    response_model=MitigationPlanResponse,
+    response_model=List[MitigationPlanResponse],
     status_code=status.HTTP_200_OK,
     responses={
         400: {"model": ErrorResponse, "description": "Bad Request"},

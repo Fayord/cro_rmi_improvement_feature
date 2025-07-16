@@ -197,41 +197,6 @@ class ErrorResponse(BaseModel):
         }
 
 
-class Control(BaseModel):
-    """Schema for control data. is a parent of ExistingControl and MitigationPlan
-    TODO: need to update attr later"""
-
-    id: int = Field(..., description="Need to update attr later")
-    name: str = Field(..., description="Need to update attr later")
-    objective: str = Field(..., description="Need to update attr later")
-    linked_risks: List[str] = Field(
-        ..., description="List of linked risks (e.g., 'Regulatory Compliance Failure')"
-    )
-    priority_level: Literal["Low", "Medium", "High"] = Field(
-        ..., description="Priority level of the control"
-    )
-
-
-class ExistingControl(Control):
-    """Schema for existing control data."""
-
-    ...
-
-
-class MitigationPlan(Control):
-    """Schema for mitigation plan data."""
-
-    ...
-
-
-class MitigationPlanRequest(RiskRecommendationRequest):
-    """Request schema for mitigation plan generation. include data in RiskRecommendationRequest but have optional data of existing control"""
-
-    existing_controls: Optional[List[ExistingControl]] = Field(
-        None, description="List of existing controls to consider"
-    )
-
-
 class FileSchema(BaseModel):
     """Schema for an uploaded file."""
 
@@ -338,7 +303,7 @@ class TargetRiskReductionItemSchema(BaseModel):
     ]  # Example values
 
 
-class MitigationPlanResponse(BaseModel):
+class Control(BaseModel):
     """Overall schema for the entire response dictionary."""
 
     plan_detail: PlanDetailSchema
@@ -355,3 +320,20 @@ class MitigationPlanResponse(BaseModel):
         ),
     )
     task_management: List[TaskSchema]  # List of tasks
+
+
+class MitigationPlan(Control): ...
+
+
+class ExistingControl(Control): ...
+
+
+class MitigationPlanResponse(MitigationPlan): ...
+
+
+class MitigationPlanRequest(RiskRecommendationRequest):
+    """Request schema for mitigation plan generation. include data in RiskRecommendationRequest but have optional data of existing control"""
+
+    existing_controls: Optional[List[ExistingControl]] = Field(
+        None, description="List of existing controls to consider"
+    )
