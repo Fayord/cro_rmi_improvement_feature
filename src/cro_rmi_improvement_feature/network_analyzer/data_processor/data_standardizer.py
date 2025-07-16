@@ -3,6 +3,7 @@ import json
 import pandas as pd
 from typing import Union, List, Dict, Any
 import warnings
+from pathlib import Path
 
 from torch import set_anomaly_enabled
 
@@ -585,70 +586,319 @@ def process_risk_data(
     return result_list
 
 
-def process_multiple_datasets():
+def load_standardized_data(data_dir: str) -> List[Dict[str, Any]]:
     """
-    Process multiple datasets for different companies and dates.
+    Load all standardized JSON files from the data directory.
+
+    Args:
+        data_dir: Path to the directory containing standardized JSON files
+
+    Returns:
+        List of all risk data records from all files
     """
-    dir_path = os.path.dirname(os.path.realpath(__file__))
+    all_data = []
+    data_path = Path(data_dir)
 
-    # Define datasets to process
-    datasets = [
-        {
-            "risk_data_path": os.path.join(
-                dir_path,
-                "../data/raw/",
-                "250528_PCG_assessment_report_Q1-2025_controlperrow.xlsx",
-            ),
-            "catalog_data_path": os.path.join(
-                dir_path, "../data/raw/", "seed_excel_13May2025 1.xlsx"
-            ),
-            "company_name": "PCG",
-            "date_stamp": "20250513",
-            "output_path": os.path.join(
-                dir_path, "../data/standardized/", "20250513-PCG_risk_data.json"
-            ),
-        },
-        {
-            "risk_data_path": os.path.join(
-                dir_path,
-                "../data/raw/",
-                "250520_Retail (Guangdong-Guangxi)_assessment_report_Q1-2025_controlperrow_original.xlsx",
-            ),
-            "catalog_data_path": os.path.join(
-                dir_path, "../data/raw/", "seed_excel_13May2025 1.xlsx"
-            ),
-            "company_name": "lotus_south",
-            "date_stamp": "20250513",
-            "output_path": os.path.join(
-                dir_path, "../data/standardized/", "20250513-lotus_south_risk_data.json"
-            ),
-        },
-    ]
+    if not data_path.exists():
+        raise FileNotFoundError(f"Data directory not found: {data_dir}")
 
-    for dataset in datasets:
-        print(f"\nProcessing {dataset['company_name']} dataset...")
+    # Find all JSON files in the directory
+    json_files = list(data_path.glob("*.json"))
+
+    if not json_files:
+        raise FileNotFoundError(f"No JSON files found in {data_dir}")
+
+    for json_file in json_files:
+        print(f"Loading data from: {json_file}")
         try:
-            result = process_risk_data(
-                risk_data_path=dataset["risk_data_path"],
-                catalog_data_path=dataset["catalog_data_path"],
-                company_name=dataset["company_name"],
-                output_path=dataset["output_path"],
-                date_stamp=dataset["date_stamp"],
-            )
-            print(
-                f"Successfully processed {len(result)} risk records for {dataset['company_name']}"
-            )
-            print(f"Output saved to: {dataset['output_path']}")
+            with open(json_file, "r", encoding="utf-8") as f:
+                file_data = json.load(f)
+                all_data.extend(file_data)
+                print(f"Loaded {len(file_data)} records from {json_file.name}")
         except Exception as e:
-            print(f"Error processing {dataset['company_name']} data: {e}")
+            print(f"Error loading {json_file}: {e}")
+            continue
+
+    print(f"Total records loaded: {len(all_data)}")
+    return all_data
+
+
+def merge_all_data(
+    standardized_data: List[Dict[str, Any]],
+    remove_duplicates: bool = True,
+    duplicate_strategy: str = "keep_first",
+) -> pd.DataFrame:
+    """
+    Merge all standardized data into a single DataFrame with optional duplicate removal.
+
+    Args:
+        standardized_data: List of risk data records
+        remove_duplicates: Whether to remove duplicate records
+        duplicate_strategy: Strategy for handling duplicates ("keep_first", "keep_last", "drop_all")
+
+    Returns:
+        Merged DataFrame with all data
+    """
+    if not standardized_data:
+        raise ValueError("No data to merge")
+
+    # Convert to DataFrame
+    df = pd.DataFrame(standardized_data)
+
+    # Ensure all records have required fields
+    required_fields = ["company", "risk", "risk_desc", "date_stamp"]
+    missing_fields = [field for field in required_fields if field not in df.columns]
+
+    if missing_fields:
+        raise ValueError(f"Missing required fields: {missing_fields}")
+
+    initial_count = len(df)
+    print(f"Initial data shape: {df.shape}")
+
+    if remove_duplicates:
+        print(f"Removing duplicates using strategy: {duplicate_strategy}")
+
+        # Create combined fields for rootcause and process data
+        # Handle list fields by concatenating with descriptions
+        if "rootcause" in df.columns or "rootcause_desc" in df.columns:
+
+            def combine_rootcause_data(row):
+                """Combine rootcause and rootcause_desc into a single field."""
+                rootcause = row.get("rootcause", "")
+                rootcause_desc = row.get("rootcause_desc", "")
+
+                # Handle None values
+                if rootcause is None:
+                    rootcause = ""
+                if rootcause_desc is None:
+                    rootcause_desc = ""
+
+                # Convert to string if it's a list
+                if isinstance(rootcause, list):
+                    rootcause = ", ".join(
+                        [str(item) for item in rootcause if item is not None]
+                    )
+                else:
+                    rootcause = str(rootcause)
+
+                if isinstance(rootcause_desc, list):
+                    rootcause_desc = ", ".join(
+                        [str(item) for item in rootcause_desc if item is not None]
+                    )
+                else:
+                    rootcause_desc = str(rootcause_desc)
+
+                # Combine and clean up
+                combined = f"{rootcause} {rootcause_desc}".strip()
+                return combined if combined else ""
+
+            df["rootcause_data"] = df.apply(combine_rootcause_data, axis=1)
+            print("Created rootcause_data field")
+
+        if "process" in df.columns or "process_desc" in df.columns:
+
+            def combine_process_data(row):
+                """Combine process and process_desc into a single field."""
+                process = row.get("process", "")
+                process_desc = row.get("process_desc", "")
+
+                # Handle None values
+                if process is None:
+                    process = ""
+                if process_desc is None:
+                    process_desc = ""
+
+                # Convert to string if it's a list
+                if isinstance(process, list):
+                    process = ", ".join(
+                        [str(item) for item in process if item is not None]
+                    )
+                else:
+                    process = str(process)
+
+                if isinstance(process_desc, list):
+                    process_desc = ", ".join(
+                        [str(item) for item in process_desc if item is not None]
+                    )
+                else:
+                    process_desc = str(process_desc)
+
+                # Combine and clean up
+                combined = f"{process} {process_desc}".strip()
+                return combined if combined else ""
+
+            df["process_data"] = df.apply(combine_process_data, axis=1)
+            print("Created process_data field")
+
+        # Define columns to check for duplicates
+        # Use the new combined fields instead of separate rootcause/process fields
+        duplicate_columns = ["company", "risk", "risk_desc"]
+
+        # Add date_stamp if available for more precise duplicate detection
+        if "date_stamp" in df.columns:
+            duplicate_columns.append("date_stamp")
+
+        # Add the new combined fields
+        if "rootcause_data" in df.columns:
+            duplicate_columns.append("rootcause_data")
+        if "process_data" in df.columns:
+            duplicate_columns.append("process_data")
+
+        # Add other relevant fields if they exist (but not the original list fields)
+        optional_columns = ["risk_desc_catalog"]
+        for col in optional_columns:
+            if col in df.columns:
+                duplicate_columns.append(col)
+
+        # Filter out columns that contain unhashable types (like lists)
+        safe_duplicate_columns = []
+        for col in duplicate_columns:
+            if col in df.columns:
+                # Check if the column contains any list values
+                sample_values = (
+                    df[col].dropna().head(100)
+                )  # Check first 100 non-null values
+                has_lists = any(isinstance(val, list) for val in sample_values)
+
+                if not has_lists:
+                    safe_duplicate_columns.append(col)
+                else:
+                    print(
+                        f"Warning: Column '{col}' contains list values, skipping from duplicate detection"
+                    )
+
+        print(f"Checking duplicates based on columns: {safe_duplicate_columns}")
+
+        if not safe_duplicate_columns:
+            print(
+                "Warning: No safe columns for duplicate detection. Skipping duplicate removal."
+            )
+        else:
+            # Count duplicates before removal
+            duplicate_count = df.duplicated(subset=safe_duplicate_columns).sum()
+            print(f"Found {duplicate_count} duplicate records")
+
+            if duplicate_count > 0:
+                if duplicate_strategy == "keep_first":
+                    df = df.drop_duplicates(subset=safe_duplicate_columns, keep="first")
+                elif duplicate_strategy == "keep_last":
+                    df = df.drop_duplicates(subset=safe_duplicate_columns, keep="last")
+                elif duplicate_strategy == "drop_all":
+                    # Keep only records that appear exactly once
+                    df = df.drop_duplicates(subset=safe_duplicate_columns, keep=False)
+                else:
+                    raise ValueError(
+                        f"Invalid duplicate_strategy: {duplicate_strategy}"
+                    )
+
+                final_count = len(df)
+                removed_count = initial_count - final_count
+                print(f"Removed {removed_count} duplicate records")
+                print(f"Final data shape: {df.shape}")
+            else:
+                print("No duplicates found")
+    else:
+        print("Duplicate removal skipped")
+
+    print(f"Companies in data: {df['company'].unique()}")
+    print(f"Date stamps in data: {df['date_stamp'].unique()}")
+
+    return df
+
+
+def save_merged_data(df: pd.DataFrame, output_path: str):
+    """
+    Save merged DataFrame to JSON format.
+
+    Args:
+        df: DataFrame with merged data (without embeddings)
+        output_path: Path to save the JSON file
+    """
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+
+    # Convert DataFrame to list of dicts for JSON serialization
+    data_to_save = df.to_dict(orient="records")
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(data_to_save, f, ensure_ascii=False, indent=2)
+    print(f"Merged data saved to: {output_path}")
+
+
+def process_merged_data(
+    standardized_data_dir: str,
+    processed_output_path: str,
+    remove_duplicates: bool = True,
+    duplicate_strategy: str = "keep_first",
+) -> pd.DataFrame:
+    """
+    Process and merge all standardized data, saving to processed folder.
+
+    Args:
+        standardized_data_dir: Directory containing standardized JSON files
+        processed_output_path: Path to save the merged data JSON file
+        remove_duplicates: Whether to remove duplicate records
+        duplicate_strategy: Strategy for handling duplicates ("keep_first", "keep_last", "drop_all")
+
+    Returns:
+        DataFrame with merged data (without embeddings)
+    """
+    print("Starting data merging process...")
+
+    # Load all standardized data
+    print("Loading standardized data...")
+    standardized_data = load_standardized_data(standardized_data_dir)
+
+    # Merge all data with duplicate removal
+    print("Merging data...")
+    merged_df = merge_all_data(
+        standardized_data,
+        remove_duplicates=remove_duplicates,
+        duplicate_strategy=duplicate_strategy,
+    )
+
+    # Save merged data to processed folder
+    print("Saving merged data...")
+    save_merged_data(merged_df, processed_output_path)
+
+    print("Data merging process completed!")
+    return merged_df
+
+
+# Flag to control sample run
+IS_SAMPLE_RUN = True
 
 
 def main():
     """
-    Example usage of the risk data processor.
+    Example usage of the data standardizer and merger.
     """
-    # Process multiple datasets
-    process_multiple_datasets()
+    # Get the directory of this file
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+
+    # Define paths
+    standardized_data_dir = os.path.join(dir_path, "../data/standardized/")
+    processed_output_path = os.path.join(
+        dir_path, "../data/processed/", "merged_risk_data.json"
+    )
+
+    try:
+        # Process and merge all standardized data
+        print("Starting data standardization and merging...")
+        merged_df = process_merged_data(
+            standardized_data_dir,
+            processed_output_path,
+            remove_duplicates=True,  # Enable duplicate removal
+            duplicate_strategy="keep_first",  # Keep the first occurrence of duplicates
+        )
+
+        print(f"Processing completed! Processed {len(merged_df)} records")
+        print(f"Merged data saved to: {processed_output_path}")
+        print(f"Duplicate removal: Enabled (strategy: keep_first)")
+
+    except FileNotFoundError as e:
+        print(f"Error: {e}")
+        print("Please ensure standardized data exists in ../data/standardized/")
+    except Exception as e:
+        print(f"Error: {e}")
 
 
 if __name__ == "__main__":
