@@ -159,6 +159,7 @@ def create_nodes_and_edges(
     # create fully connected edges for each node
     # I want distance to be  1-distance so that smaller distance means more similar
     edges = []
+    distance_list = []
     for i in range(len(nodes)):
         for j in range(i + 1, len(nodes)):
 
@@ -170,6 +171,7 @@ def create_nodes_and_edges(
             distance = distance / (
                 np.linalg.norm(nodes[i].embedding) * np.linalg.norm(nodes[j].embedding)
             )
+            distance_list.append(distance)
             edges.append(
                 {
                     "data": {
@@ -181,6 +183,10 @@ def create_nodes_and_edges(
                     }
                 }
             )
+    # create a soreted index of distance_list and update the edges with the sorted index
+    sorted_distance_index = np.argsort(distance_list)
+    for i in range(len(edges)):
+        edges[i]["data"]["similarity_rank"] = sorted_distance_index[i]
 
     return nodes, edges
 
