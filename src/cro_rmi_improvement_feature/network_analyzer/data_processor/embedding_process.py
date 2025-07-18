@@ -73,7 +73,7 @@ def load_merged_data(input_path: str) -> pd.DataFrame:
 def add_embeddings_to_data(
     df: pd.DataFrame,
     embedding_provider: str = "openai_large",
-    max_embeddings: Optional[int] = None,
+    sample_rows_per_company: Optional[int] = None,  # New parameter
 ) -> pd.DataFrame:
     """
     Add both embedding versions to each record in the DataFrame.
@@ -81,14 +81,25 @@ def add_embeddings_to_data(
     Args:
         df: DataFrame containing risk data
         embedding_provider: Provider for embeddings ("openai_large", "openai_small", "sentence_transformers", etc.)
-        max_embeddings: Maximum number of embeddings to generate (None for all)
+        sample_rows_per_company: Maximum number of embeddings to generate per company (None for all)
 
     Returns:
         DataFrame with both embedding versions added
     """
     print(f"Adding embeddings using provider: {embedding_provider}")
-    if max_embeddings:
-        print(f"Limiting to {max_embeddings} embeddings")
+    if sample_rows_per_company:
+        print(f"Limiting to {sample_rows_per_company} embeddings per company")
+
+    # If sample_rows_per_company is set, sample the DataFrame
+    if sample_rows_per_company and "company" in df.columns:
+        print(f"Sampling data to {sample_rows_per_company} rows per company...")
+        df = df.groupby("company").head(sample_rows_per_company).reset_index(drop=True)
+        print(f"Sampled DataFrame shape: {df.shape}")
+    elif sample_rows_per_company and "company" not in df.columns:
+        print(
+            "Warning: 'company' column not found for per-company sampling. Limiting globally."
+        )
+        df = df.head(sample_rows_per_company).reset_index(drop=True)
 
     # Create text for embedding (combine relevant fields)
     def create_embedding_text_raw_user_data(row: pd.Series) -> str:
@@ -208,8 +219,6 @@ def add_embeddings_to_data(
 
         def get_openai_large_embedding(text: str, index: int) -> List[float]:
             """Get embedding from OpenAI large model."""
-            if max_embeddings and index >= max_embeddings:
-                return None
             if not text or text.strip() == "":
                 return None
             try:
@@ -256,9 +265,6 @@ def add_embeddings_to_data(
 
         def get_openai_small_embedding(text: str, index: int) -> List[float]:
             """Get embedding from OpenAI small model."""
-            if max_embeddings and index >= max_embeddings:
-                return None
-
             if not text or text.strip() == "":
                 return None
             try:
@@ -305,8 +311,6 @@ def add_embeddings_to_data(
 
         def get_sentence_transformer_embedding(text: str, index: int) -> List[float]:
             """Get embedding using sentence transformers."""
-            if max_embeddings and index >= max_embeddings:
-                return None
             if not text or text.strip() == "":
                 return None
             try:
@@ -414,7 +418,7 @@ def process_embeddings(
     merged_data_path: str,
     embeddings_output_path: str,
     embedding_provider: str = "openai_large",
-    max_embeddings: Optional[int] = None,
+    sample_rows_per_company: Optional[int] = None,  # New parameter
     is_sample_run: bool = False,
 ) -> pd.DataFrame:
     """
@@ -424,7 +428,7 @@ def process_embeddings(
         merged_data_path: Path to the merged data JSON file
         embeddings_output_path: Path to save the embeddings data file
         embedding_provider: Provider for embeddings
-        max_embeddings: Maximum number of embeddings to generate (None for all)
+        sample_rows_per_company: Maximum number of rows to process per company (None for all)
         is_sample_run: If True, save embeddings as JSON for easier debugging
 
     Returns:
@@ -439,7 +443,7 @@ def process_embeddings(
     # Add embeddings for both versions
     print("Adding embeddings for both versions...")
     df_with_embeddings = add_embeddings_to_data(
-        merged_df, embedding_provider, max_embeddings
+        merged_df, embedding_provider, sample_rows_per_company  # Pass new parameter
     )
 
     # Save embeddings data
@@ -453,7 +457,8 @@ def process_embeddings(
 
 
 # Flag to control sample run
-IS_SAMPLE_RUN = False
+IS_SAMPLE_RUN = True
+SAMPLE_ROWS_PER_COMPANY = 10  # Default to 10 rows per company
 
 
 def main():
@@ -487,9 +492,11 @@ def main():
         print("Running in FULL MODE - processing all data")
 
     # Set max_embeddings for sample run
-    max_embeddings = 10 if IS_SAMPLE_RUN else None
+    # max_embeddings = 10 if IS_SAMPLE_RUN else None # This line will be removed
     if IS_SAMPLE_RUN:
-        print("Running in SAMPLE MODE - limiting to 10 embeddings")
+        print(
+            f"Running in SAMPLE MODE - limiting to {SAMPLE_ROWS_PER_COMPANY} rows per company"
+        )
 
     try:
         # Process embeddings
@@ -497,7 +504,7 @@ def main():
             merged_data_path,
             embeddings_output_path,
             "openai_large",
-            max_embeddings,
+            sample_rows_per_company=SAMPLE_ROWS_PER_COMPANY,  # Pass new parameter
             is_sample_run=IS_SAMPLE_RUN,
         )
 
