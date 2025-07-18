@@ -881,6 +881,9 @@ def main():
     )
 
     try:
+        # Standardize multiple datasets
+        standardize_multiple_datasets()
+
         # Process and merge all standardized data
         print("Starting data standardization and merging...")
         merged_df = process_merged_data(
@@ -899,6 +902,64 @@ def main():
         print("Please ensure standardized data exists in ../data/standardized/")
     except Exception as e:
         print(f"Error: {e}")
+
+
+def standardize_multiple_datasets():
+    """
+    Process multiple datasets for different companies and dates.
+    """
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+
+    # Define datasets to process
+    datasets = [
+        {
+            "risk_data_path": os.path.join(
+                dir_path,
+                "../data/raw/",
+                "250528_PCG_assessment_report_Q1-2025_controlperrow.xlsx",
+            ),
+            "catalog_data_path": os.path.join(
+                dir_path, "../data/raw/", "seed_excel_13May2025 1.xlsx"
+            ),
+            "company_name": "PCG",
+            "date_stamp": "20250513",
+            "output_path": os.path.join(
+                dir_path, "../data/standardized/", "20250513-PCG_risk_data.json"
+            ),
+        },
+        {
+            "risk_data_path": os.path.join(
+                dir_path,
+                "../data/raw/",
+                "250520_Retail (Guangdong-Guangxi)_assessment_report_Q1-2025_controlperrow_original.xlsx",
+            ),
+            "catalog_data_path": os.path.join(
+                dir_path, "../data/raw/", "seed_excel_13May2025 1.xlsx"
+            ),
+            "company_name": "lotus_south",
+            "date_stamp": "20250513",
+            "output_path": os.path.join(
+                dir_path, "../data/standardized/", "20250513-lotus_south_risk_data.json"
+            ),
+        },
+    ]
+
+    for dataset in datasets:
+        print(f"\nProcessing {dataset['company_name']} dataset...")
+        try:
+            result = process_risk_data(
+                risk_data_path=dataset["risk_data_path"],
+                catalog_data_path=dataset["catalog_data_path"],
+                company_name=dataset["company_name"],
+                output_path=dataset["output_path"],
+                date_stamp=dataset["date_stamp"],
+            )
+            print(
+                f"Successfully processed {len(result)} risk records for {dataset['company_name']}"
+            )
+            print(f"Output saved to: {dataset['output_path']}")
+        except Exception as e:
+            print(f"Error processing {dataset['company_name']} data: {e}")
 
 
 if __name__ == "__main__":
