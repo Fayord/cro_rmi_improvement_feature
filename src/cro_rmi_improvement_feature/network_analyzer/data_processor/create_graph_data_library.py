@@ -6,7 +6,6 @@ import itertools
 import os
 import pickle
 from pathlib import Path
-from turtle import position
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
@@ -16,6 +15,8 @@ from pydantic import BaseModel, Field
 
 
 class RiskData(BaseModel):
+    id: str = Field(..., description="The id of the risk node.")
+    label: str = Field(..., description="Text to display for the risk node.")
     risk: str = Field(..., description="The name of the risk.")
     risk_cat: str = Field(..., description="The category of the risk.")
     risk_desc: str = Field(..., description="The description of the risk.")
@@ -37,19 +38,13 @@ class RiskData(BaseModel):
     )
 
 
-class RiskNodeData(RiskData):
-    id: str = Field(..., description="The id of the risk node.")
-    label: str = Field(..., description="The label of the risk node.")
-
-
-class RiskNodeDataWithPositionAndEmbedding(BaseModel):
-    data: RiskNodeData = Field(..., description="The risk node data.")
-    position: Dict[str, Any] = Field(..., description="The position of the risk node.")
+class RiskDataWithEmbedding(BaseModel):
+    data: RiskData = Field(..., description="The risk node data.")
     embedding: List[float] = Field(..., description="The embedding of the risk node.")
 
 
 class RiskOverlayData(BaseModel):
-    overlay_data: Dict[str, List[RiskNodeDataWithPositionAndEmbedding]] = Field(
+    overlay_data: Dict[str, List[RiskDataWithEmbedding]] = Field(
         ..., description="A dictionary mapping risk name to list of risk data"
     )
 
@@ -61,7 +56,7 @@ class CompanyGraphData(BaseModel):
     (e.g., nodes: List[Node], edges: List[Edge]) if needed.
     """
 
-    nodes: List[RiskNodeDataWithPositionAndEmbedding] = Field(
+    nodes: List[RiskDataWithEmbedding] = Field(
         ..., description="List of node objects, each with properties."
     )
     edges: List[Dict[str, Any]] = Field(
@@ -96,7 +91,7 @@ class GraphDataLibrary(BaseModel):
         ...,
         description="A dictionary mapping risk_overlay_id str join by '|' (overlay_type|timestamp|embedding_source_type or overlay_name) to its RiskOverlayData.",
     )
-    risk_catalog_reference_datas: Dict[str, List[RiskData]] = Field(
+    risk_catalog_reference_datas: Dict[str, List[RiskDataWithEmbedding]] = Field(
         ...,
         description="A dictionary mapping timestamp to the risk data.",
     )
@@ -113,21 +108,22 @@ def load_embedded_data(file_path: Path) -> pd.DataFrame:
         return pickle.load(f)
 
 
-def generate_node_id(company: str, idx: int) -> str:
+def generate_risk_id(company: str, idx: int, date_stamp: str) -> str:
     """Generates a unique node id for a risk data."""
-    return f"risk_{company.replace(' ', '_')}_{idx}"
+    return f"risk_{company.replace(' ', '_')}_{date_stamp}_{idx}"
 
 
 def create_nodes_with_embedding(
     data_list: List[Dict[str, Any]], company: str, embedding_key: str
-) -> List[RiskNodeDataWithPositionAndEmbedding]:
+) -> List[RiskDataWithEmbedding]:
     """Creates a list of node dictionaries for Cytoscape."""
     nodes = []
     for idx, data in enumerate(data_list):
-        node_id = generate_node_id(company, idx)
+        date_stamp = data["date_stamp"]
+        node_id = generate_risk_id(company, idx, date_stamp)
         nodes.append(
-            RiskNodeDataWithPositionAndEmbedding(
-                data=RiskNodeData(
+            RiskDataWithEmbedding(
+                data=RiskData(
                     id=node_id,
                     label=data["risk"],
                     risk=data["risk"],
@@ -140,10 +136,6 @@ def create_nodes_with_embedding(
                     process_summary=data["process_summary"],
                     rootcause_summary=data["rootcause_summary"],
                 ),
-                position={
-                    "x": 0,
-                    "y": 0,
-                },
                 embedding=data[embedding_key],
             ),
         )
@@ -156,10 +148,11 @@ def create_nodes_and_edges(
     company: str,
 ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     """Creates nodes and edges for a company."""
-    # create fully connected edges for each node
-    # I want distance to be  1-distance so that smaller distance means more similar
     edges = []
-    distance_list = []
+    # Store (distance, original_index) to sort distances and then map back to edges
+    distance_with_indices = []
+
+    edge_counter = 0
     for i in range(len(nodes)):
         for j in range(i + 1, len(nodes)):
 
@@ -171,7 +164,7 @@ def create_nodes_and_edges(
             distance = distance / (
                 np.linalg.norm(nodes[i].embedding) * np.linalg.norm(nodes[j].embedding)
             )
-            distance_list.append(distance)
+
             edges.append(
                 {
                     "data": {
@@ -183,10 +176,18 @@ def create_nodes_and_edges(
                     }
                 }
             )
-    # create a soreted index of distance_list and update the edges with the sorted index
-    sorted_distance_index = np.argsort(distance_list)
-    for i in range(len(edges)):
-        edges[i]["data"]["similarity_rank"] = sorted_distance_index[i]
+            distance_with_indices.append((distance, edge_counter))
+            edge_counter += 1
+
+    # Sort distances in descending order (higher similarity = higher cosine score)
+    # The rank should be assigned such that the most similar (highest cosine score) has the lowest rank (0)
+    sorted_distance_with_indices = sorted(
+        distance_with_indices, key=lambda x: x[0], reverse=True
+    )
+
+    # Assign similarity rank based on the sorted order
+    for rank, (distance, original_index) in enumerate(sorted_distance_with_indices):
+        edges[original_index]["data"]["similarity_rank"] = rank
 
     return nodes, edges
 
@@ -226,9 +227,9 @@ def generate_graph_elements_for_company(
 def generate_risk_catalog_top_n_overlay_data(
     risk_catalog_list: List[Dict[str, Any]],
     top_n: int = 10,
-) -> Dict[str, List[RiskNodeData]]:
+) -> Dict[str, List[RiskDataWithEmbedding]]:
     """Generates overlay data for the risk catalog.
-    Dict[str, List[RiskNodeData]] where str is the risk name and List[RiskNodeData] is the top n relatedrisk data
+    Dict[str, List[RiskDataWithEmbedding]] where str is the risk name and List[RiskDataWithEmbedding] is the top n relatedrisk data
     """
     risk_catalog_top_n_overlay_data = {}
     # Ensure all embeddings are numerical lists/arrays
@@ -250,19 +251,31 @@ def generate_risk_catalog_top_n_overlay_data(
         top_n_related_risk_data = np.argsort(cosine_similarities)[-top_n:]
         risk_catalog_top_n_overlay_data[risk_data["risk"]] = []
         for related_risk_data_index in top_n_related_risk_data:
-            id = f"risk_{risk_data['company']}_{related_risk_data_index}"
+            id = generate_risk_id(
+                risk_data["company"], related_risk_data_index, risk_data["date_stamp"]
+            )
             label = risk_catalog_list[related_risk_data_index]["risk"]
             risk_catalog_top_n_overlay_data[risk_data["risk"]].append(
-                RiskNodeDataWithPositionAndEmbedding(
-                    data=RiskNodeData(
+                RiskDataWithEmbedding(
+                    data=RiskData(
                         id=id,
                         label=label,
-                        **risk_catalog_list[related_risk_data_index],
+                        risk=risk_catalog_list[related_risk_data_index]["risk"],
+                        risk_cat=risk_catalog_list[related_risk_data_index]["risk_cat"],
+                        risk_level=risk_catalog_list[related_risk_data_index][
+                            "risk_level"
+                        ],
+                        risk_desc=risk_catalog_list[related_risk_data_index][
+                            "risk_desc"
+                        ],
+                        process=risk_catalog_list[related_risk_data_index]["process"],
+                        rootcause=risk_catalog_list[related_risk_data_index][
+                            "rootcause"
+                        ],
+                        risk_desc_summary=risk_catalog_list[related_risk_data_index][
+                            "risk_desc_summary"
+                        ],
                     ),
-                    position={
-                        "x": 0,
-                        "y": 0,
-                    },
                     embedding=risk_catalog_list[related_risk_data_index][
                         "embedding_raw_user_data"
                     ],
@@ -281,7 +294,7 @@ def create_and_save_graphs(data_path: Path, output_dir: Path) -> GraphDataLibrar
     print(df.info())
     company_graph_datas: Dict[str, CompanyGraphData] = {}
     risk_overlay_datas: Dict[str, RiskOverlayData] = {}
-    risk_catalog_reference_datas: Dict[str, List[RiskData]] = {}
+    risk_catalog_reference_datas: Dict[str, List[RiskDataWithEmbedding]] = {}
     company_name_list = df["company"].unique()
     for company_name in company_name_list:
         company_data = df[df["company"] == company_name]
@@ -294,8 +307,19 @@ def create_and_save_graphs(data_path: Path, output_dir: Path) -> GraphDataLibrar
                 risk_catalog_reference_datas[timestamp] = []
                 risk_catalog_list = company_data.to_dict(orient="records")
                 for risk_data in risk_catalog_list:
+                    id = generate_risk_id(
+                        risk_data["company"], risk_data["date_stamp"], risk_data["risk"]
+                    )
+                    label = risk_data["risk"]
                     risk_catalog_reference_datas[timestamp].append(
-                        RiskData(**risk_data)
+                        RiskDataWithEmbedding(
+                            data=RiskData(
+                                id=id,
+                                label=label,
+                                **risk_data,
+                            ),
+                            embedding=risk_data["embedding_raw_user_data"],
+                        )
                     )
                 embedding_key = "embedding_all_risk_catalog_data"
                 risk_overlay_keys = (
