@@ -29,6 +29,7 @@ dependencies = [
     "langchain-google-genai>=2.1.7",
     "pyarrow>=20.0.0",
     "fastparquet>=2024.11.0",
+    "pytest>=8.4.1",
 ]
 requires-python = "==3.12.*"
 readme = "README.md"
