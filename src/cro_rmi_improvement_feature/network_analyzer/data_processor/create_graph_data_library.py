@@ -10,9 +10,13 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
+import sys
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append("../")
 from scipy.spatial.distance import pdist, squareform
 from pydantic import BaseModel, Field
-from relation_classifier import classify_relationship
+from data_processor.relation_classifier import classify_relationship
 
 
 class RiskData(BaseModel):
