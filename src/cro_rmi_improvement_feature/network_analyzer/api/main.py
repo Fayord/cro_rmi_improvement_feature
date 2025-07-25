@@ -97,15 +97,17 @@ async def recommend_risks_to_assess_api(request: RiskRecommendationRequest):
     """
     try:
         # Validate input
-        if not request.existing_risks:
+        if not request.assessment_risks:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="At least one existing risk must be provided",
+                detail="At least one assessment risk must be provided",
             )
 
         # TODO: Integrate with your existing risk assessment logic
         # For now, returning mock data
-        all_recommended_risks = recommend_risk_to_assesses(request.company_id, request)
+        all_recommended_risks = recommend_risk_to_assesses(
+            request.company_id, request.assessment_risks, request.assessment_version
+        )
         return RiskRecommendationResponse(
             company_id=request.company_id, recommendations=all_recommended_risks
         )

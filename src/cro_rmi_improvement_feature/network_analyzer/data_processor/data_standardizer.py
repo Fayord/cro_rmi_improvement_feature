@@ -863,47 +863,6 @@ def process_merged_data(
     return merged_df
 
 
-# Flag to control sample run
-IS_SAMPLE_RUN = True
-
-
-def main():
-    """
-    Example usage of the data standardizer and merger.
-    """
-    # Get the directory of this file
-    dir_path = os.path.dirname(os.path.realpath(__file__))
-
-    # Define paths
-    standardized_data_dir = os.path.join(dir_path, "../data/standardized/")
-    processed_output_path = os.path.join(
-        dir_path, "../data/processed/", "riskview_merged_data.json"
-    )
-
-    try:
-        # Standardize multiple datasets
-        standardize_multiple_datasets()
-
-        # Process and merge all standardized data
-        print("Starting data standardization and merging...")
-        merged_df = process_merged_data(
-            standardized_data_dir,
-            processed_output_path,
-            remove_duplicates=True,  # Enable duplicate removal
-            duplicate_strategy="keep_first",  # Keep the first occurrence of duplicates
-        )
-
-        print(f"Processing completed! Processed {len(merged_df)} records")
-        print(f"Merged data saved to: {processed_output_path}")
-        print(f"Duplicate removal: Enabled (strategy: keep_first)")
-
-    except FileNotFoundError as e:
-        print(f"Error: {e}")
-        print("Please ensure standardized data exists in ../data/standardized/")
-    except Exception as e:
-        print(f"Error: {e}")
-
-
 def standardize_multiple_datasets():
     """
     Process multiple datasets for different companies and dates.
@@ -955,11 +914,60 @@ def standardize_multiple_datasets():
                 date_stamp=dataset["date_stamp"],
             )
             print(
-                f"Successfully processed {len(result)} risk records for {dataset['company_name']}"
+                f"\tSuccessfully processed {len(result)} risk records for {dataset['company_name']}"
             )
             print(f"Output saved to: {dataset['output_path']}")
         except Exception as e:
             print(f"Error processing {dataset['company_name']} data: {e}")
+
+
+# Flag to control sample run
+IS_SAMPLE_RUN = True
+
+
+def main():
+    """
+    Example usage of the data standardizer and merger.
+    """
+    # Get the directory of this file
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+
+    # Define paths
+    standardized_data_dir = os.path.join(dir_path, "../data/standardized/")
+    processed_output_path = os.path.join(
+        dir_path, "../data/processed/", "riskview_merged_data.json"
+    )
+
+    try:
+        # Standardize multiple datasets
+        standardize_multiple_datasets()
+
+        # Process and merge all standardized data
+        print("Starting data standardization and merging...")
+        merged_df = process_merged_data(
+            standardized_data_dir,
+            processed_output_path,
+            remove_duplicates=True,  # Enable duplicate removal
+            duplicate_strategy="keep_first",  # Keep the first occurrence of duplicates
+        )
+
+        print(f"Processing completed! Processed {len(merged_df)} records")
+        company_list = merged_df["company"].unique()
+        print("\n")
+
+        for company in company_list:
+            print(
+                f"\tCompany: {company} number of records: {len(merged_df[merged_df['company'] == company])}"
+            )
+            print("\n")
+        print(f"Merged data saved to: {processed_output_path}")
+        print(f"Duplicate removal: Enabled (strategy: keep_first)")
+
+    except FileNotFoundError as e:
+        print(f"Error: {e}")
+        print("Please ensure standardized data exists in ../data/standardized/")
+    except Exception as e:
+        print(f"Error: {e}")
 
 
 if __name__ == "__main__":

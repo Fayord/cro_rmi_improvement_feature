@@ -299,10 +299,10 @@ class ExistingRisk(BaseModel):
         }
 
 
-class RiskRecommendationRequest(BaseModel):
-    """Request schema for risk recommendations."""
+class AssessmentRisk(BaseModel):
+    """Schema for assessment risk data."""
 
-    company_id: str = Field(..., description="Unique identifier for the user")
+    user_id: str = Field(..., description="Unique identifier for the user")
     existing_risks: List[ExistingRisk] = Field(
         ..., description="List of existing risks to consider"
     )
@@ -341,6 +341,14 @@ class RiskRecommendationRequest(BaseModel):
                 ],
             }
         }
+
+
+class RiskRecommendationRequest(BaseModel):
+    """Request schema for risk recommendations."""
+
+    company_id: str = Field(..., description="Unique identifier for the user")
+    assessment_version: str = Field(..., description="YYYYQ1, YYYYQ2, YYYYQ3, YYYYQ4")
+    assessment_risks: List[AssessmentRisk]
 
 
 class MitigationPlanRequest(RiskRecommendationRequest):
