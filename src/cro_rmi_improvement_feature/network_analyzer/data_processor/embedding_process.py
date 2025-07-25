@@ -457,7 +457,7 @@ def process_embeddings(
 
 
 # Flag to control sample run
-IS_SAMPLE_RUN = True
+IS_SAMPLE_RUN = False
 SAMPLE_ROWS_PER_COMPANY = 10  # Default to 10 rows per company
 
 
@@ -484,19 +484,16 @@ def main():
             "../data/embeddings/",
             f"{data_type}_sample_data_with_embeddings.json",
         )
-        print("Running in SAMPLE MODE - processing first 10 rows only")
+        print(
+            f"Running in SAMPLE MODE - limiting to {SAMPLE_ROWS_PER_COMPANY} rows per company"
+        )
+        current_sample_rows_per_company = SAMPLE_ROWS_PER_COMPANY
     else:
         embeddings_output_path = os.path.join(
             dir_path, "../data/embeddings/", f"{data_type}_data_with_embeddings.pkl"
         )
         print("Running in FULL MODE - processing all data")
-
-    # Set max_embeddings for sample run
-    # max_embeddings = 10 if IS_SAMPLE_RUN else None # This line will be removed
-    if IS_SAMPLE_RUN:
-        print(
-            f"Running in SAMPLE MODE - limiting to {SAMPLE_ROWS_PER_COMPANY} rows per company"
-        )
+        current_sample_rows_per_company = None
 
     try:
         # Process embeddings
@@ -504,11 +501,15 @@ def main():
             merged_data_path,
             embeddings_output_path,
             "openai_large",
-            sample_rows_per_company=SAMPLE_ROWS_PER_COMPANY,  # Pass new parameter
+            sample_rows_per_company=current_sample_rows_per_company,
             is_sample_run=IS_SAMPLE_RUN,
         )
 
         print(f"Processing completed! Processed {len(df_with_embeddings)} records")
+        # show number of records per company
+        print(
+            f"Number of records per company: {df_with_embeddings['company'].value_counts()}"
+        )
         print(f"Embeddings data saved to: {embeddings_output_path}")
         print(
             f"Each record contains embeddings for: raw_user_data, risk_desc_catalog, summary_user_data"

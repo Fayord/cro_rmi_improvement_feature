@@ -13,10 +13,10 @@ Intended for import and use in main.py to power the /recommend_risk_to_assess en
 """
 
 from schemas import (
-    RiskRecommendationRequest,
     RiskRecommendationAssessmentResponse,
     RecommendedRisk,
     ExistingRisk,
+    AssessmentRisk,
 )
 from typing import List, Set
 import pickle
@@ -36,7 +36,7 @@ from data_processor.create_graph_data_library import (
 
 
 def _save_or_update_risk_data(
-    company_id: str, risk_data: List[RiskRecommendationRequest]
+    company_id: str, risk_data: List[AssessmentRisk]
 ) -> None: ...
 
 
@@ -59,13 +59,14 @@ def filter_interested_risk(
 
 def recommend_risk_to_assesses(
     company_id: str,
-    risk_data: RiskRecommendationRequest,
+    assessment_risks: List[AssessmentRisk],
+    assessment_version: str,
     timestamp: str = "20250513",
 ) -> List[RecommendedRisk]:
     # 1. Receiving all risk data for a given company. (Handled by input `risk_data`)
 
     # 2. Save and update risk data
-    _save_or_update_risk_data(company_id, risk_data.existing_risks)
+    _save_or_update_risk_data(company_id, assessment_risks)
 
     all_recommended_risks: List[RecommendedRisk] = []
     # load it from graph data library

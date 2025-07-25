@@ -4,7 +4,7 @@ FastAPI application for risk recommendation service.
 
 from datetime import datetime
 
-from typing import List
+from typing import List, Optional
 import uuid
 
 from fastapi import FastAPI, HTTPException, status
@@ -12,7 +12,6 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
 from schemas import (
-    RiskRecommendationRequest,
     RecommendedRisk,
     ErrorResponse,
     MitigationPlanResponse,
@@ -27,6 +26,7 @@ from schemas import (
     GraphDataRetrievalRequest,
     GraphDataRetrievalResponse,
     ClusterMitigationPlanRequest,
+    AssessmentRisk,  # Added new import
 )
 import os
 import sys
@@ -113,7 +113,9 @@ async def retrieve_graph_data_api(request: GraphDataRetrievalRequest):
         500: {"model": ErrorResponse, "description": "Internal Server Error"},
     },
 )
-async def recommend_risks_to_assess_api(request: RiskRecommendationRequest):
+async def recommend_risks_to_assess_api(
+    request: AssessmentRisk,
+):  # Changed request type
     """
     Expected to use all data in the same year and quarter
     Generate risk recommendations for assessment based on existing risks and user context.
@@ -123,17 +125,21 @@ async def recommend_risks_to_assess_api(request: RiskRecommendationRequest):
     """
     try:
         # Validate input
-        if not request.existing_risks:
+        if not request.existing_risks:  # Changed attribute name
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="At least one existing risk must be provided",
+                detail="At least one assessment risk must be provided",
             )
 
         # TODO: Integrate with your existing risk assessment logic
         # For now, returning mock data
-        all_recommended_risks = recommend_risk_to_assesses(request.company_id, request)
-        return RiskRecommendationAssessmentResponse(
-            company_id=request.company_id, recommendations=all_recommended_risks
+        all_recommended_risks = recommend_risk_to_assesses(
+            request.id,
+            request.existing_risks,
+            request.year_quarter,  # Modified arguments
+        )
+        return RiskRecommendationAssessmentResponse(  # Changed return model
+            id=request.id, recommendations=all_recommended_risks
         )
 
     except HTTPException:
@@ -156,7 +162,9 @@ async def recommend_risks_to_assess_api(request: RiskRecommendationRequest):
         500: {"model": ErrorResponse, "description": "Internal Server Error"},
     },
 )
-async def recommend_risks_to_mitigate(request: List[RiskRecommendationRequest]):
+async def recommend_risks_to_mitigate(
+    request: MitigationPlanRequest,
+):  # Changed request type
     """
     Generate risk recommendations for mitigation based on existing risks and user context.
 
@@ -165,7 +173,7 @@ async def recommend_risks_to_mitigate(request: List[RiskRecommendationRequest]):
     """
     try:
         # Validate input
-        if not request.existing_risks:
+        if not request.risks:  # Changed attribute name
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="At least one existing risk must be provided",
@@ -176,7 +184,7 @@ async def recommend_risks_to_mitigate(request: List[RiskRecommendationRequest]):
         recommendations = _generate_mock_mitigation_recommendations(request)
 
         response = RiskRecommendationMitigationPlanResponse(
-            user_id=request.user_id,
+            id=request.id,  # Changed attribute name
             recommendations=recommendations,
             graph_id=uuid.uuid4().hex[:8],
         )
@@ -219,23 +227,29 @@ async def generate_mitigation_plan(request: MitigationPlanRequest):
         500: {"model": ErrorResponse, "description": "Internal Server Error"},
     },
 )
-async def generate_cluster_mitigation_plan(request: List[ClusterMitigationPlanRequest]):
+async def generate_cluster_mitigation_plan(
+    requests: List[ClusterMitigationPlanRequest],
+):  # Changed parameter name
     """
     Generate a mitigation plan for a given risk. anything with a dropdown/Literal type eg. priority_level, status, etc. Need to review the schema later
     """
     try:
-        # Validate input
-        if not request.risk_id:
+        if not requests:  # Changed validation logic
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Risk ID must be provided",
+                detail="At least one cluster mitigation plan request must be provided",
             )
 
-        # TODO: Integrate with your existing risk mitigation logic
-        # For now, returning mock data
-        mitigation_plan = _generate_mock_mitigation_plan(request)
+        mitigation_plans = []
+        for request in requests:  # Iterating through the list
+            # TODO: Integrate with your existing risk mitigation logic
+            # For now, returning mock data
+            mitigation_plan = _generate_mock_mitigation_plan(
+                request
+            )  # Modified argument
+            mitigation_plans.append(mitigation_plan)
 
-        return mitigation_plan
+        return mitigation_plans  # Returning a list
 
     except HTTPException:
         raise
@@ -247,20 +261,24 @@ async def generate_cluster_mitigation_plan(request: List[ClusterMitigationPlanRe
 
 
 def _generate_mock_mitigation_plan(
-    request: ClusterMitigationPlanRequest,
+    request: ClusterMitigationPlanRequest,  # Changed type hint
 ) -> MitigationPlanResponse:
     """
     Generate mock mitigation plan for a given risk.
     """
     # Extract risk information from request
-    risk_name = (
-        request.existing_risks[0].risk_name
-        if request.existing_risks
-        else "Supply Chain Disruption"
-    )
-    risk_id = (
-        request.existing_risks[0].risk_id if request.existing_risks else "risk_001"
-    )
+    # NOTE: This mock assumes a single risk in the cluster for simplicity.
+    # Adjust as per actual cluster structure and requirements.
+    risk_name = "N/A"
+    risk_id = "N/A"
+    if (
+        request.cluster_of_risk
+        and "risks" in request.cluster_of_risk
+        and request.cluster_of_risk["risks"]
+    ):
+        first_risk = request.cluster_of_risk["risks"][0]
+        risk_name = first_risk.get("risk_name", "N/A")
+        risk_id = first_risk.get("risk_id", "N/A")
 
     # Create Plan Detail
     plan_detail = PlanDetailSchema(
@@ -388,7 +406,7 @@ def _generate_mock_mitigation_plan(
 
 
 def _generate_mock_assessment_recommendations(
-    request: RiskRecommendationRequest,
+    request: MitigationPlanRequest,  # Changed type hint
 ) -> List[RecommendedRisk]:
     """
     Generate mock risk recommendations for assessment based on existing risks.
@@ -397,8 +415,12 @@ def _generate_mock_assessment_recommendations(
     risk assessment logic from the network_analyzer or other modules.
     """
     # Analyze existing risks to generate relevant recommendations
-    existing_categories = set(risk.risk_category for risk in request.existing_risks)
-    existing_risk_names = set(risk.risk_name for risk in request.existing_risks)
+    existing_categories = set(
+        risk.risk_category for risk in request.risks
+    )  # Changed attribute
+    existing_risk_names = set(
+        risk.risk_name for risk in request.risks
+    )  # Changed attribute
 
     # Mock risk data for assessment - replace with actual risk assessment logic
     mock_risks = [
@@ -434,7 +456,7 @@ def _generate_mock_assessment_recommendations(
 
 
 def _generate_mock_mitigation_recommendations(
-    request: RiskRecommendationRequest,
+    request: MitigationPlanRequest,  # Changed type hint
 ) -> List[RecommendedRisk]:
     """
     Generate mock risk recommendations for mitigation based on existing risks.
@@ -443,8 +465,12 @@ def _generate_mock_mitigation_recommendations(
     risk mitigation logic from the network_analyzer or other modules.
     """
     # Analyze existing risks to generate relevant recommendations
-    existing_categories = set(risk.risk_category for risk in request.existing_risks)
-    existing_risk_names = set(risk.risk_name for risk in request.existing_risks)
+    existing_categories = set(
+        risk.risk_category for risk in request.risks
+    )  # Changed attribute
+    existing_risk_names = set(
+        risk.risk_name for risk in request.risks
+    )  # Changed attribute
 
     # Mock risk data for mitigation - replace with actual risk mitigation logic
     mock_risks = [

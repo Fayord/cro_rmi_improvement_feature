@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
 import pandas as pd
 import sys
+from tqdm import tqdm
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append("../")
@@ -66,6 +67,13 @@ class EdgeData(BaseModel):
     risk_a_data: RiskData = Field(..., description="The risk node data of risk a.")
     risk_b_data: RiskData = Field(..., description="The risk node data of risk b.")
     distance: float = Field(..., description="The distance between the two risks.")
+    cosine_similarity: float = Field(
+        ..., description="The cosine similarity of the edge."
+    )
+    high_priority: bool = Field(
+        False,
+        description="it is a primary connected edge to high risk",
+    )
     similarity_rank: int = Field(..., description="The similarity rank of the edge.")
 
 
@@ -176,29 +184,38 @@ def create_nodes_and_edges(
     for i in range(len(nodes)):
         for j in range(i + 1, len(nodes)):
 
-            # distance cosine from embedding
             distance = np.dot(
                 nodes[i].embedding,
                 nodes[j].embedding,
             )
-            distance = distance / (
-                np.linalg.norm(nodes[i].embedding) * np.linalg.norm(nodes[j].embedding)
-            )
+            # Add a small epsilon to the denominator to prevent division by zero if norm is 0
+            norm_i = np.linalg.norm(nodes[i].embedding)
+            norm_j = np.linalg.norm(nodes[j].embedding)
+
+            # Handle cases where norm might be zero (e.g., zero vector embedding)
+            if norm_i == 0 or norm_j == 0:
+                cosine_similarity = 0  # Or define a suitable behavior for zero vectors
+            else:
+                cosine_similarity = distance / (norm_i * norm_j)
+
+            # The transformation you're testing: (1 - cosine_similarity) / 2
+            scaled_distance = (1 - cosine_similarity) / 2
 
             edges.append(
                 {
                     "risk_a_data": nodes[i].data,
                     "risk_b_data": nodes[j].data,
-                    "distance": (1 - distance) / 2,  # normalize to 0-1
+                    "distance": scaled_distance,  # normalize to 0-1
+                    "cosine_similarity": cosine_similarity,  # -1 to 1
                 }
             )
-            distance_with_indices.append((distance, edge_counter))
+            distance_with_indices.append((scaled_distance, edge_counter))
             edge_counter += 1
 
-    # Sort distances in descending order (higher similarity = higher cosine score)
-    # The rank should be assigned such that the most similar (highest cosine score) has the lowest rank (0)
+    # Sort distances in descending order (less distance = higher similarity)
+    # The rank should be assigned such that the most similar (less distance) has the lowest rank (0)
     sorted_distance_with_indices = sorted(
-        distance_with_indices, key=lambda x: x[0], reverse=True
+        distance_with_indices, key=lambda x: x[0], reverse=False
     )
 
     # Assign similarity rank based on the sorted order
@@ -212,6 +229,7 @@ def generate_graph_elements_for_company(
     company_data: pd.DataFrame,
     company_name: str,
     classify_model_name: str = "gpt-4.1-mini",
+    high_priority_threshold_percentage: float = 0.15,
 ) -> Dict[str, CompanyGraphData]:
     """Generates a dictionary of graphs for each valid embedding type for a company."""
     company_graph_datas: Dict[str, CompanyGraphData] = {}
@@ -231,52 +249,129 @@ def generate_graph_elements_for_company(
         # calculate distance threshold
         number_of_nodes = len(nodes)
         number_of_displayed_edges = 2 * number_of_nodes
+        processed_edges = []
+
+        # 1. Calculate high_priority for all edges while it is less than high_priority_threshold_percentage
         for edge in edges:
-            similarity_rank = edge["similarity_rank"]
-            risk_a_data: RiskData = edge["risk_a_data"]
-            risk_b_data: RiskData = edge["risk_b_data"]
-            if similarity_rank < number_of_displayed_edges:
-                # do the edge relationship classification
+            if (
+                edge["risk_a_data"].risk_level >= 3
+                or edge["risk_b_data"].risk_level >= 3
+            ):
+                if (
+                    edge["similarity_rank"]
+                    < len(edges) * high_priority_threshold_percentage
+                ):
+                    edge["high_priority"] = True
+                else:
+                    edge["high_priority"] = False
+            else:
+                edge["high_priority"] = False
+
+        # print number of high priority edges
+        print(
+            f"\tNumber of high priority edges: {len([edge for edge in edges if edge['high_priority']])}"
+        )
+        print(
+            f"\tNumber of low priority edges: {len([edge for edge in edges if not edge['high_priority']])}"
+        )
+        # 2. Separate edges into high-priority and low-priority lists
+        high_priority_edges = sorted(
+            [edge for edge in edges if edge["high_priority"]],
+            key=lambda x: x[
+                "similarity_rank"
+            ],  # Sort high-priority by similarity_rank too
+        )
+        low_priority_edges = sorted(
+            [edge for edge in edges if not edge["high_priority"]],
+            key=lambda x: x["similarity_rank"],
+        )
+
+        total_classifications_needed = 2 * number_of_nodes
+        classified_count = 0
+
+        # 3. Classify high-priority edges first
+        for edge in tqdm(
+            high_priority_edges,
+            desc=f"Classifying HIGH PRIORITY relationships for {company_name} ({embedding_key})",
+        ):
+            relationship = classify_relationship(
+                edge["risk_a_data"].model_dump(),
+                edge["risk_b_data"].model_dump(),
+                classify_model_name,
+            )
+            edge["relationship"] = relationship
+            classified_count += 1
+            processed_edges.append(edge)  # Add to processed list early to keep track
+
+        # 4. Classify remaining edges from low-priority list until limit is reached
+        for edge in tqdm(
+            low_priority_edges,
+            desc=f"Classifying LOW PRIORITY relationships for {company_name} ({embedding_key})",
+        ):
+            if classified_count < total_classifications_needed:
                 relationship = classify_relationship(
-                    risk_a_data.model_dump(),
-                    risk_b_data.model_dump(),
+                    edge["risk_a_data"].model_dump(),
+                    edge["risk_b_data"].model_dump(),
                     classify_model_name,
                 )
-
-                if relationship["direction"] in ["A → B", "Both"]:
-                    edge["source"] = risk_a_data.id
-                    edge["target"] = risk_b_data.id
-                else:
-                    edge["source"] = risk_b_data.id
-                    edge["target"] = risk_a_data.id
+                edge["relationship"] = relationship
+                classified_count += 1
+                processed_edges.append(edge)
             else:
-                # do not need to classify the relationship so no need to care who is source and who is target
-                # then set a to source and b to target
-                edge["source"] = risk_a_data.id
-                edge["target"] = risk_b_data.id
-                relationship = {
+                # If not classified, set relationship to None and add to processed_edges
+                edge["relationship"] = {
                     "interdependency_type": None,
                     "direction": None,
                     "rationale": None,
                     "confidence": None,
                 }
-            edge = EdgeData(
-                source=edge["source"],
-                target=edge["target"],
-                interdependency_type=relationship["interdependency_type"],
-                direction=relationship["direction"],
-                rationale=relationship["rationale"],
-                confidence=relationship["confidence"],
-                risk_a_data=edge["risk_a_data"],
-                risk_b_data=edge["risk_b_data"],
-                distance=edge["distance"],
-                similarity_rank=edge["similarity_rank"],
+                processed_edges.append(edge)
+
+        # 5. Process all edges (classified and unclassified) to create EdgeData objects
+        final_edge_data_list = []
+        for edge in processed_edges:
+            relationship = edge.get(
+                "relationship",
+                {  # Use .get with a default for unclassified edges
+                    "interdependency_type": None,
+                    "direction": None,
+                    "rationale": None,
+                    "confidence": None,
+                },
+            )
+
+            # Determine source and target based on classification only if relationship exists and has a direction
+            if relationship["direction"] in ["A → B", "Both"]:
+                source = edge["risk_a_data"].id
+                target = edge["risk_b_data"].id
+            elif relationship["direction"] == "B → A":
+                source = edge["risk_b_data"].id
+                target = edge["risk_a_data"].id
+            else:  # For unclassified or 'None' direction, default to A as source, B as target
+                source = edge["risk_a_data"].id
+                target = edge["risk_b_data"].id
+
+            final_edge_data_list.append(
+                EdgeData(
+                    source=source,
+                    target=target,
+                    interdependency_type=relationship["interdependency_type"],
+                    direction=relationship["direction"],
+                    rationale=relationship["rationale"],
+                    confidence=relationship["confidence"],
+                    risk_a_data=edge["risk_a_data"],
+                    risk_b_data=edge["risk_b_data"],
+                    distance=edge["distance"],
+                    similarity_rank=edge["similarity_rank"],
+                    cosine_similarity=edge["cosine_similarity"],
+                    high_priority=edge["high_priority"],
+                )
             )
         print(f"number_of_displayed_edges: {number_of_displayed_edges}")
         company_graph_id = f"{company_name}|{embedding_key}"
         company_graph_datas[company_graph_id] = CompanyGraphData(
             nodes=nodes,
-            edges=edges,
+            edges=final_edge_data_list,
             number_of_displayed_edges=number_of_displayed_edges,
         )
 
@@ -370,6 +465,7 @@ def create_and_save_graphs(data_path: Path, output_dir: Path) -> GraphDataLibrar
 
     for company_name in company_name_list:
         company_data = df[df["company"] == company_name]
+        print(f"\tProcessing {company_name} with {len(company_data)} rows")
         if company_name.find("risk_catalog") == -1:
             continue
         timestamp = company_name.split("-")[-1]
@@ -394,6 +490,7 @@ def create_and_save_graphs(data_path: Path, output_dir: Path) -> GraphDataLibrar
     for company_name in company_name_list:
         if company_name.find("risk_catalog") != -1:
             continue
+        company_data = df[df["company"] == company_name]
         company_graph_data_dict: Dict[str, CompanyGraphData] = (
             generate_graph_elements_for_company(company_data, company_name)
         )
