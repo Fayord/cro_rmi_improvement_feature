@@ -13,16 +13,20 @@ import uvicorn
 
 from schemas import (
     RiskRecommendationRequest,
-    RiskRecommendationResponse,
     RecommendedRisk,
     ErrorResponse,
-    MitigationPlanRequest,
     MitigationPlanResponse,
+    MitigationPlanRequest,
     PlanDetailSchema,
     TimelineBudgetSchema,
     TargetRiskReductionItemSchema,
     FileSchema,
     TaskSchema,
+    RiskRecommendationAssessmentResponse,
+    RiskRecommendationMitigationPlanResponse,
+    GraphDataRetrievalRequest,
+    GraphDataRetrievalResponse,
+    ClusterMitigationPlanRequest,
 )
 import os
 import sys
@@ -62,13 +66,13 @@ app.add_middleware(
 )
 
 
-@app.get("/", tags=["Health"])
+@app.get("/")
 async def root():
     """Health check endpoint."""
     return {"message": "Risk Recommendation API is running", "status": "healthy"}
 
 
-@app.get("/health", tags=["Health"])
+@app.get("/health")
 async def health_check():
     """Detailed health check endpoint."""
     return {
@@ -78,18 +82,40 @@ async def health_check():
     }
 
 
+def retrieve_graph_data(graph_id: str) -> GraphDataRetrievalResponse:
+    # TODO: Implement the logic to retrieve graph data
+    return GraphDataRetrievalResponse(
+        graph_visualize_data={},
+        cluster_of_risks=[],
+    )
+
+
 @app.post(
-    "/recommend_risk_to_assess",
-    response_model=RiskRecommendationResponse,
+    "/retrieve_graph_data",
+    response_model=GraphDataRetrievalResponse,
     status_code=status.HTTP_200_OK,
     responses={
         400: {"model": ErrorResponse, "description": "Bad Request"},
         500: {"model": ErrorResponse, "description": "Internal Server Error"},
     },
-    tags=["Recommendations"],
+)
+async def retrieve_graph_data_api(request: GraphDataRetrievalRequest):
+    """Retrieve graph data for a given graph identifier."""
+    return retrieve_graph_data(request.graph_id)
+
+
+@app.post(
+    "/recommend_risk_to_assess",
+    response_model=RiskRecommendationAssessmentResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        400: {"model": ErrorResponse, "description": "Bad Request"},
+        500: {"model": ErrorResponse, "description": "Internal Server Error"},
+    },
 )
 async def recommend_risks_to_assess_api(request: RiskRecommendationRequest):
     """
+    Expected to use all data in the same year and quarter
     Generate risk recommendations for assessment based on existing risks and user context.
 
     This endpoint analyzes the provided existing risks and user information to generate
@@ -106,7 +132,7 @@ async def recommend_risks_to_assess_api(request: RiskRecommendationRequest):
         # TODO: Integrate with your existing risk assessment logic
         # For now, returning mock data
         all_recommended_risks = recommend_risk_to_assesses(request.company_id, request)
-        return RiskRecommendationResponse(
+        return RiskRecommendationAssessmentResponse(
             company_id=request.company_id, recommendations=all_recommended_risks
         )
 
@@ -123,13 +149,12 @@ async def recommend_risks_to_assess_api(request: RiskRecommendationRequest):
 
 @app.post(
     "/recommend_risk_to_mitigate",
-    response_model=RiskRecommendationResponse,
+    response_model=RiskRecommendationMitigationPlanResponse,
     status_code=status.HTTP_200_OK,
     responses={
         400: {"model": ErrorResponse, "description": "Bad Request"},
         500: {"model": ErrorResponse, "description": "Internal Server Error"},
     },
-    tags=["Recommendations"],
 )
 async def recommend_risks_to_mitigate(request: List[RiskRecommendationRequest]):
     """
@@ -150,9 +175,10 @@ async def recommend_risks_to_mitigate(request: List[RiskRecommendationRequest]):
         # For now, returning mock data
         recommendations = _generate_mock_mitigation_recommendations(request)
 
-        response = RiskRecommendationResponse(
+        response = RiskRecommendationMitigationPlanResponse(
             user_id=request.user_id,
             recommendations=recommendations,
+            graph_id=uuid.uuid4().hex[:8],
         )
 
         return response
@@ -170,15 +196,30 @@ async def recommend_risks_to_mitigate(request: List[RiskRecommendationRequest]):
 
 @app.post(
     "/generate_mitigation_plan",
+    response_model=MitigationPlanResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        400: {"model": ErrorResponse, "description": "Bad Request"},
+        500: {"model": ErrorResponse, "description": "Internal Server Error"},
+    },
+)
+async def generate_mitigation_plan(request: MitigationPlanRequest):
+    """
+    Future Feature: Generate a mitigation plan for a given risks.
+    """
+    return _generate_mock_mitigation_plan(request)
+
+
+@app.post(
+    "/generate_cluster_mitigation_plan",
     response_model=List[MitigationPlanResponse],
     status_code=status.HTTP_200_OK,
     responses={
         400: {"model": ErrorResponse, "description": "Bad Request"},
         500: {"model": ErrorResponse, "description": "Internal Server Error"},
     },
-    tags=["Generate"],
 )
-async def generate_mitigation_plan(request: List[MitigationPlanRequest]):
+async def generate_cluster_mitigation_plan(request: List[ClusterMitigationPlanRequest]):
     """
     Generate a mitigation plan for a given risk. anything with a dropdown/Literal type eg. priority_level, status, etc. Need to review the schema later
     """
@@ -206,7 +247,7 @@ async def generate_mitigation_plan(request: List[MitigationPlanRequest]):
 
 
 def _generate_mock_mitigation_plan(
-    request: MitigationPlanRequest,
+    request: ClusterMitigationPlanRequest,
 ) -> MitigationPlanResponse:
     """
     Generate mock mitigation plan for a given risk.

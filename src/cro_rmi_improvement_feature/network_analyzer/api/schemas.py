@@ -78,10 +78,36 @@ class RecommendedRisk(BaseModel):
         }
 
 
-class RiskRecommendationResponse(BaseModel):
+class RiskRecommendationMitigationPlanResponse(BaseModel):
     """Response schema for risk recommendations."""
 
-    company_id: str = Field(..., description="Company identifier")
+    id: str = Field(..., description="Company identifier")
+    recommendations: List[RecommendedRisk] = Field(
+        ..., description="List of recommended risks"
+    )
+    graph_id: str = Field(..., description="Graph identifier")
+
+
+class GraphDataRetrievalRequest(BaseModel):
+    """Request schema for graph data retrieval."""
+
+    graph_id: str = Field(..., description="Graph identifier")
+
+
+class GraphDataRetrievalResponse(BaseModel):
+    """Response schema for graph data retrieval."""
+
+    graph_visualize_data: dict = Field(..., description="Graph data for visualization")
+    cluster_of_risks: List[dict] = Field(
+        ...,
+        description="Cluster data and include key that represent recommend cluster",
+    )
+
+
+class RiskRecommendationAssessmentResponse(BaseModel):
+    """Response schema for risk recommendations."""
+
+    id: str = Field(..., description="Company identifier")
     recommendations: List[RecommendedRisk] = Field(
         ..., description="List of recommended risks"
     )
@@ -259,6 +285,19 @@ class ExistingRisk(BaseModel):
     """Schema for existing risk data."""
 
     risk_id: str = Field(..., description="Unique identifier for the risk")
+    user_id: str = Field(
+        ...,
+        description="Unique identifier for the user",
+    )
+    company_id: str = Field(
+        ...,
+        description="Unique identifier for the company",
+    )
+    country_id: str = Field(
+        ...,
+        description="Unique identifier for the country",
+    )
+
     risk_name: str = Field(..., description="Name of the risk")
     risk_description: str = Field(..., description="Description of the risk")
     processes: List[Process] = Field(
@@ -277,6 +316,10 @@ class ExistingRisk(BaseModel):
         schema_extra = {
             "example": {
                 "risk_id": "risk_001",
+                "user_id": "user_123",
+                "company_id": "company_123",
+                "country_id": "country_123",
+                "year_quarter": "2024-Q1",
                 "risk_name": "Supply Chain Disruption",
                 "risk_description": "Risk of disruption in supply chain operations",
                 "processes": [
@@ -302,7 +345,16 @@ class ExistingRisk(BaseModel):
 class RiskRecommendationRequest(BaseModel):
     """Request schema for risk recommendations."""
 
-    company_id: str = Field(..., description="Unique identifier for the user")
+    id: str = Field(..., description="Unique identifier for the user")
+    # the reason for data_level is when it is user level, we don't need to save and create graph
+    data_level: Literal["user", "company", "country", "multi_country"] = Field(
+        ...,
+        description="Level of the request (user, company, country, multi_country)",
+    )
+    year_quarter: str = Field(
+        ...,
+        description="Year and quarter of the risk (e.g., '2024-Q1', '2024-Q2')",
+    )
     existing_risks: List[ExistingRisk] = Field(
         ..., description="List of existing risks to consider"
     )
@@ -310,7 +362,9 @@ class RiskRecommendationRequest(BaseModel):
     class Config:
         schema_extra = {
             "example": {
-                "company_id": "user_123",
+                "id": "user_123",
+                "data_level": "user",
+                "year_quarter": "2024-Q1",
                 "existing_risks": [
                     {
                         "risk_id": "risk_001",
@@ -343,5 +397,30 @@ class RiskRecommendationRequest(BaseModel):
         }
 
 
-class MitigationPlanRequest(RiskRecommendationRequest):
+class ClusterMitigationPlanRequest(BaseModel):
     """Request schema for mitigation plan generation. include data in RiskRecommendationRequest but have optional data of existing control"""
+
+    id: str = Field(..., description="Unique identifier for the user")
+    graph_id: str = Field(..., description="Graph identifier")
+    cluster_of_risk: dict = Field(
+        ...,
+        description="Cluster data and include key that represent recommend cluster",
+    )
+    year_quarter: str = Field(
+        ...,
+        description="Year and quarter of the risk (e.g., '2024-Q1', '2024-Q2')",
+    )
+
+
+class MitigationPlanRequest(BaseModel):
+    """Future feature"""
+
+    id: str = Field(..., description="Unique identifier for the user")
+    risks: List[ExistingRisk] = Field(
+        ...,
+        description="List of risks to consider",
+    )
+    year_quarter: str = Field(
+        ...,
+        description="Year and quarter of the risk (e.g., '2024-Q1', '2024-Q2')",
+    )

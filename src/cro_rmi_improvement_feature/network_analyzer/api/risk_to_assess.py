@@ -14,7 +14,7 @@ Intended for import and use in main.py to power the /recommend_risk_to_assess en
 
 from schemas import (
     RiskRecommendationRequest,
-    RiskRecommendationResponse,
+    RiskRecommendationAssessmentResponse,
     RecommendedRisk,
     ExistingRisk,
 )
