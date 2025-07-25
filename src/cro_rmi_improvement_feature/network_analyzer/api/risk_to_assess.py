@@ -16,7 +16,6 @@ from schemas import (
     RiskRecommendationAssessmentResponse,
     RecommendedRisk,
     ExistingRisk,
-    AssessmentRisk,
 )
 from typing import List, Set
 import pickle
@@ -36,7 +35,7 @@ from data_processor.create_graph_data_library import (
 
 
 def _save_or_update_risk_data(
-    company_id: str, risk_data: List[AssessmentRisk]
+    company_id: str, risk_data: List[ExistingRisk]
 ) -> None: ...
 
 
@@ -59,7 +58,7 @@ def filter_interested_risk(
 
 def recommend_risk_to_assesses(
     company_id: str,
-    assessment_risks: List[AssessmentRisk],
+    assessment_risks: List[ExistingRisk],
     assessment_version: str,
     timestamp: str = "20250513",
 ) -> List[RecommendedRisk]:

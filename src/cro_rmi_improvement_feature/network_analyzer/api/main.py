@@ -26,7 +26,7 @@ from schemas import (
     GraphDataRetrievalRequest,
     GraphDataRetrievalResponse,
     ClusterMitigationPlanRequest,
-    AssessmentRisk,  # Added new import
+    RiskRecommendationRequest,  # Added new import
 )
 import os
 import sys
@@ -114,7 +114,7 @@ async def retrieve_graph_data_api(request: GraphDataRetrievalRequest):
     },
 )
 async def recommend_risks_to_assess_api(
-    request: AssessmentRisk,
+    request: RiskRecommendationRequest,
 ):  # Changed request type
     """
     Expected to use all data in the same year and quarter
