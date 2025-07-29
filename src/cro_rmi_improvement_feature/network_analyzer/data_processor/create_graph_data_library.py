@@ -26,7 +26,9 @@ class RiskData(BaseModel):
     label: str = Field(..., description="Text to display for the risk node.")
     risk: str = Field(..., description="The name of the risk.")
     risk_cat: str = Field(..., description="The category of the risk.")
-    risk_desc: str = Field(..., description="The description of the risk.")
+    risk_desc: Union[List[str], str] = Field(
+        ..., description="The description of the risk."
+    )
     risk_level: int = Field(..., description="The level of the risk.")
     process: Union[List[str], str, None] = Field(
         ..., description="The process of the risk."

@@ -525,28 +525,9 @@ def process_risk_data(
     df8["risk_desc_catalog"] = df8["risk_desc_catalog"].fillna("")
     df8["risk_desc_catalog"] = df8["risk_desc_catalog"].str.strip()
 
-    # Combine descriptions - handle potential list values
-    def safe_concat(row):
-        catalog_desc = row["risk_desc_catalog"]
-        risk_desc = row["risk_desc"]
-
-        # Convert to strings if they are lists
-        if isinstance(catalog_desc, list):
-            catalog_desc = ",".join(str(item) for item in catalog_desc)
-        if isinstance(risk_desc, list):
-            risk_desc = ",".join(str(item) for item in risk_desc)
-
-        # Handle None/NaN values
-        if pd.isna(catalog_desc) or catalog_desc == "":
-            return str(risk_desc) if not pd.isna(risk_desc) else ""
-        if pd.isna(risk_desc) or risk_desc == "":
-            return str(catalog_desc) if not pd.isna(catalog_desc) else ""
-
-        return str(catalog_desc) + " " + str(risk_desc)
-
-    df8["risk_desc"] = df8.apply(safe_concat, axis=1)
-    df8["risk_desc"] = df8["risk_desc"].str.strip()
-    df8.drop("risk_desc_catalog", axis=1, inplace=True)
+    # df8["risk_desc"] = df8.apply(safe_concat, axis=1)
+    # df8["risk_desc"] = df8["risk_desc"].str.strip()
+    # df8.drop("risk_desc_catalog", axis=1, inplace=True)
 
     # Add catalog data
     df8 = pd.concat([df8, catalog_df], ignore_index=True)
