@@ -364,6 +364,11 @@ def process_graph_data_for_display(
             ]
             # Store risk_cat for outline styling in stylesheet
             risk_category = node_data_with_embedding.data.risk_cat
+            # New: Set outline color and width as data properties
+            outline_color = risk_cat_color_dict.get(
+                risk_category, "#CCCCCC"
+            )  # Get color from dict or fallback
+            outline_width = 3  # Fixed line width as requested
 
             nodes.append(
                 {
@@ -377,6 +382,8 @@ def process_graph_data_for_display(
                         "risk_level": node_data_with_embedding.data.risk_level,
                         "risk_cat": risk_category,  # Store risk_cat for outline
                         "story": node_data_with_embedding.data.risk_desc_summary or "",
+                        "color_outline": outline_color,  # New: Outline color data property
+                        "outline_linewidth": outline_width,  # New: Outline width data property
                     },
                     "position": {
                         "x": random.uniform(100, 700),
@@ -510,6 +517,15 @@ app.layout = html.Div(
             style={"margin-bottom": "10px"},
         ),
         # --- End of new toggle button ---
+        # --- New checkbox to show/hide node outlines ---
+        dcc.Checklist(
+            id="toggle-node-outline",
+            options=[{"label": "Show Node Outlines", "value": "show"}],
+            value=["show"],  # Default to checked (show outlines)
+            inline=True,
+            style={"margin-bottom": "10px"},
+        ),
+        # --- End of new checkbox ---
         # --- New slider for selecting number of edges ---
         html.Div(
             [
@@ -653,6 +669,9 @@ def update_checklist_output(selected_values):
             "hide-no-arrow-edges-toggle", "value"
         ),  # <-- Add input for the new toggle
         Input("cytospace", "layout"),  # <-- Add input to get current layout/positions
+        Input(
+            "toggle-node-outline", "value"
+        ),  # <-- Add input for the new outline toggle
     ],
 )
 def update_graph_and_output(
@@ -668,6 +687,7 @@ def update_graph_and_output(
     num_edges_to_show,
     hide_no_arrow_edges,
     current_cytoscape_layout,  # <-- Add parameter for current layout
+    toggle_node_outline_value,
 ):
     ctx = dash.callback_context
     if not ctx.triggered:
@@ -739,6 +759,29 @@ def update_graph_and_output(
         )
     )
 
+    # --- Apply outline visibility based on toggle-node-outline checkbox ---
+    show_outline = "show" in toggle_node_outline_value
+    for el in filtered_elements:
+        if "source" not in el.get("data", {}):  # It's a node
+            if not show_outline:
+                # el["data"]["color_outline"] = "#000000"  # Set outline color to black
+                el["data"]["color_outline"] = "#FFFFFF"  # Set outline color to white
+            else:
+                # Revert to original risk_cat color if checkbox is checked
+                # Ensure the original risk_cat value is available in node data
+                node_risk_cat = el["data"].get("risk_cat", None)
+                if node_risk_cat:
+                    el["data"]["color_outline"] = risk_cat_color_dict.get(
+                        node_risk_cat, "#CCCCCC"
+                    )
+                else:
+                    el["data"][
+                        "color_outline"
+                    ] = "#CCCCCC"  # Fallback if risk_cat is missing
+            # Ensure linewidth remains 3px as per the new requirement
+            el["data"]["outline_linewidth"] = 3
+    # --- End of outline visibility logic ---
+
     # --- New logic to hide edges with arrow_weight == 0 if toggle is active ---
     # We will modify the elements in place or create a new list with modified styles
     def filter_hide_no_arrow_edges(filtered_elements):
@@ -780,6 +823,15 @@ def update_graph_and_output(
                 }
             )
     print(f"\n\t{node_options=}")
+    # Debugging: Print a sample of node data to verify risk_cat
+    sample_nodes = [
+        el for el in filtered_elements if "source" not in el.get("data", {})
+    ][:5]
+    print("\n--- Sample Node Data (for risk_cat verification) ---")
+    for node in sample_nodes:
+        print(json.dumps(node["data"], indent=2))
+    print("---------------------------------------------------")
+
     # --- End of node dropdown options generation ---
 
     # Update output text to reflect the number of edges shown and the threshold
