@@ -18,6 +18,7 @@ sys.path.append("../")
 from scipy.spatial.distance import pdist, squareform
 from pydantic import BaseModel, Field
 from data_processor.relation_classifier import classify_relationship
+from collections import Counter
 
 
 class RiskData(BaseModel):
@@ -74,7 +75,9 @@ class EdgeData(BaseModel):
         False,
         description="it is a primary connected edge to high risk",
     )
-    similarity_rank: int = Field(..., description="The similarity rank of the edge.")
+    similarity_rank: int = Field(
+        ..., description="The similarity rank of the edge start from 0"
+    )
 
 
 class CompanyGraphData(BaseModel):
@@ -172,7 +175,7 @@ def create_nodes_with_embedding(
 
 
 def create_nodes_and_edges(
-    nodes: List[Dict[str, Any]],
+    nodes: List[RiskDataWithEmbedding],
     company: str,
 ) -> Tuple[List[RiskDataWithEmbedding], List[Dict[str, Any]]]:
     """Creates nodes and edges for a company."""
@@ -229,7 +232,8 @@ def generate_graph_elements_for_company(
     company_data: pd.DataFrame,
     company_name: str,
     classify_model_name: str = "gpt-4.1-mini",
-    high_priority_threshold_percentage: float = 0.15,
+    high_priority_search_space: float = 3.0,  # 3 * number of nodes
+    high_priority_atmost_number_edges: int = 3,
 ) -> Dict[str, CompanyGraphData]:
     """Generates a dictionary of graphs for each valid embedding type for a company."""
     company_graph_datas: Dict[str, CompanyGraphData] = {}
@@ -245,47 +249,115 @@ def generate_graph_elements_for_company(
     print(f"embedding_keys: {embedding_keys}")
     for embedding_key in embedding_keys:
         nodes = create_nodes_with_embedding(data_list, company_name, embedding_key)
-        nodes, edges = create_nodes_and_edges(nodes, company_name)
+        (nodes, edges) = create_nodes_and_edges(nodes, company_name)
         # calculate distance threshold
         number_of_nodes = len(nodes)
         number_of_displayed_edges = 2 * number_of_nodes
+        number_of_edges_search_space = high_priority_search_space * number_of_nodes
         processed_edges = []
 
         # 1. Calculate high_priority for all edges while it is less than high_priority_threshold_percentage
+        # high_priority is a list of edges that have high risk level >=3
+        # and if one high risk node have less than high_priority_atmost_number_edges edges,
+        # then we extend search space to high_priority_search_space * number of nodes
+        high_priority_node_counter = Counter()
+        for node in nodes:
+            if node.data.risk_level >= 3:
+                high_priority_node_counter[node.data.id] = 0
+        # check is high_priority_node have exceed high_priority_atmost_number_edges then pop it out
+        for edge in edges:
+            if edge["similarity_rank"] < number_of_displayed_edges:
+                if edge["risk_a_data"].id in high_priority_node_counter.keys():
+                    high_priority_node_counter[edge["risk_a_data"].id] += 1
+                if edge["risk_b_data"].id in high_priority_node_counter.keys():
+                    high_priority_node_counter[edge["risk_b_data"].id] += 1
+        print()
+        print(f"high_priority_node_counter: {high_priority_node_counter}")
+        print()
+        remain_high_priority_node_counter = Counter()
+        for node_id, count in high_priority_node_counter.items():
+            # if count is less than high_priority_atmost_number_edges then add it to high_priority_node_list
+            if count < high_priority_atmost_number_edges:
+                number_of_edges_to_extend = high_priority_atmost_number_edges - count
+                remain_high_priority_node_counter[node_id] = number_of_edges_to_extend
+        print(remain_high_priority_node_counter)
+        print()
+        # sort edges by similarity_rank
+        edges = sorted(edges, key=lambda x: x["similarity_rank"])
+        # set all edge high_priority to False
+        for edge in edges:
+            edge["high_priority"] = False
         for edge in edges:
             if (
-                edge["risk_a_data"].risk_level >= 3
-                or edge["risk_b_data"].risk_level >= 3
+                number_of_displayed_edges
+                <= edge["similarity_rank"]
+                < number_of_edges_search_space
             ):
-                if (
-                    edge["similarity_rank"]
-                    < len(edges) * high_priority_threshold_percentage
-                ):
-                    edge["high_priority"] = True
-                else:
-                    edge["high_priority"] = False
-            else:
-                edge["high_priority"] = False
+                if edge["risk_a_data"].id in remain_high_priority_node_counter.keys():
+                    if remain_high_priority_node_counter[edge["risk_a_data"].id] > 0:
+                        remain_high_priority_node_counter[edge["risk_a_data"].id] -= 1
+                        edge["high_priority"] = True
+                if edge["risk_b_data"].id in remain_high_priority_node_counter.keys():
+                    if remain_high_priority_node_counter[edge["risk_b_data"].id] > 0:
+                        remain_high_priority_node_counter[edge["risk_b_data"].id] -= 1
+                        edge["high_priority"] = True
+        # count all high priority edges
+        print(
+            f"Number of high priority edges: {len([edge for edge in edges if edge['high_priority']])}"
+        )
+        # print edge that have high_priority
+        high_priority_edges = [edge for edge in edges if edge["high_priority"]]
+        for edge in high_priority_edges:
+            print(
+                f"high_priority_edges: {edge['risk_a_data'].risk} -> {edge['risk_b_data'].risk} similarity_rank: {edge['similarity_rank']}"
+            )
 
-        # print number of high priority edges
         print(
-            f"\tNumber of high priority edges: {len([edge for edge in edges if edge['high_priority']])}"
+            f"Number of remain high priority node counter: {remain_high_priority_node_counter}"
         )
-        print(
-            f"\tNumber of low priority edges: {len([edge for edge in edges if not edge['high_priority']])}"
-        )
-        # 2. Separate edges into high-priority and low-priority lists
-        high_priority_edges = sorted(
-            [edge for edge in edges if edge["high_priority"]],
-            key=lambda x: x[
-                "similarity_rank"
-            ],  # Sort high-priority by similarity_rank too
-        )
+
+        # high_priority_count_per_node = Counter()
+        # for edge in edges:
+        #     risk_level_a = edge["risk_a_data"].risk_level
+        #     risk_level_b = edge["risk_b_data"].risk_level
+        #     if risk_level_a >= 3 or risk_level_b >= 3:
+        #         edge["high_priority"] = True
+        #     else:
+        #         edge["high_priority"] = False
+
+        # for edge in edges:
+        #     risk_level_a = edge["risk_a_data"].risk_level
+        #     risk_level_b = edge["risk_b_data"].risk_level
+        #     if risk_level_a >= 3:
+        #         edge["high_priority_a_count"] = (
+        #             high_priority_count_per_node[edge["risk_a_data"].id] + 1
+        #         )
+        #     if risk_level_b >= 3:
+        #         edge["high_priority_b_count"] = (
+        #             high_priority_count_per_node[edge["risk_b_data"].id] + 1
+        #         )
+        # # print number of high priority edges
+        # print(
+        #     f"\tNumber of high priority edges: {len([edge for edge in edges if edge['high_priority']])}"
+        # )
+        # print(
+        #     f"\tNumber of low priority edges: {len([edge for edge in edges if not edge['high_priority']])}"
+        # )
+
+        # # 2. Separate edges into high-priority and low-priority lists
+        # high_priority_edges = sorted(
+        #     [edge for edge in edges if edge["high_priority"]],
+        #     key=lambda x: x[
+        #         "similarity_rank"
+        #     ],  # Sort high-priority by similarity_rank too
+        # )
+        print(f"high_priority_edges: {len(high_priority_edges)}")
         low_priority_edges = sorted(
             [edge for edge in edges if not edge["high_priority"]],
             key=lambda x: x["similarity_rank"],
         )
-
+        print(f"low_priority_edges: {len(low_priority_edges)}")
+        # raise
         total_classifications_needed = 2 * number_of_nodes
         classified_count = 0
 
@@ -487,7 +559,8 @@ def create_and_save_graphs(data_path: Path, output_dir: Path) -> GraphDataLibrar
                         embedding=risk_data[risk_catalog_embedding_key],
                     )
                 )
-    for company_name in company_name_list:
+    for company_name in company_name_list[::-1]:
+
         if company_name.find("risk_catalog") != -1:
             continue
         company_data = df[df["company"] == company_name]
