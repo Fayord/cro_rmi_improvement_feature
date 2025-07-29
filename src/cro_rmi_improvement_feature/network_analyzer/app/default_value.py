@@ -7,40 +7,6 @@ CHECKLIST_OPTIONS = [
 ]
 
 
-node_highlight_selector_risk_level4 = {
-    "selector": "node[risk_level = 4]",
-    "style": {
-        "border-width": "3px",
-        "border-color": "#FF7F7F",  # dim red
-        "border-style": "solid",
-    },
-}
-node_highlight_selector_risk_level3 = {
-    "selector": "node[risk_level = 3]",
-    "style": {
-        "border-width": "3px",
-        "border-color": "#FFB17F",  # dim orange
-        "border-style": "solid",
-    },
-}
-node_highlight_selector_risk_level2 = {
-    "selector": "node[risk_level = 2]",
-    "style": {
-        "border-width": "3px",
-        "border-color": "#FFFF7F",  # dim yellow
-        "border-style": "solid",
-    },
-}
-node_highlight_selector_risk_level1 = {
-    "selector": "node[risk_level = 1]",
-    "style": {
-        "border-width": "3px",
-        "border-color": "#7FFF7F",  # dim green
-        "border-style": "solid",
-    },
-}
-
-
 rgb_color_list = [
     "rgb(255, 99, 132)",  # Red
     "rgb(54, 162, 235)",  # Blue
@@ -55,6 +21,15 @@ rgb_color_list = [
     "rgb(0, 255, 255)",  # Aqua
     "rgb(240, 230, 140)",  # Khaki
 ]
+
+# New: Map risk levels to specific colors (Green, Yellow, Orange, Red)
+risk_level_color_map = {
+    1: "#7FFF7F",  # Green for Level 1
+    2: "#FFFF00",  # Yellow for Level 2
+    3: "#FFA500",  # Orange for Level 3
+    4: "#FF0000",  # Red for Level 4
+}
+
 risk_cat_color_dict = {
     "Operational Risk": "rgb(54, 162, 235)",
     "Strategic Risk": "rgb(255, 206, 86)",
@@ -129,22 +104,67 @@ bezier_stylesheet = [
         },
     },
     # Add this new selector for large nodes
-    node_highlight_selector_risk_level1,
-    node_highlight_selector_risk_level2,
-    node_highlight_selector_risk_level3,
-    node_highlight_selector_risk_level4,
+    # node highlight selectors for risk categories (outline color)
+    {
+        "selector": 'node[risk_cat = "Operational Risk"]',
+        "style": {
+            "border-width": "3px",
+            "border-color": risk_cat_color_dict.get("Operational Risk", "#CCCCCC"),
+            "border-style": "solid",
+        },
+    },
+    {
+        "selector": 'node[risk_cat = "Strategic Risk"]',
+        "style": {
+            "border-width": "3px",
+            "border-color": risk_cat_color_dict.get("Strategic Risk", "#CCCCCC"),
+            "border-style": "solid",
+        },
+    },
+    {
+        "selector": 'node[risk_cat = "Credit Risk"]',
+        "style": {
+            "border-width": "3px",
+            "border-color": risk_cat_color_dict.get("Credit Risk", "#CCCCCC"),
+            "border-style": "solid",
+        },
+    },
+    {
+        "selector": 'node[risk_cat = "Market Risk"]',
+        "style": {
+            "border-width": "3px",
+            "border-color": risk_cat_color_dict.get("Market Risk", "#CCCCCC"),
+            "border-style": "solid",
+        },
+    },
+    {
+        "selector": 'node[risk_cat = "Liquidity Risk"]',
+        "style": {
+            "border-width": "3px",
+            "border-color": risk_cat_color_dict.get("Liquidity Risk", "#CCCCCC"),
+            "border-style": "solid",
+        },
+    },
+    # Fallback for other risk categories or if not found
+    {
+        "selector": "node[risk_cat]",  # Selects any node with a risk_cat property
+        "style": {
+            "border-width": "3px",
+            "border-color": "#CCCCCC",  # Default grey border for unmatched categories
+            "border-style": "solid",
+        },
+    },
     {
         "selector": "edge",
         "style": {
-            "curve-style": "unbundled-bezier",
-            "control-point-step-size": 10,  # Adjust for bundling strength
-            "control-point-weight": 0.5,  # Adjust for bundling shape
-            "opacity": 0.6,
-            "line-color": "data(color)",
+            "curve-style": "bezier",  # Use bezier for bundled edges
+            # "haystack-radius": "0",
+            "opacity": "0.4",
+            "line-color": "data(color)",  # Use the color data property for edges
             "width": "mapData(weight, 0, 20, 1, 8)",
             "overlay-padding": "3px",
             "content": "data(weight)",
-            "font-size": "0px",
+            "font-size": "0px",  # set to 0px to hide the label
             "text-valign": "center",
             "text-halign": "center",
             # --- Add arrow properties here ---
@@ -154,6 +174,9 @@ bezier_stylesheet = [
             # "source-arrow-shape": "circle", # Example for source arrow
             # "source-arrow-color": "blue",
             # --- End of arrow properties ---
+            "control-point-step-size": "10px",  # Fixed for bezier
+            "control-point-weight": "0.5",  # Fixed for bezier
+            # "edge-distances": "node-position", # deprecated
         },
     },
 ]
@@ -173,10 +196,38 @@ round_segment_stylesheet = [
             "background-color": "data(color)",
         },
     },
-    node_highlight_selector_risk_level1,
-    node_highlight_selector_risk_level2,
-    node_highlight_selector_risk_level3,
-    node_highlight_selector_risk_level4,
+    {
+        "selector": "node[risk_level = 1]",
+        "style": {
+            "border-width": "3px",
+            "border-color": "#7FFF7F",  # dim green
+            "border-style": "solid",
+        },
+    },
+    {
+        "selector": "node[risk_level = 2]",
+        "style": {
+            "border-width": "3px",
+            "border-color": "#FFFF7F",  # dim yellow
+            "border-style": "solid",
+        },
+    },
+    {
+        "selector": "node[risk_level = 3]",
+        "style": {
+            "border-width": "3px",
+            "border-color": "#FFB17F",  # dim orange
+            "border-style": "solid",
+        },
+    },
+    {
+        "selector": "node[risk_level = 4]",
+        "style": {
+            "border-width": "3px",
+            "border-color": "#FF7F7F",  # dim red
+            "border-style": "solid",
+        },
+    },
     {
         "selector": "edge",
         "style": {
@@ -219,10 +270,38 @@ taxi_stylesheet = [
             "background-color": "data(color)",
         },
     },
-    node_highlight_selector_risk_level1,
-    node_highlight_selector_risk_level2,
-    node_highlight_selector_risk_level3,
-    node_highlight_selector_risk_level4,
+    {
+        "selector": "node[risk_level = 1]",
+        "style": {
+            "border-width": "3px",
+            "border-color": "#7FFF7F",  # dim green
+            "border-style": "solid",
+        },
+    },
+    {
+        "selector": "node[risk_level = 2]",
+        "style": {
+            "border-width": "3px",
+            "border-color": "#FFFF7F",  # dim yellow
+            "border-style": "solid",
+        },
+    },
+    {
+        "selector": "node[risk_level = 3]",
+        "style": {
+            "border-width": "3px",
+            "border-color": "#FFB17F",  # dim orange
+            "border-style": "solid",
+        },
+    },
+    {
+        "selector": "node[risk_level = 4]",
+        "style": {
+            "border-width": "3px",
+            "border-color": "#FF7F7F",  # dim red
+            "border-style": "solid",
+        },
+    },
     {
         "selector": "edge",
         "style": {

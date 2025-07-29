@@ -40,10 +40,7 @@ from default_value import (  # Import needed constants
     round_segment_stylesheet,
     taxi_stylesheet,
     CHECKLIST_OPTIONS,
-    node_highlight_selector_risk_level1,
-    node_highlight_selector_risk_level2,
-    node_highlight_selector_risk_level3,
-    node_highlight_selector_risk_level4,
+    risk_level_color_map,  # Import the new risk_level_color_map
 )
 from utils import (  # Import needed utility functions
     find_proportional_count_boundaries,
@@ -195,10 +192,20 @@ def filter_elements_by_weight_and_recalculate_edges(
     nodes_in_filtered = {}  # Store nodes for easy access
 
     # First pass: Filter edges and collect raw weights of visible edges
+    high_priority_edge_count = 0
     for el in elements:
         if "source" in el.get("data", {}):
-
-            if el["data"]["similarity_rank"] < slider_value:
+            if el["data"]["high_priority"]:
+                high_priority_edge_count += 1
+                filtered_elements.append(el)
+                node_edge_counter["edge"] += 1
+                old_line_weights.append(el["data"]["raw_weight"])
+    print(f"high_priority_edge_count: {high_priority_edge_count}")
+    remaining_slider_value = slider_value - high_priority_edge_count
+    for el in elements:
+        if "source" in el.get("data", {}):
+            # get all edge that have high_priority
+            if el["data"]["similarity_rank"] < remaining_slider_value:
                 # Append edge for now, will update properties in second pass
                 filtered_elements.append(el)
                 node_edge_counter["edge"] += 1
@@ -315,6 +322,7 @@ def process_graph_data_for_display(
                     "target": edge_data.target,
                     "similarity_rank": edge_data.similarity_rank,
                     "raw_weight": raw_weight,
+                    "high_priority": edge_data.high_priority,
                     "do_not_cal_weight": False,  # This might need to be re-evaluated
                     "edge_relation_reason": edge_data.rationale,
                     "source_risk_data": edge_data.risk_a_data.model_dump(),
@@ -350,9 +358,12 @@ def process_graph_data_for_display(
             raw_size = node_raw_sizes_from_edges[node_id]
             level = get_level_from_boundaries(node_boundaries, raw_size)
             display_size = node_size_list[level - 1]
-            risk_cat_color = risk_cat_color_dict.get(
-                node_data_with_embedding.data.risk_cat, "#CCCCCC"
-            )
+            # Use risk_level to determine node fill color
+            node_fill_color = risk_level_color_map[
+                node_data_with_embedding.data.risk_level
+            ]
+            # Store risk_cat for outline styling in stylesheet
+            risk_category = node_data_with_embedding.data.risk_cat
 
             nodes.append(
                 {
@@ -362,8 +373,9 @@ def process_graph_data_for_display(
                         "raw_size": raw_size,
                         "size_level": level,
                         "size": display_size,
-                        "color": risk_cat_color,
+                        "color": node_fill_color,  # Node color based on risk_level
                         "risk_level": node_data_with_embedding.data.risk_level,
+                        "risk_cat": risk_category,  # Store risk_cat for outline
                         "story": node_data_with_embedding.data.risk_desc_summary or "",
                     },
                     "position": {
@@ -406,14 +418,25 @@ app.layout = html.Div(
                 html.P(
                     "Arrow on Edge: Indicates a causal relationship. An arrow from Risk A to Risk B means Risk A causes Risk B. For non-arrow edges, it means the risks are not direct dependency but are similar"
                 ),
-                html.P("Node Colors: Represent risk categories"),
-                html.P("Node Highlight/Outline (4 Levels of Risk):"),
+                html.P("Node Colors: Represent risk levels"),
+                html.P("Node Highlight/Outline (Risk Category):"),
                 html.Ul(
                     [
-                        html.Li("Level 1: Green  - Description for Level 1 risks."),
-                        html.Li("Level 2: Yellow - Description for Level 2 risks."),
-                        html.Li("Level 3: Orange - Description for Level 3 risks."),
-                        html.Li("Level 4: Red    - Description for Level 4 risks."),
+                        html.Li(
+                            f"Operational Risk: {risk_cat_color_dict.get("Operational Risk", "#CCCCCC")}"
+                        ),
+                        html.Li(
+                            f"Strategic Risk: {risk_cat_color_dict.get("Strategic Risk", "#CCCCCC")}"
+                        ),
+                        html.Li(
+                            f"Credit Risk: {risk_cat_color_dict.get("Credit Risk", "#CCCCCC")}"
+                        ),
+                        html.Li(
+                            f"Market Risk: {risk_cat_color_dict.get("Market Risk", "#CCCCCC")}"
+                        ),
+                        html.Li(
+                            f"Liquidity Risk: {risk_cat_color_dict.get("Liquidity Risk", "#CCCCCC")}"
+                        ),
                     ]
                 ),
             ],
