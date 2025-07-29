@@ -1,10 +1,5 @@
 FONT_SIZE = 5
 EDGE_SIZE_MULTIPLIER = 2
-CHECKLIST_OPTIONS = [
-    {"label": "risk_desc_label", "value": "risk_desc"},
-    {"label": "rootcause_label", "value": "rootcause"},
-    {"label": "process_label", "value": "process"},
-]
 
 
 rgb_color_list = [

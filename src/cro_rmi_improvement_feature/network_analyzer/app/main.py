@@ -39,7 +39,6 @@ from default_value import (  # Import needed constants
     bezier_stylesheet,
     round_segment_stylesheet,
     taxi_stylesheet,
-    CHECKLIST_OPTIONS,
     risk_level_color_map,  # Import the new risk_level_color_map
 )
 from utils import (  # Import needed utility functions
@@ -282,7 +281,6 @@ def filter_elements_by_weight_and_recalculate_edges(
 def process_graph_data_for_display(
     graph_data_library: GraphDataLibrary,
     company: str,
-    selected_checklist_values: list,  # Keep for future filtering
 ):
     nodes = []
     edges = []
@@ -404,7 +402,6 @@ def process_graph_data_for_display(
 elements, line_weights, total_edges, total_nodes = process_graph_data_for_display(
     graph_data_library,
     default_company,
-    ["risk_desc"],
 )  # Initial call with empty checklist
 
 app = dash.Dash(__name__, url_base_pathname="/plot_network/")
@@ -472,7 +469,6 @@ app.layout = html.Div(
             clearable=False,
             style={"width": "200px", "margin-bottom": "10px"},
         ),
-        # --- Add sliders for bezier controls ---
         # Removed the bezier control sliders as per user request
         # html.Div(
         #     [
@@ -499,14 +495,16 @@ app.layout = html.Div(
         #     ],
         #     style={"margin-bottom": "20px"},
         # ),
-        dcc.Checklist(
-            id="filter-checklist",
-            options=CHECKLIST_OPTIONS,
-            value=([CHECKLIST_OPTIONS[0]["value"]] if CHECKLIST_OPTIONS else []),
-            # value=([]),
-            inline=True,
-        ),
-        html.Div(id="checklist-output-container"),
+        # dcc.Checklist(
+        #     id="filter-checklist",
+        #     options=CHECKLIST_OPTIONS,
+        #     value=([CHECKLIST_OPTIONS[0]["value"]] if CHECKLIST_OPTIONS else []),
+        #     # value=([]),
+        #     inline=True,
+        # ),
+        html.Div(
+            id="checklist-output-container"
+        ),  # Keep this Div for now, remove its content in the callback
         html.Hr(),
         # --- New toggle button to hide edges with no arrows ---
         dcc.Checklist(
@@ -626,18 +624,18 @@ app.layout = html.Div(
 
 
 # Callback to update the checklist output
-@app.callback(
-    Output("checklist-output-container", "children"),
-    [Input("filter-checklist", "value")],
-)
-def update_checklist_output(selected_values):
-    if selected_values is None:
-        selected_values = []
-    print(f"Checklist values changed to: {selected_values}")  # Print to console
-    # You can also retrieve the original complex value from CHECKLIST_OPTIONS if needed:
-    return (
-        f"Selected options: {', '.join(selected_values) if selected_values else 'None'}"
-    )
+# @app.callback(
+#     Output("checklist-output-container", "children"),
+#     [Input("filter-checklist", "value")],
+# )
+# def update_checklist_output(selected_values):
+#     if selected_values is None:
+#         selected_values = []
+#     print(f"Checklist values changed to: {selected_values}")  # Print to console
+#     # You can also retrieve the original complex value from CHECKLIST_OPTIONS if needed:
+#     return (
+#         f"Selected options: {', '.join(selected_values) if selected_values else 'None'}"
+#     )
 
 
 # Callback to update the graph elements and slider output based on company selection
@@ -663,7 +661,7 @@ def update_checklist_output(selected_values):
         # Removed bezier sliders inputs
         # Input("bezier-step-size-slider", "value"),
         # Input("bezier-weight-slider", "value"),
-        Input("filter-checklist", "value"),
+        # Removed Input("filter-checklist", "value"),
         Input("num-edges-slider", "value"),  # <-- Add input for the new slider
         Input(
             "hide-no-arrow-edges-toggle", "value"
@@ -683,7 +681,7 @@ def update_graph_and_output(
     # Removed bezier_step_size and bezier_weight inputs
     # bezier_step_size,
     # bezier_weight,
-    selected_checklist_values,
+    # selected_checklist_values, # Removed this parameter
     num_edges_to_show,
     hide_no_arrow_edges,
     current_cytoscape_layout,  # <-- Add parameter for current layout
@@ -700,7 +698,7 @@ def update_graph_and_output(
     elements, line_weights, total_edges, total_nodes = process_graph_data_for_display(
         graph_data_library,
         company,
-        selected_checklist_values,
+        # selected_checklist_values, # Removed this parameter
     )
 
     # If the company dropdown triggered the callback, reset num_edges_to_show
