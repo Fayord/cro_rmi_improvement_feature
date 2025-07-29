@@ -26,14 +26,14 @@ try:
     env_path = f"{dir_path}/../../../.env"
     load_dotenv(env_path)
     api_key = os.getenv("OPENAI_API_KEY")
-    assert api_key, "API key is missing"
+    assert api_key, "1.API key is missing"
 except Exception:
     # /Users/ford/Documents/coding_trae/cro_rmi_improvement_feature/src/cro_rmi_improvement_feature/plot_risk_related/utils.py
     print(dir_path)
     env_path = f"{dir_path}/../../../../../coding/confidential/.env"
     load_dotenv(env_path)
     api_key = os.getenv("OPENAI_API_KEY")
-    assert api_key, "API key is missing"
+    assert api_key, "2.API key is missing"
 
 
 def get_number_edges_to_show(total_nodes):
