@@ -131,9 +131,11 @@ async def recommend_risks_to_assess_api(request: RiskRecommendationRequest):
 
         # TODO: Integrate with your existing risk assessment logic
         # For now, returning mock data
-        all_recommended_risks = recommend_risk_to_assesses(request.company_id, request)
+        all_recommended_risks = recommend_risk_to_assesses(
+            request.id, request.existing_risks, request.year_quarter
+        )
         return RiskRecommendationAssessmentResponse(
-            company_id=request.company_id, recommendations=all_recommended_risks
+            id=request.id, recommendations=all_recommended_risks
         )
 
     except HTTPException:

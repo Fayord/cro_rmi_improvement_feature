@@ -293,7 +293,7 @@ class ExistingRisk(BaseModel):
         ...,
         description="Unique identifier for the company",
     )
-    country_id: str = Field(
+    country: str = Field(
         ...,
         description="Unique identifier for the country",
     )
@@ -310,6 +310,9 @@ class ExistingRisk(BaseModel):
     score: RiskScore = Field(..., description="Risk scoring information")
     existing_controls: Optional[List[ExistingControl]] = Field(
         None, description="List of existing controls to consider"
+    )
+    mitigation_plans: Optional[List[MitigationPlan]] = Field(
+        None, description="List of mitigation plans to consider"
     )
 
     class Config:
