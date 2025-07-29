@@ -23,7 +23,8 @@ dir_path = os.path.dirname(os.path.realpath(__file__))
 set_llm_cache(SQLiteCache(database_path=f"{dir_path}/.langchain.db"))
 
 try:
-    env_path = f"{dir_path}/../../../.env"
+    env_path = f"{dir_path}/../../../../.env"
+    print("env_path", os.path.abspath(env_path))
     load_dotenv(env_path)
     api_key = os.getenv("OPENAI_API_KEY")
     assert api_key, "1.API key is missing"
