@@ -338,6 +338,18 @@ def generate_network_from_real_data(
             }
         )
     print(f"{node_size_counter=}")
+
+    # Filter edges and recalculate node sizes based on the new logic
+    number_edge_display = 2 * len(nodes)
+    nodes, edges = filter_edges_by_count_and_recalculate_nodes(
+        nodes,
+        edges,
+        number_edge_display,
+        edge_rgb_color_list,
+        node_proportion_list,
+        node_size_list,
+    )
+
     # Return nodes, edges, line_weight_list, and total number of edges
     # save nodes and edges to pickle file
     dir_path = os.path.dirname(os.path.realpath(__file__))
