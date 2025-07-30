@@ -137,7 +137,27 @@ async def recommend_risks_to_assess_api(request: RiskRecommendationRequest):
         return RiskRecommendationAssessmentResponse(
             id=request.id, recommendations=all_recommended_risks
         )
-
+    except ValueError as e:
+        # return mockup data for now
+        return RiskRecommendationAssessmentResponse(
+            id=request.id,
+            recommendations=[
+                RecommendedRisk(
+                    risk_id="risk_001",
+                    risk_name="Risk 1",
+                    risk_category="Operational",
+                    risk_level=3,
+                    risk_likelihood=3,
+                ),
+                RecommendedRisk(
+                    risk_id="risk_002",
+                    risk_name="Risk 2",
+                    risk_category="Operational",
+                    risk_level=3,
+                    risk_likelihood=3,
+                ),
+            ],
+        )
     except HTTPException:
         print_exc()
         raise

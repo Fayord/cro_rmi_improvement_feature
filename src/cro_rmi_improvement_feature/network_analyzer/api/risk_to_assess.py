@@ -70,6 +70,9 @@ def recommend_risk_to_assesses(
     all_recommended_risks: List[RecommendedRisk] = []
     # load it from graph data library
     graph_data_library = load_graph_data_library()
+    # check if company_id is in graph_data_library.company_graph_datas
+    if company_id not in graph_data_library.company_graph_datas:
+        raise ValueError(f"Company {company_id} not found in graph data library")
     company_graph_data = graph_data_library.company_graph_datas[company_id]
     existing_risk_name_set = {risk.data.risk for risk in company_graph_data.nodes}
     interested_risks = filter_interested_risk(company_graph_data)
