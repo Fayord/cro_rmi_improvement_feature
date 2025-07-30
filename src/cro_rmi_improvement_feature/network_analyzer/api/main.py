@@ -138,6 +138,7 @@ async def recommend_risks_to_assess_api(request: RiskRecommendationRequest):
             id=request.id, recommendations=all_recommended_risks
         )
     except ValueError as e:
+        print_exc()
         # return mockup data for now
         return RiskRecommendationAssessmentResponse(
             id=request.id,
@@ -145,16 +146,40 @@ async def recommend_risks_to_assess_api(request: RiskRecommendationRequest):
                 RecommendedRisk(
                     risk_id="risk_001",
                     risk_name="Risk 1",
-                    risk_category="Operational",
-                    risk_level=3,
-                    risk_likelihood=3,
+                    recommend_risk_list=[
+                        RiskData(
+                            id="risk_001",
+                            label="Risk 1",
+                            risk="Risk 1",
+                            risk_cat="Operational",
+                            risk_level=3,
+                            process="Process 1",
+                            risk_desc="Risk 1 description",
+                            rootcause="Rootcause 1",
+                            process_summary="Process 1 summary",
+                            rootcause_summary="Rootcause 1 summary",
+                            risk_desc_summary="Risk 1 description summary",
+                        )
+                    ],
                 ),
                 RecommendedRisk(
                     risk_id="risk_002",
                     risk_name="Risk 2",
-                    risk_category="Operational",
-                    risk_level=3,
-                    risk_likelihood=3,
+                    recommend_risk_list=[
+                        RiskData(
+                            id="risk_002",
+                            label="Risk 2",
+                            risk="Risk 2",
+                            risk_cat="Operational",
+                            risk_level=3,
+                            process="Process 2",
+                            risk_desc="Risk 2 description",
+                            rootcause="Rootcause 2",
+                            process_summary="Process 2 summary",
+                            rootcause_summary="Rootcause 2 summary",
+                            risk_desc_summary="Risk 2 description summary",
+                        )
+                    ],
                 ),
             ],
         )
