@@ -29,6 +29,12 @@ from data_processor.create_graph_data_library import (
     RiskData,
     EdgeData,
     RiskOverlayData,
+    GraphDataLibraryNoEmbedding,
+    CompanyGraphDataNoEmbedding,
+    RiskOverlayDataNoEmbedding,
+    RiskDataNoEmbedding,
+    RiskDataWithOutEmbedding,
+    EdgeDataNoEmbedding,
 )
 from default_value import (  # Import needed constants
     EDGE_SIZE_MULTIPLIER,
@@ -52,10 +58,10 @@ cyto.load_extra_layouts()
 
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
-new_data_path: GraphDataLibrary = f"{dir_path}/../data/graph/graph_data_library.pkl"
+new_data_path = f"{dir_path}/../data/graph/graph_data_library_no_embedding.pkl"
 
 
-graph_data_library: GraphDataLibrary = pickle.load(open(new_data_path, "rb"))
+graph_data_library: GraphDataLibraryNoEmbedding = pickle.load(open(new_data_path, "rb"))
 
 # Extract unique company names from real_data
 companys = sorted(list(graph_data_library.company_graph_datas.keys()))

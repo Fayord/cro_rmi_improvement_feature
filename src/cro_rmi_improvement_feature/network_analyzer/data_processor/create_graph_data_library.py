@@ -191,6 +191,7 @@ def generate_graph_elements_for_company(
     classify_model_name: str = "gpt-4.1-mini",
     high_priority_search_space: float = 3.0,  # 3 * number of nodes
     high_priority_atmost_number_edges: int = 3,
+    relation_process: str = "oneway_run",
 ) -> Dict[str, CompanyGraphData]:
     """Generates a dictionary of graphs for each valid embedding type for a company."""
     company_graph_datas: Dict[str, CompanyGraphData] = {}
@@ -287,12 +288,24 @@ def generate_graph_elements_for_company(
             high_priority_edges,
             desc=f"Classifying HIGH PRIORITY relationships for {company_name} ({embedding_key})",
         ):
-            relationship = classify_relationship(
+            relationship_a_b = classify_relationship(
                 edge["risk_a_data"].model_dump(),
                 edge["risk_b_data"].model_dump(),
                 classify_model_name,
             )
-            edge["relationship"] = relationship
+            # For two-way processing, also classify B->A
+            if relation_process == "twoway_run":
+                relationship_b_a = classify_relationship(
+                    edge["risk_b_data"].model_dump(),
+                    edge["risk_a_data"].model_dump(),
+                    classify_model_name,
+                )
+                # dummy function always select a->b as a final data
+                edge["relationship"] = process_two_way_relationships(
+                    relationship_a_b, relationship_b_a
+                )
+            else:
+                edge["relationship"] = relationship_a_b
             classified_count += 1
             processed_edges.append(edge)  # Add to processed list early to keep track
 
@@ -302,12 +315,22 @@ def generate_graph_elements_for_company(
             desc=f"Classifying LOW PRIORITY relationships for {company_name} ({embedding_key})",
         ):
             if classified_count < total_classifications_needed:
-                relationship = classify_relationship(
+                relationship_a_b = classify_relationship(
                     edge["risk_a_data"].model_dump(),
                     edge["risk_b_data"].model_dump(),
                     classify_model_name,
                 )
-                edge["relationship"] = relationship
+                if relation_process == "twoway_run":
+                    relationship_b_a = classify_relationship(
+                        edge["risk_b_data"].model_dump(),
+                        edge["risk_a_data"].model_dump(),
+                        classify_model_name,
+                    )
+                    edge["relationship"] = process_two_way_relationships(
+                        relationship_a_b, relationship_b_a
+                    )
+                else:
+                    edge["relationship"] = relationship_a_b
                 classified_count += 1
                 processed_edges.append(edge)
             else:
@@ -361,7 +384,7 @@ def generate_graph_elements_for_company(
                 )
             )
         print(f"number_of_displayed_edges: {number_of_displayed_edges}")
-        company_graph_id = f"{company_name}|{embedding_key}"
+        company_graph_id = f"{company_name}|{embedding_key}|{relation_process}"
         company_graph_datas[company_graph_id] = CompanyGraphData(
             nodes=nodes,
             edges=final_edge_data_list,
@@ -442,6 +465,111 @@ def generate_risk_catalog_top_n_overlay_data(
     return risk_catalog_top_n_overlay_data
 
 
+def final_relationship(
+    interdependency_type_a_b,
+    interdependency_type_b_a,
+    direction_a_b,
+    direction_b_a,
+    rationale_a_b,
+    rationale_b_a,
+    confidence_a_b,
+    confidence_b_a,
+):
+    priority_interdependency_type_list = [
+        "Causal",
+        "Correlated",
+        "None",
+    ]
+    priority_direction_list = [
+        "Both",
+        "A → B",
+        "B → A",
+        "None",
+    ]
+
+    ####### preprocess
+    if interdependency_type_b_a in ["Causal"]:
+        if direction_b_a == "A → B":
+            direction_b_a = "B → A"
+        elif direction_b_a == "B → A":
+            direction_b_a = "A → B"
+    #######
+    if interdependency_type_a_b == interdependency_type_b_a:
+        final_interdependency_type = interdependency_type_a_b
+        if interdependency_type_a_b in ["Causal"]:
+
+            index_direction_a_b = priority_direction_list.index(direction_a_b)
+            index_direction_b_a = priority_direction_list.index(direction_b_a)
+            if (direction_a_b, direction_b_a) in [
+                ("A → B", "B → A"),
+                ("B → A", "A → B"),
+            ]:
+                final_direction = "Both"
+                final_rationale = f"{rationale_a_b} / {rationale_b_a}"
+                final_confidence = (confidence_a_b + confidence_b_a) / 2
+            elif index_direction_a_b < index_direction_b_a:
+                final_direction = direction_a_b
+                final_rationale = rationale_a_b
+                final_confidence = confidence_a_b
+            else:
+                final_direction = direction_b_a
+                final_rationale = rationale_b_a
+                final_confidence = confidence_b_a
+        else:
+            final_direction = "None"
+            final_rationale = f"{rationale_a_b} / {rationale_b_a}"
+            final_confidence = (confidence_a_b + confidence_b_a) / 2
+
+    else:
+        index_interdependency_type_a_b = priority_interdependency_type_list.index(
+            interdependency_type_a_b
+        )
+        index_interdependency_type_b_a = priority_interdependency_type_list.index(
+            interdependency_type_b_a
+        )
+        if index_interdependency_type_a_b < index_interdependency_type_b_a:
+            final_interdependency_type = interdependency_type_a_b
+            final_direction = direction_a_b
+            final_rationale = rationale_a_b
+            final_confidence = confidence_a_b
+        else:
+            final_interdependency_type = interdependency_type_b_a
+            final_direction = direction_b_a
+            final_rationale = rationale_b_a
+            final_confidence = confidence_b_a
+
+    return {
+        "interdependency_type": final_interdependency_type,
+        "direction": final_direction,
+        "rationale": final_rationale,
+        "confidence": final_confidence,
+    }
+
+
+def process_two_way_relationships(
+    relationship_a_b: Dict, relationship_b_a: Dict
+) -> Dict:
+    """
+    Dummy function to process two-way relationships.
+    For now, it always selects relationship A->B as the final data.
+    In a real scenario, this would involve merging or reconciling the two relationships.
+    """
+    # This is where you'd implement the logic to combine/choose between A->B and B->A
+    # For example, you might choose the one with higher confidence, or merge rationales.
+    # As per the user's request, we'll just return relationship_a_b for now.
+    final_relationship_data = final_relationship(
+        relationship_a_b["interdependency_type"],
+        relationship_b_a["interdependency_type"],
+        relationship_a_b["direction"],
+        relationship_b_a["direction"],
+        relationship_a_b["rationale"],
+        relationship_b_a["rationale"],
+        relationship_a_b["confidence"],
+        relationship_b_a["confidence"],
+    )
+    return final_relationship_data
+
+
 def create_and_save_graphs(data_path: Path, output_dir: Path) -> GraphDataLibrary:
     """
     Loads data, creates graph structures, saves them to files, and returns the result.
@@ -485,23 +613,30 @@ def create_and_save_graphs(data_path: Path, output_dir: Path) -> GraphDataLibrar
         if company_name.find("risk_catalog") != -1:
             continue
         company_data = df[df["company"] == company_name]
-        company_graph_data_dict: Dict[str, CompanyGraphData] = (
-            generate_graph_elements_for_company(company_data, company_name)
-        )
+        for relation_process in ["oneway_run", "twoway_run"]:
+            company_graph_data_dict: Dict[str, CompanyGraphData] = (
+                generate_graph_elements_for_company(
+                    company_data, company_name, relation_process=relation_process
+                )
+            )
 
-        company_graph_datas.update(company_graph_data_dict)
-        # create risk overlay data
-        for company_graph_id, company_graph_data in company_graph_data_dict.items():
-            overlay_key = f"risk_catalog_top_n_overlay|{timestamp}|{company_graph_id}"
-            risk_catalog_top_n_overlay_data = generate_risk_catalog_top_n_overlay_data(
-                company_name,
-                risk_catalog_reference_datas[timestamp],
-                company_graph_data,
-                top_n=10,
-            )
-            risk_overlay_datas[overlay_key] = RiskOverlayData(
-                overlay_data=risk_catalog_top_n_overlay_data,
-            )
+            company_graph_datas.update(company_graph_data_dict)
+            # create risk overlay data
+            for company_graph_id, company_graph_data in company_graph_data_dict.items():
+                overlay_key = (
+                    f"risk_catalog_top_n_overlay|{timestamp}|{company_graph_id}"
+                )
+                risk_catalog_top_n_overlay_data = (
+                    generate_risk_catalog_top_n_overlay_data(
+                        company_name,
+                        risk_catalog_reference_datas[timestamp],
+                        company_graph_data,
+                        top_n=10,
+                    )
+                )
+                risk_overlay_datas[overlay_key] = RiskOverlayData(
+                    overlay_data=risk_catalog_top_n_overlay_data,
+                )
 
     graph_data_library = GraphDataLibrary(
         company_graph_datas=company_graph_datas,
@@ -513,7 +648,6 @@ def create_and_save_graphs(data_path: Path, output_dir: Path) -> GraphDataLibrar
     with open(output_dir / "graph_data_library.pkl", "wb") as f:
         pickle.dump(graph_data_library, f)
     print(f"Saved all graphs to {output_dir / 'graph_data_library.pkl'}")
-
     # Create and save graph_data_library_no_embedding
     company_graph_datas_no_embedding = {}
     for (
@@ -560,6 +694,11 @@ def create_and_save_graphs(data_path: Path, output_dir: Path) -> GraphDataLibrar
         pickle.dump(graph_data_library_no_embedding, f)
     print(
         f"Saved all graphs without embedding to {output_dir / 'graph_data_library_no_embedding.pkl'}"
+    )
+    with open(output_dir / "graph_data_library_no_embedding_dict.pkl", "wb") as f:
+        pickle.dump(graph_data_library_no_embedding.model_dump(), f)
+    print(
+        f"Saved all graphs without embedding to {output_dir / 'graph_data_library_no_embedding_dict.pkl'}"
     )
 
     return graph_data_library
