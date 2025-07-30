@@ -245,12 +245,14 @@ class TargetRiskReductionItemSchema(BaseModel):
         description="List of related assets (e.g., 'Supplier A', 'Supplier B')",
     )
 
-    target_risk_likelihood: Literal[
-        "1: Rare", "2: Unlikely", "3: Moderate", "4: Likely", "5: Certain"
-    ]  # Example values
-    target_risk_impact: Literal[
-        "1: Minor", "2: Moderate", "3: Significant", "4: Major", "5: Catastrophic"
-    ]  # Example values
+    target_risk_likelihood: int = Field(
+        ...,
+        description="Target risk likelihood (integer 1-5)",
+    )
+    target_risk_impact: int = Field(
+        ...,
+        description="Target risk impact (integer 1-5)",
+    )
 
 
 class Control(BaseModel):
