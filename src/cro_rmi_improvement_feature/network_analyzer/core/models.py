@@ -35,13 +35,31 @@ class RiskData(BaseModel):
     )
 
 
+class RiskDataNoEmbedding(RiskData):
+    """
+    A version of RiskData without the embedding field, for cases where only data is needed.
+    """
+
+    pass
+
+
 class RiskDataWithEmbedding(BaseModel):
     data: RiskData = Field(..., description="The risk node data.")
     embedding: List[float] = Field(..., description="The embedding of the risk node.")
 
 
+class RiskDataWithOutEmbedding(BaseModel):
+    data: RiskDataNoEmbedding = Field(..., description="The risk node data.")
+
+
 class RiskOverlayData(BaseModel):
     overlay_data: Dict[str, List[RiskDataWithEmbedding]] = Field(
+        ..., description="A dictionary mapping risk name to list of risk data"
+    )
+
+
+class RiskOverlayDataNoEmbedding(BaseModel):
+    overlay_data: Dict[str, List[RiskDataWithOutEmbedding]] = Field(
         ..., description="A dictionary mapping risk name to list of risk data"
     )
 
@@ -57,6 +75,34 @@ class EdgeData(BaseModel):
     confidence: Optional[float] = Field(None, description="The confidence of the edge.")
     risk_a_data: RiskData = Field(..., description="The risk node data of risk a.")
     risk_b_data: RiskData = Field(..., description="The risk node data of risk b.")
+    distance: float = Field(..., description="The distance between the two risks.")
+    cosine_similarity: float = Field(
+        ..., description="The cosine similarity of the edge."
+    )
+    high_priority: bool = Field(
+        False,
+        description="it is a primary connected edge to high risk",
+    )
+    similarity_rank: int = Field(
+        ..., description="The similarity rank of the edge start from 0"
+    )
+
+
+class EdgeDataNoEmbedding(BaseModel):
+    source: str = Field(..., description="The source of the edge. risk_a_data.id")
+    target: str = Field(..., description="The target of the edge. risk_b_data.id")
+    interdependency_type: Optional[str] = Field(
+        None, description="The interdependency type of the edge."
+    )
+    direction: Optional[str] = Field(None, description="The direction of the edge.")
+    rationale: Optional[str] = Field(None, description="The rationale of the edge.")
+    confidence: Optional[float] = Field(None, description="The confidence of the edge.")
+    risk_a_data: RiskDataNoEmbedding = Field(
+        ..., description="The risk node data of risk a."
+    )
+    risk_b_data: RiskDataNoEmbedding = Field(
+        ..., description="The risk node data of risk b."
+    )
     distance: float = Field(..., description="The distance between the two risks.")
     cosine_similarity: float = Field(
         ..., description="The cosine similarity of the edge."
@@ -98,6 +144,32 @@ class CompanyGraphData(BaseModel):
     )
 
 
+class CompanyGraphDataNoEmbedding(BaseModel):
+    """
+    Represents the graph data for a specific company and embedding type, without embedding data.
+    """
+
+    nodes: List[RiskDataWithOutEmbedding] = Field(
+        ..., description="List of node objects, each with properties."
+    )
+    edges: List[EdgeDataNoEmbedding] = Field(
+        ...,
+        description="List of edge objects, each with source, target, and properties.",
+    )
+    number_of_displayed_edges: Optional[int] = Field(
+        None, description="Number of edges to display in the graph."
+    )
+    risk_catalog_reference_id: Optional[str] = Field(
+        None, description="Version of the risk catalog used for reference."
+    )
+    overlay_top_n_risks_catalog_id: Optional[str] = Field(
+        None, description="Version of the top n risks catalog."
+    )
+    overlay_news_id_list: Optional[List[str]] = Field(
+        None, description="List of news ids to overlay sub graph"
+    )
+
+
 class GraphDataLibrary(BaseModel):
     """
     The main schema representing graph data organized by embedding type -> company -> graph data
@@ -113,6 +185,26 @@ class GraphDataLibrary(BaseModel):
         description="A dictionary mapping risk_overlay_id str join by '|' (overlay_type|timestamp|embedding_source_type or overlay_name) to its RiskOverlayData.",
     )
     risk_catalog_reference_datas: Dict[str, List[RiskDataWithEmbedding]] = Field(
+        ...,
+        description="A dictionary mapping timestamp to the risk data.",
+    )
+
+
+class GraphDataLibraryNoEmbedding(BaseModel):
+    """
+    The main schema representing graph data organized by embedding type -> company -> graph data, without embedding data.
+    """
+
+    company_graph_datas: Dict[str, CompanyGraphDataNoEmbedding] = Field(
+        ...,
+        description="A dictionary mapping company_graph_id str join by '|' (datestamp|company|embedding_source_type) to its CompanyGraphData.",
+    )
+
+    risk_overlay_datas: Dict[str, RiskOverlayDataNoEmbedding] = Field(
+        ...,
+        description="A dictionary mapping risk_overlay_id str join by '|' (overlay_type|timestamp|embedding_source_type or overlay_name) to its RiskOverlayData.",
+    )
+    risk_catalog_reference_datas: Dict[str, List[RiskDataWithOutEmbedding]] = Field(
         ...,
         description="A dictionary mapping timestamp to the risk data.",
     )

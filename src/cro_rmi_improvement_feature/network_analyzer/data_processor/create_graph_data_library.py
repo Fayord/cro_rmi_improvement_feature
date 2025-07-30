@@ -26,6 +26,14 @@ from core.models import (
     CompanyGraphData,
     GraphDataLibrary,
 )
+from core.models import (
+    RiskDataNoEmbedding,
+    RiskDataWithOutEmbedding,
+    EdgeDataNoEmbedding,
+    CompanyGraphDataNoEmbedding,
+    GraphDataLibraryNoEmbedding,
+    RiskOverlayDataNoEmbedding,
+)
 
 
 def load_embedded_data(file_path: Path) -> pd.DataFrame:
@@ -42,6 +50,51 @@ def load_embedded_data(file_path: Path) -> pd.DataFrame:
 def generate_risk_id(company: str, idx: int, date_stamp: str) -> str:
     """Generates a unique node id for a risk data."""
     return f"risk_{company.replace(' ', '_')}_{date_stamp}_{idx}"
+
+
+def convert_to_no_embedding_risk_data(
+    risk_data_with_embedding: RiskDataWithEmbedding,
+) -> RiskDataWithOutEmbedding:
+    """Converts RiskDataWithEmbedding to RiskDataWithOutEmbedding."""
+    return RiskDataWithOutEmbedding(data=risk_data_with_embedding.data)
+
+
+def convert_to_no_embedding_edge_data(edge_data: EdgeData) -> EdgeDataNoEmbedding:
+    """Converts EdgeData to EdgeDataNoEmbedding."""
+    return EdgeDataNoEmbedding(
+        source=edge_data.source,
+        target=edge_data.target,
+        interdependency_type=edge_data.interdependency_type,
+        direction=edge_data.direction,
+        rationale=edge_data.rationale,
+        confidence=edge_data.confidence,
+        risk_a_data=edge_data.risk_a_data,
+        risk_b_data=edge_data.risk_b_data,
+        distance=edge_data.distance,
+        cosine_similarity=edge_data.cosine_similarity,
+        high_priority=edge_data.high_priority,
+        similarity_rank=edge_data.similarity_rank,
+    )
+
+
+def convert_to_no_embedding_company_graph_data(
+    company_graph_data: CompanyGraphData,
+) -> CompanyGraphDataNoEmbedding:
+    """Converts CompanyGraphData to CompanyGraphDataNoEmbedding."""
+    nodes_no_embedding = [
+        convert_to_no_embedding_risk_data(node) for node in company_graph_data.nodes
+    ]
+    edges_no_embedding = [
+        convert_to_no_embedding_edge_data(edge) for edge in company_graph_data.edges
+    ]
+    return CompanyGraphDataNoEmbedding(
+        nodes=nodes_no_embedding,
+        edges=edges_no_embedding,
+        number_of_displayed_edges=company_graph_data.number_of_displayed_edges,
+        risk_catalog_reference_id=company_graph_data.risk_catalog_reference_id,
+        overlay_top_n_risks_catalog_id=company_graph_data.overlay_top_n_risks_catalog_id,
+        overlay_news_id_list=company_graph_data.overlay_news_id_list,
+    )
 
 
 def create_nodes_with_embedding(
@@ -215,42 +268,6 @@ def generate_graph_elements_for_company(
         print(
             f"Number of remain high priority node counter: {remain_high_priority_node_counter}"
         )
-
-        # high_priority_count_per_node = Counter()
-        # for edge in edges:
-        #     risk_level_a = edge["risk_a_data"].risk_level
-        #     risk_level_b = edge["risk_b_data"].risk_level
-        #     if risk_level_a >= 3 or risk_level_b >= 3:
-        #         edge["high_priority"] = True
-        #     else:
-        #         edge["high_priority"] = False
-
-        # for edge in edges:
-        #     risk_level_a = edge["risk_a_data"].risk_level
-        #     risk_level_b = edge["risk_b_data"].risk_level
-        #     if risk_level_a >= 3:
-        #         edge["high_priority_a_count"] = (
-        #             high_priority_count_per_node[edge["risk_a_data"].id] + 1
-        #         )
-        #     if risk_level_b >= 3:
-        #         edge["high_priority_b_count"] = (
-        #             high_priority_count_per_node[edge["risk_b_data"].id] + 1
-        #         )
-        # # print number of high priority edges
-        # print(
-        #     f"\tNumber of high priority edges: {len([edge for edge in edges if edge['high_priority']])}"
-        # )
-        # print(
-        #     f"\tNumber of low priority edges: {len([edge for edge in edges if not edge['high_priority']])}"
-        # )
-
-        # # 2. Separate edges into high-priority and low-priority lists
-        # high_priority_edges = sorted(
-        #     [edge for edge in edges if edge["high_priority"]],
-        #     key=lambda x: x[
-        #         "similarity_rank"
-        #     ],  # Sort high-priority by similarity_rank too
-        # )
         print(f"high_priority_edges: {len(high_priority_edges)}")
         low_priority_edges = sorted(
             [edge for edge in edges if not edge["high_priority"]],
@@ -492,6 +509,55 @@ def create_and_save_graphs(data_path: Path, output_dir: Path) -> GraphDataLibrar
     with open(output_dir / "graph_data_library.pkl", "wb") as f:
         pickle.dump(graph_data_library, f)
     print(f"Saved all graphs to {output_dir / 'graph_data_library.pkl'}")
+
+    # Create and save graph_data_library_no_embedding
+    company_graph_datas_no_embedding = {}
+    for (
+        company_graph_id,
+        company_graph_data,
+    ) in graph_data_library.company_graph_datas.items():
+        company_graph_datas_no_embedding[company_graph_id] = (
+            convert_to_no_embedding_company_graph_data(company_graph_data)
+        )
+
+    risk_overlay_datas_no_embedding = {}
+    for (
+        risk_overlay_id,
+        risk_overlay_data,
+    ) in graph_data_library.risk_overlay_datas.items():
+        overlay_data_no_embedding = {}
+        for (
+            risk_name,
+            risk_list_with_embedding,
+        ) in risk_overlay_data.overlay_data.items():
+            overlay_data_no_embedding[risk_name] = [
+                convert_to_no_embedding_risk_data(r) for r in risk_list_with_embedding
+            ]
+        risk_overlay_datas_no_embedding[risk_overlay_id] = RiskOverlayDataNoEmbedding(
+            overlay_data=overlay_data_no_embedding
+        )
+
+    risk_catalog_reference_datas_no_embedding = {}
+    for (
+        timestamp,
+        risk_list_with_embedding,
+    ) in graph_data_library.risk_catalog_reference_datas.items():
+        risk_catalog_reference_datas_no_embedding[timestamp] = [
+            convert_to_no_embedding_risk_data(r) for r in risk_list_with_embedding
+        ]
+
+    graph_data_library_no_embedding = GraphDataLibraryNoEmbedding(
+        company_graph_datas=company_graph_datas_no_embedding,
+        risk_overlay_datas=risk_overlay_datas_no_embedding,
+        risk_catalog_reference_datas=risk_catalog_reference_datas_no_embedding,
+    )
+
+    with open(output_dir / "graph_data_library_no_embedding.pkl", "wb") as f:
+        pickle.dump(graph_data_library_no_embedding, f)
+    print(
+        f"Saved all graphs without embedding to {output_dir / 'graph_data_library_no_embedding.pkl'}"
+    )
+
     return graph_data_library
 
 
