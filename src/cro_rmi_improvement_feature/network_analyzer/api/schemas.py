@@ -159,7 +159,6 @@ class FileSchema(BaseModel):
 class TaskSchema(BaseModel):
     """Schema for an individual task."""
 
-    pre_defined_task: str
     weighted_activity_percent: Optional[str] = Field(
         None,
         description="Weighted activity percent (optional because it can be default to 100/n_tasks but not be accurate)",
@@ -195,7 +194,6 @@ class PlanDetailSchema(BaseModel):
 
     mitigation_plan_name: str
     mitigation_plan_objective: str
-    linked_risks: List[str]  # e.g., ["Regulatory Compliance Failure"]
     priority_level: Literal["Low", "Medium", "High"]
     plan_owner: Optional[str] = Field(
         None,
