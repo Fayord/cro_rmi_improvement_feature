@@ -474,7 +474,7 @@ def process_graph_data_for_display(
                         "edge_relation_reason": edge_data.rationale,
                         "source_risk_data": edge_data.risk_a_data.model_dump(),
                         "target_risk_data": edge_data.risk_b_data.model_dump(),
-                        "arrow_weight": None,
+                        "arrow_weight": "none",
                     }
                 }
             )
@@ -1154,7 +1154,7 @@ def display_edge_info(edge_data):
         raw_weight = edge_data["data"].get("raw_weight", "N/A")
         display_weight = edge_data["data"].get("weight", "N/A")
         color = edge_data["data"].get("color", "N/A")
-        arrow_weight = edge_data["data"].get("arrow_weight", "N/A")
+        arrow_weight = edge_data["data"].get("arrow_weight", "none")
         do_not_cal_weight = edge_data["data"].get("do_not_cal_weight", "N/A")
         edge_relation_reason = edge_data["data"].get("edge_relation_reason", "N/A")
         source_risk_data = edge_data["data"].get("source_risk_data", {})
