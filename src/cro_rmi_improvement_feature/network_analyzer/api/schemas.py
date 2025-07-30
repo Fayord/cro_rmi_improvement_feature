@@ -278,6 +278,44 @@ class Control(BaseModel):
 class MitigationPlan(Control): ...
 
 
+class MitigationPlanResponse(MitigationPlan): ...
+
+
+class ClusterMitigationPlanRequest(BaseModel):
+    """Request schema for mitigation plan generation. include data in RiskRecommendationRequest but have optional data of existing control"""
+
+    id: str = Field(..., description="Unique identifier for the user")
+    graph_id: str = Field(..., description="Graph identifier")
+    cluster_of_risk: dict = Field(
+        ...,
+        description="Cluster data and include key that represent recommend cluster",
+    )
+    year_quarter: str = Field(
+        ...,
+        description="Year and quarter of the risk (e.g., '2024-Q1', '2024-Q2')",
+    )
+
+
+class ProcessAnswerDetail(BaseModel):
+    """Schema for details within process_answer."""
+
+    ref_id: Optional[str] = Field(
+        None, description="Reference ID for the process detail"
+    )
+    name: str = Field(..., description="Name of the process detail")
+    description: str = Field(..., description="Description of the process detail")
+
+
+class CauseAnswerDetail(BaseModel):
+    """Schema for details within cause_answer."""
+
+    ref_id: Optional[int] = Field(None, description="Reference ID for the cause detail")
+    name: str = Field(..., description="Name of the cause detail")
+    description: Optional[str] = Field(
+        None, description="Description of the cause detail"
+    )
+
+
 class ExistingControl(BaseModel):
     """Schema for a detailed control record, replacing the old ExistingControl."""
 
@@ -348,9 +386,6 @@ class ExistingControl(BaseModel):
                 "id": 174,
             }
         }
-
-
-class MitigationPlanResponse(MitigationPlan): ...
 
 
 class ExistingRisk(BaseModel):
@@ -472,21 +507,6 @@ class RiskRecommendationRequest(BaseModel):
         }
 
 
-class ClusterMitigationPlanRequest(BaseModel):
-    """Request schema for mitigation plan generation. include data in RiskRecommendationRequest but have optional data of existing control"""
-
-    id: str = Field(..., description="Unique identifier for the user")
-    graph_id: str = Field(..., description="Graph identifier")
-    cluster_of_risk: dict = Field(
-        ...,
-        description="Cluster data and include key that represent recommend cluster",
-    )
-    year_quarter: str = Field(
-        ...,
-        description="Year and quarter of the risk (e.g., '2024-Q1', '2024-Q2')",
-    )
-
-
 class MitigationPlanRequest(BaseModel):
     """Future feature"""
 
@@ -498,24 +518,4 @@ class MitigationPlanRequest(BaseModel):
     year_quarter: str = Field(
         ...,
         description="Year and quarter of the risk (e.g., '2024-Q1', '2024-Q2')",
-    )
-
-
-class ProcessAnswerDetail(BaseModel):
-    """Schema for details within process_answer."""
-
-    ref_id: Optional[str] = Field(
-        None, description="Reference ID for the process detail"
-    )
-    name: str = Field(..., description="Name of the process detail")
-    description: str = Field(..., description="Description of the process detail")
-
-
-class CauseAnswerDetail(BaseModel):
-    """Schema for details within cause_answer."""
-
-    ref_id: Optional[int] = Field(None, description="Reference ID for the cause detail")
-    name: str = Field(..., description="Name of the cause detail")
-    description: Optional[str] = Field(
-        None, description="Description of the cause detail"
     )
