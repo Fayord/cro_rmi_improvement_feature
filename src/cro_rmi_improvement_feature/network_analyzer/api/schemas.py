@@ -2,10 +2,11 @@
 Pydantic schemas for the risk recommendation API.
 """
 
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Dict
 from pydantic import BaseModel, Field
 import sys
 import os
+from datetime import datetime
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append("../")
@@ -277,7 +278,76 @@ class Control(BaseModel):
 class MitigationPlan(Control): ...
 
 
-class ExistingControl(Control): ...
+class ExistingControl(BaseModel):
+    """Schema for a detailed control record, replacing the old ExistingControl."""
+
+    ref_id: Optional[str] = Field(
+        None, description="Reference ID for the control record"
+    )
+    question_id: int = Field(
+        ..., description="ID of the question associated with the control"
+    )
+    name: str = Field(..., description="Name of the control")
+    description: str = Field(..., description="Description of the control")
+    process_answer: Dict[str, ProcessAnswerDetail] = Field(
+        ..., description="Dictionary of process answers, keyed by a unique identifier"
+    )
+    cause_answer: Dict[str, CauseAnswerDetail] = Field(
+        ..., description="Dictionary of cause answers, keyed by a unique identifier"
+    )
+    external_organization_answer: Dict = Field(
+        ..., description="Dictionary for external organization answers"
+    )
+    owner: str = Field(..., description="Owner of the control")
+    control_design: str = Field(..., description="Design of the control")
+    effective_operating: str = Field(
+        ..., description="Operating effectiveness of the control"
+    )
+    form_id: int = Field(..., description="Form ID associated with the control")
+    created_at: datetime = Field(..., description="Timestamp of creation")
+    updated_at: datetime = Field(..., description="Timestamp of last update")
+    created_by: str = Field(..., description="User ID who created the record")
+    updated_by: str = Field(..., description="User ID who last updated the record")
+    id: int = Field(..., description="Unique identifier for the control record")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "ref_id": None,
+                "question_id": 357,
+                "name": "Cyber Risk Awareness",
+                "description": "sensitive data leak",
+                "process_answer": {
+                    "1.717389162884948e+38": {
+                        "ref_id": None,
+                        "name": "normal thing",
+                        "description": "",
+                    }
+                },
+                "cause_answer": {
+                    "2255": {
+                        "ref_id": 2255,
+                        "name": "root_cause_2_CY001_lack_of_encryption_during_in-transit,_at-rest_or_in-use",
+                        "description": None,
+                    },
+                    "1.5648670951729316e+38": {
+                        "ref_id": None,
+                        "name": "new thing",
+                        "description": "",
+                    },
+                },
+                "external_organization_answer": {},
+                "owner": "ME",
+                "control_design": "None",
+                "effective_operating": "Good",
+                "form_id": 376,
+                "created_at": "2025-05-26T03:11:50.814825Z",
+                "updated_at": "2025-05-26T03:22:32.109071Z",
+                "created_by": "39ca950c-7041-70e2-9b25-7f19980673a4",
+                "updated_by": "39ca950c-7041-70e2-9b25-7f19980673a4",
+                "id": 174,
+            }
+        }
 
 
 class MitigationPlanResponse(MitigationPlan): ...
@@ -428,4 +498,24 @@ class MitigationPlanRequest(BaseModel):
     year_quarter: str = Field(
         ...,
         description="Year and quarter of the risk (e.g., '2024-Q1', '2024-Q2')",
+    )
+
+
+class ProcessAnswerDetail(BaseModel):
+    """Schema for details within process_answer."""
+
+    ref_id: Optional[str] = Field(
+        None, description="Reference ID for the process detail"
+    )
+    name: str = Field(..., description="Name of the process detail")
+    description: str = Field(..., description="Description of the process detail")
+
+
+class CauseAnswerDetail(BaseModel):
+    """Schema for details within cause_answer."""
+
+    ref_id: Optional[int] = Field(None, description="Reference ID for the cause detail")
+    name: str = Field(..., description="Name of the cause detail")
+    description: Optional[str] = Field(
+        None, description="Description of the cause detail"
     )
