@@ -69,6 +69,22 @@ companys = sorted(list(graph_data_library.company_graph_datas.keys()))
 # Set default company
 default_company = companys[0] if companys else None
 
+# --- New constants for risk level and edge count mapping ---
+# Define 4 levels for node size based on risk level
+risk_level_to_size_map = {
+    "Low": 20,
+    "Medium": 40,
+    "High": 60,
+    "Critical": 80,
+}
+
+# Define 4 levels for node color based on edge count
+# These colors are for when 'node color is number of edges'
+edge_count_color_map = risk_level_color_map
+
+node_proportion_list = [50, 25, 15, 10]
+node_size_list = [1, 40, 80, 120]
+
 
 # --- New function to calculate custom pyramid layout positions ---
 def calculate_pyramid_layout(
@@ -255,7 +271,6 @@ def filter_elements_by_weight_and_recalculate_edges(
     remaining_slider_value = slider_value - high_priority_edge_count
     for el in elements:
         if "source" in el.get("data", {}):
-            # get all edge that have high_priority
             if el["data"]["similarity_rank"] < remaining_slider_value:
                 # Append edge for now, will update properties in second pass
                 filtered_elements.append(el)
@@ -334,14 +349,20 @@ def filter_elements_by_weight_and_recalculate_edges(
 def process_graph_data_for_display(
     graph_data_library: GraphDataLibrary,
     company: str,
+    visualization_mode: str,  # Add visualization mode parameter
 ):
     nodes = []
     edges = []
     line_weight_list = []
     node_size_multiplier = 10  # This might be superseded by node_size_list
-    number_of_scales = 3  # Number of levels for node and edge sizing
-    node_proportion_list = [65, 30, 5]  # Proportions for node sizing
-    node_size_list = [1, 50, 120]  # Actual sizes for nodes based on level
+    # number_of_scales = 4  # Now using 4 levels for default too
+    node_proportion_list = [50, 25, 15, 10]  # Proportions for node sizing (4 levels)
+    node_size_list = [
+        1,
+        40,
+        80,
+        120,
+    ]  # Actual sizes for nodes based on level (4 levels)
 
     company_graph_data: CompanyGraphData = None
     for k, v in graph_data_library.company_graph_datas.items():
@@ -357,35 +378,107 @@ def process_graph_data_for_display(
         node_id = node_data_with_embedding.data.id
         node_raw_sizes_from_edges[node_id] = 0.0
 
+    # Calculate edge counts for each node for the 'risk_focus' mode once
+    node_edge_counts_for_color = Counter()
+    for edge_data in company_graph_data.edges:
+        node_edge_counts_for_color[edge_data.source] += 1
+        node_edge_counts_for_color[edge_data.target] += 1
+
     for edge_data in company_graph_data.edges:
         raw_weight = (
-            edge_data.cosine_similarity
-        )  # raw_weight is -1 to 1 and 1 is the most similar
+            1 + edge_data.cosine_similarity
+        ) / 2  # raw_weight is 0 to 2 and 2 is the most similar
         line_weight_list.append(raw_weight)
 
         node_raw_sizes_from_edges[edge_data.source] += raw_weight
         node_raw_sizes_from_edges[edge_data.target] += raw_weight
+        if edge_data.direction == "A → B":
 
-        edges.append(
-            {
-                "data": {
-                    "source": edge_data.source,
-                    "target": edge_data.target,
-                    "similarity_rank": edge_data.similarity_rank,
-                    "raw_weight": raw_weight,
-                    "high_priority": edge_data.high_priority,
-                    "do_not_cal_weight": False,  # This might need to be re-evaluated
-                    "edge_relation_reason": edge_data.rationale,
-                    "source_risk_data": edge_data.risk_a_data.model_dump(),
-                    "target_risk_data": edge_data.risk_b_data.model_dump(),
-                    "arrow_weight": (
-                        "triangle"
-                        if edge_data.direction in ["A → B", "Both"]
-                        else "none"
-                    ),
+            edges.append(
+                {
+                    "data": {
+                        "source": edge_data.source,
+                        "target": edge_data.target,
+                        "similarity_rank": edge_data.similarity_rank,
+                        "raw_weight": raw_weight,
+                        "high_priority": edge_data.high_priority,
+                        "do_not_cal_weight": False,  # This might need to be re-evaluated
+                        "edge_relation_reason": edge_data.rationale,
+                        "source_risk_data": edge_data.risk_a_data.model_dump(),
+                        "target_risk_data": edge_data.risk_b_data.model_dump(),
+                        "arrow_weight": "triangle",
+                    }
                 }
-            }
-        )
+            )
+        elif edge_data.direction == "B → A":
+            edges.append(
+                {
+                    "data": {
+                        "source": edge_data.target,
+                        "target": edge_data.source,
+                        "similarity_rank": edge_data.similarity_rank,
+                        "raw_weight": raw_weight,
+                        "high_priority": edge_data.high_priority,
+                        "do_not_cal_weight": False,  # This might need to be re-evaluated
+                        "edge_relation_reason": edge_data.rationale,
+                        "source_risk_data": edge_data.risk_b_data.model_dump(),
+                        "target_risk_data": edge_data.risk_a_data.model_dump(),
+                        "arrow_weight": "triangle",
+                    }
+                }
+            )
+        elif edge_data.direction == "Both":
+            edges.append(
+                {
+                    "data": {
+                        "source": edge_data.source,
+                        "target": edge_data.target,
+                        "similarity_rank": edge_data.similarity_rank,
+                        "raw_weight": raw_weight,
+                        "high_priority": edge_data.high_priority,
+                        "do_not_cal_weight": False,  # This might need to be re-evaluated
+                        "edge_relation_reason": edge_data.rationale,
+                        "source_risk_data": edge_data.risk_a_data.model_dump(),
+                        "target_risk_data": edge_data.risk_b_data.model_dump(),
+                        "arrow_weight": "triangle",
+                    }
+                }
+            )
+            # this one swap
+            edges.append(
+                {
+                    "data": {
+                        "source": edge_data.target,
+                        "target": edge_data.source,
+                        "similarity_rank": edge_data.similarity_rank,
+                        "raw_weight": raw_weight,
+                        "high_priority": edge_data.high_priority,
+                        "do_not_cal_weight": True,  # This might need to be re-evaluated
+                        "edge_relation_reason": edge_data.rationale,
+                        "source_risk_data": edge_data.risk_b_data.model_dump(),
+                        "target_risk_data": edge_data.risk_a_data.model_dump(),
+                        "arrow_weight": "triangle",
+                    }
+                }
+            )
+        else:
+            edges.append(
+                {
+                    "data": {
+                        "source": edge_data.source,
+                        "target": edge_data.target,
+                        "similarity_rank": edge_data.similarity_rank,
+                        "raw_weight": raw_weight,
+                        "high_priority": edge_data.high_priority,
+                        "do_not_cal_weight": False,  # This might need to be re-evaluated
+                        "edge_relation_reason": edge_data.rationale,
+                        "source_risk_data": edge_data.risk_a_data.model_dump(),
+                        "target_risk_data": edge_data.risk_b_data.model_dump(),
+                        "arrow_weight": None,
+                    }
+                }
+            )
+
     if line_weight_list:
         edge_boundaries = find_proportional_count_boundaries(
             line_weight_list, [60, 30, 10]  # Proportions for edge sizing
@@ -401,40 +494,57 @@ def process_graph_data_for_display(
 
     current_node_raw_sizes = list(node_raw_sizes_from_edges.values())
     if current_node_raw_sizes:
+        # Determine node_proportion_list and node_size_list based on visualization_mode
+        if visualization_mode == "default":
+            current_node_proportion_list = node_proportion_list
+            current_node_size_list = node_size_list
+        else:  # "risk_focus"
+            current_node_proportion_list = node_proportion_list
+            current_node_size_list = node_size_list
+
         node_boundaries = find_proportional_count_boundaries(
-            current_node_raw_sizes, node_proportion_list
+            current_node_raw_sizes, current_node_proportion_list
         )
+
         for node_data_with_embedding in company_graph_data.nodes:
             node_id = node_data_with_embedding.data.id
-            raw_size = node_raw_sizes_from_edges[node_id]
-            level = get_level_from_boundaries(node_boundaries, raw_size)
-            display_size = node_size_list[level - 1]
-            # Use risk_level to determine node fill color
-            node_fill_color = risk_level_color_map[
-                node_data_with_embedding.data.risk_level
-            ]
-            # Store risk_cat for outline styling in stylesheet
+            risk_level = node_data_with_embedding.data.risk_level
             risk_category = node_data_with_embedding.data.risk_cat
-            # New: Set outline color and width as data properties
-            outline_color = risk_cat_color_dict.get(
-                risk_category, "#CCCCCC"
-            )  # Get color from dict or fallback
-            outline_width = 3  # Fixed line width as requested
+            story = node_data_with_embedding.data.risk_desc_summary or ""
+            outline_color = risk_cat_color_dict.get(risk_category, "#CCCCCC")
+            outline_width = 3
+
+            # Determine node size and color based on visualization_mode
+            if visualization_mode == "default":
+                raw_size = node_raw_sizes_from_edges[node_id]
+                level = get_level_from_boundaries(node_boundaries, raw_size)
+                display_size = current_node_size_list[level - 1]
+                node_fill_color = risk_level_color_map[risk_level]
+            else:  # "risk_focus"
+                raw_size = node_raw_sizes_from_edges[node_id]
+                level = get_level_from_boundaries(node_boundaries, raw_size)
+
+                node_fill_color = edge_count_color_map.get(level)
+                display_size = current_node_size_list[risk_level - 1]
 
             nodes.append(
                 {
                     "data": {
                         "id": node_id,
                         "label": node_data_with_embedding.data.label,
-                        "raw_size": raw_size,
-                        "size_level": level,
+                        "raw_size": node_raw_sizes_from_edges[
+                            node_id
+                        ],  # Keep original raw size
+                        "size_level": (
+                            level if visualization_mode == "default" else None
+                        ),  # Only meaningful in default mode
                         "size": display_size,
-                        "color": node_fill_color,  # Node color based on risk_level
-                        "risk_level": node_data_with_embedding.data.risk_level,
-                        "risk_cat": risk_category,  # Store risk_cat for outline
-                        "story": node_data_with_embedding.data.risk_desc_summary or "",
-                        "color_outline": outline_color,  # New: Outline color data property
-                        "outline_linewidth": outline_width,  # New: Outline width data property
+                        "color": node_fill_color,
+                        "risk_level": risk_level,
+                        "risk_cat": risk_category,
+                        "story": story,
+                        "color_outline": outline_color,
+                        "outline_linewidth": outline_width,
                     },
                     "position": {
                         "x": random.uniform(100, 700),
@@ -442,7 +552,6 @@ def process_graph_data_for_display(
                     },
                 }
             )
-
     total_edges = len(edges)
     total_nodes = len(nodes)
     print(
@@ -455,7 +564,8 @@ def process_graph_data_for_display(
 elements, line_weights, total_edges, total_nodes = process_graph_data_for_display(
     graph_data_library,
     default_company,
-)  # Initial call with empty checklist
+    "default",  # Initial call with empty checklist
+)
 
 app = dash.Dash(__name__, url_base_pathname="/plot_network/")
 
@@ -522,6 +632,24 @@ app.layout = html.Div(
             clearable=False,
             style={"width": "200px", "margin-bottom": "10px"},
         ),
+        # --- New Dropdown for Visualization Mode --- #
+        dcc.Dropdown(
+            id="visualization-mode-dropdown",
+            options=[
+                {
+                    "label": "Default (Size by Edges, Color by Risk Level)",
+                    "value": "default",
+                },
+                {
+                    "label": "Risk Focus (Size by Risk Level, Color by Edges)",
+                    "value": "risk_focus",
+                },
+            ],
+            value="default",  # Default visualization mode
+            clearable=False,
+            style={"width": "400px", "margin-bottom": "10px"},
+        ),
+        # --- End of New Dropdown --- #
         # Removed the bezier control sliders as per user request
         # html.Div(
         #     [
@@ -723,6 +851,9 @@ app.layout = html.Div(
         Input(
             "toggle-node-outline", "value"
         ),  # <-- Add input for the new outline toggle
+        Input(
+            "visualization-mode-dropdown", "value"
+        ),  # <-- Add input for visualization mode
     ],
 )
 def update_graph_and_output(
@@ -739,6 +870,7 @@ def update_graph_and_output(
     hide_no_arrow_edges,
     current_cytoscape_layout,  # <-- Add parameter for current layout
     toggle_node_outline_value,
+    visualization_mode,  # <-- Add parameter for visualization mode
 ):
     ctx = dash.callback_context
     if not ctx.triggered:
@@ -752,6 +884,7 @@ def update_graph_and_output(
         graph_data_library,
         company,
         # selected_checklist_values, # Removed this parameter
+        visualization_mode,  # Pass visualization_mode
     )
 
     # If the company dropdown triggered the callback, reset num_edges_to_show
@@ -861,11 +994,15 @@ def update_graph_and_output(
     # --- End of new logic ---
 
     # --- New: Recalculate node sizes after filtering edges with no arrows ---
-    # Define or ensure access to these lists within this callback if they are not global
-    node_proportion_list = [65, 30, 5]  # Proportions for node sizing
-    node_size_list = [1, 50, 120]  # Actual sizes for nodes based on level
+
+    # All node size recalculations based on edges will now use the 4-level scheme.
+    current_node_proportion_list_for_recalc = node_proportion_list
+    current_node_size_list_for_recalc = node_size_list
+
     filtered_elements = recalculate_node_sizes_based_on_edges(
-        filtered_elements, node_proportion_list, node_size_list
+        filtered_elements,
+        current_node_proportion_list_for_recalc,
+        current_node_size_list_for_recalc,
     )
     # --- End of new node size recalculation ---
 

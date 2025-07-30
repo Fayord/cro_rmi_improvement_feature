@@ -189,7 +189,7 @@ def generate_graph_elements_for_company(
     company_data: pd.DataFrame,
     company_name: str,
     classify_model_name: str = "gpt-4.1-mini",
-    high_priority_search_space: float = 3.0,  # 3 * number of nodes
+    high_priority_search_space: float = 4.0,
     high_priority_atmost_number_edges: int = 3,
     relation_process: str = "oneway_run",
 ) -> Dict[str, CompanyGraphData]:
