@@ -56,7 +56,11 @@ def convert_to_no_embedding_risk_data(
     risk_data_with_embedding: RiskDataWithEmbedding,
 ) -> RiskDataWithOutEmbedding:
     """Converts RiskDataWithEmbedding to RiskDataWithOutEmbedding."""
-    return RiskDataWithOutEmbedding(data=risk_data_with_embedding.data)
+    # Create an instance of RiskDataNoEmbedding from the data part of RiskDataWithEmbedding
+    risk_data_no_embedding = RiskDataNoEmbedding(
+        **risk_data_with_embedding.data.model_dump()
+    )
+    return RiskDataWithOutEmbedding(data=risk_data_no_embedding)
 
 
 def convert_to_no_embedding_edge_data(edge_data: EdgeData) -> EdgeDataNoEmbedding:
@@ -68,8 +72,8 @@ def convert_to_no_embedding_edge_data(edge_data: EdgeData) -> EdgeDataNoEmbeddin
         direction=edge_data.direction,
         rationale=edge_data.rationale,
         confidence=edge_data.confidence,
-        risk_a_data=edge_data.risk_a_data,
-        risk_b_data=edge_data.risk_b_data,
+        risk_a_data=RiskDataNoEmbedding(**edge_data.risk_a_data.model_dump()),
+        risk_b_data=RiskDataNoEmbedding(**edge_data.risk_b_data.model_dump()),
         distance=edge_data.distance,
         cosine_similarity=edge_data.cosine_similarity,
         high_priority=edge_data.high_priority,
