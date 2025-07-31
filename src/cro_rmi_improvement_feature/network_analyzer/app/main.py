@@ -375,7 +375,10 @@ def apply_visual_styles_to_elements(  # Renamed function
     # Count nodes and edges in the final display_elements
     for el in display_elements:
         if "source" in el.get("data", {}):
-            node_edge_counter["edge"] += 1
+            if el["data"]["do_not_cal_weight"]:
+                pass
+            else:
+                node_edge_counter["edge"] += 1
         else:
             node_edge_counter["node"] += 1
 
@@ -1083,6 +1086,7 @@ def update_graph_and_output(
     # --- End of node dropdown options generation ---
 
     # Update output text to reflect the number of edges shown and the threshold
+
     output_text = f"Showing {node_edge_counter['edge']} out of {total_edges} edges. Nodes: {node_edge_counter['node']}"
 
     # Always use bezier_stylesheet with fixed values for "fcose"
