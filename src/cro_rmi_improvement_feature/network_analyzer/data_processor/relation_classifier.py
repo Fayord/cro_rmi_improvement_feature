@@ -20,8 +20,13 @@ dir_path = os.path.dirname(os.path.abspath(__file__))
 
 set_llm_cache(SQLiteCache(database_path=f"{dir_path}/.relationship_classifier.db"))
 
-env_path = os.path.join(dir_path, "../../.env")
+env_path = os.path.join(dir_path, "../../../../.env")
 load_dotenv(env_path)
+# print abs env path
+print(f"env_path: {os.path.abspath(env_path)}")
+# if OPENAI_API_KEY not set, raise error
+if not os.getenv("OPENAI_API_KEY"):
+    raise ValueError("OPENAI_API_KEY is not set")
 
 
 class RiskRelationResult(BaseModel):
@@ -30,7 +35,14 @@ class RiskRelationResult(BaseModel):
         "Correlated",
         "None",
     ]
-    direction: Optional[Literal["A → B", "B → A", "None", "Both"]] = None
+    direction: Optional[
+        Literal[
+            "Both",
+            "A → B",
+            "B → A",
+            "None",
+        ]
+    ] = None
     rationale: str
     confidence: int = Field(..., ge=1, le=5)
 
@@ -90,9 +102,9 @@ Valid Types:
 3. **None**: There is no meaningful relationship.
 
 Valid directions:
+- Both (Bidirectional causality)
 - A → B (Risk A leads to Risk B)
 - B → A (Risk B leads to Risk A)
-- Both (Bidirectional causality)
 - None (For non-directional types)
 
 Direction is required for Causal types.

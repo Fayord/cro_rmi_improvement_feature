@@ -282,7 +282,7 @@ def generate_graph_elements_for_company(
         # raise
         total_classifications_needed = 2 * number_of_nodes
         classified_count = 0
-
+        direction_list = Counter()
         # 3. Classify high-priority edges first
         for edge in tqdm(
             high_priority_edges,
@@ -293,6 +293,8 @@ def generate_graph_elements_for_company(
                 edge["risk_b_data"].model_dump(),
                 classify_model_name,
             )
+            direction_list[relationship_a_b["direction"]] += 1
+
             # For two-way processing, also classify B->A
             if relation_process == "twoway_run":
                 relationship_b_a = classify_relationship(
@@ -320,6 +322,8 @@ def generate_graph_elements_for_company(
                     edge["risk_b_data"].model_dump(),
                     classify_model_name,
                 )
+                direction_list[relationship_a_b["direction"]] += 1
+
                 if relation_process == "twoway_run":
                     relationship_b_a = classify_relationship(
                         edge["risk_b_data"].model_dump(),
@@ -342,7 +346,8 @@ def generate_graph_elements_for_company(
                     "confidence": None,
                 }
                 processed_edges.append(edge)
-
+        print(f"direction_list: {direction_list}")
+        # raise
         # 5. Process all edges (classified and unclassified) to create EdgeData objects
         final_edge_data_list = []
         for edge in processed_edges:
