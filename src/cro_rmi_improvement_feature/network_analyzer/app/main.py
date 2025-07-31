@@ -82,8 +82,8 @@ risk_level_to_size_map = {
 # These colors are for when 'node color is number of edges'
 edge_count_color_map = risk_level_color_map
 
-node_proportion_list = [50, 25, 15, 10]
-node_size_list = [1, 40, 80, 120]
+node_proportion_list = [60, 30, 10]
+node_size_list = [40, 80, 120]
 
 
 # --- New function to calculate custom pyramid layout positions ---
@@ -244,105 +244,142 @@ def recalculate_node_sizes_based_on_edges(
             level = get_level_from_boundaries(node_boundaries, raw_size)
             display_size = node_size_list[level - 1]
             node_size_counter[level] += 1
+            if raw_size == 0:
+                display_size = 1
             el["data"]["size"] = display_size  # Update node size to display size
+
     # print(f"{node_size_counter=}")
-    return elements
+    return elements, node_raw_sizes, node_boundaries
 
 
 # --- New function to filter elements by weight and recalculate edge properties ---
-def filter_elements_by_weight_and_recalculate_edges(
-    elements, slider_value, edge_rgb_color_list
+def apply_visual_styles_to_elements(  # Renamed function
+    elements,
+    num_edges_to_show,
+    edge_rgb_color_list,
+    visualization_mode,
+    risk_level_color_map,
+    edge_count_color_map,
+    node_proportion_list,
+    node_size_list,
 ):
     node_edge_counter = Counter()
-    filtered_elements = []
-    old_line_weights = []
-    nodes_in_filtered = {}  # Store nodes for easy access
+    filtered_elements_with_edges = []
+    line_weights_of_visible_edges = []  # Renamed from old_line_weights
 
-    # First pass: Filter edges and collect raw weights of visible edges
+    # First pass: Filter edges by similarity_rank and high_priority
     high_priority_edge_count = 0
     for el in elements:
         if "source" in el.get("data", {}):
             if el["data"]["high_priority"]:
                 high_priority_edge_count += 1
-                filtered_elements.append(el)
-                node_edge_counter["edge"] += 1
-                old_line_weights.append(el["data"]["raw_weight"])
-    print(f"high_priority_edge_count: {high_priority_edge_count}")
-    remaining_slider_value = slider_value - high_priority_edge_count
+                filtered_elements_with_edges.append(el)
+                # node_edge_counter["edge"] += 1 # Will count later after full filtering
+                line_weights_of_visible_edges.append(el["data"]["raw_weight"])
+    # print(f"high_priority_edge_count: {high_priority_edge_count}") # Debugging removed
+
+    remaining_edges_to_show = num_edges_to_show - high_priority_edge_count
+    # Ensure we don't try to add negative number of edges
+    if remaining_edges_to_show < 0:
+        remaining_edges_to_show = 0
+
+    # Sort all non-high_priority edges by similarity_rank to pick the top ones
+    non_high_priority_edges = []
     for el in elements:
-        if "source" in el.get("data", {}):
-            if el["data"]["similarity_rank"] < remaining_slider_value:
-                # Append edge for now, will update properties in second pass
-                filtered_elements.append(el)
-                node_edge_counter["edge"] += 1
-                old_line_weights.append(el["data"]["raw_weight"])
+        if "source" in el.get("data", {}) and not el["data"]["high_priority"]:
+            non_high_priority_edges.append(el)
+
+    # Sort by similarity_rank (lower rank means higher similarity/priority)
+    non_high_priority_edges_sorted = sorted(
+        non_high_priority_edges, key=lambda x: x["data"]["similarity_rank"]
+    )
+
+    # Add the top 'remaining_edges_to_show' non-high_priority edges
+    for i, el in enumerate(non_high_priority_edges_sorted):
+        if i < remaining_edges_to_show:
+            filtered_elements_with_edges.append(el)
+            line_weights_of_visible_edges.append(el["data"]["raw_weight"])
         else:
-            # Keep all nodes and store them
-            filtered_elements.append(el)
-            nodes_in_filtered[el["data"]["id"]] = el
-            node_edge_counter["node"] += 1
+            break  # Stop once we have enough edges
+
+    # Now, add all nodes. Nodes are not filtered out by edge weight.
+    nodes_in_elements = {}
+    for el in elements:
+        if "source" not in el.get("data", {}):  # It's a node
+            nodes_in_elements[el["data"]["id"]] = el
+            # node_edge_counter["node"] += 1 # Will count later after all elements are finalized
+
+    # Combine filtered edges and all nodes to form the initial set of elements for display
+    # We create a new list for elements that will have their styles applied
+    display_elements = list(nodes_in_elements.values()) + filtered_elements_with_edges
 
     # Recalculate edge boundaries and update edge properties for visible edges
-    if old_line_weights:
-        edge_boudaries = find_proportional_count_boundaries(
-            old_line_weights, [60, 30, 10]
+    if line_weights_of_visible_edges:
+        edge_boundaries = find_proportional_count_boundaries(
+            line_weights_of_visible_edges, node_proportion_list
         )
-        for el in filtered_elements:
-            if "source" in el.get("data", {}):
-                old_line_weight = el["data"]["raw_weight"]
-                level = get_level_from_boundaries(edge_boudaries, old_line_weight)
+        for el in display_elements:
+            if "source" in el.get("data", {}):  # It's an edge
+                raw_weight = el["data"]["raw_weight"]
+                level = get_level_from_boundaries(edge_boundaries, raw_weight)
                 display_weight = level * EDGE_SIZE_MULTIPLIER
                 el["data"]["color"] = edge_rgb_color_list[level - 1]
                 el["data"][
                     "weight"
                 ] = display_weight  # Update edge weight to display weight
 
-    # --- Removed the node raw_size and display_size recalculation logic from here ---
-    # --- New logic to recalculate node raw_size based on filtered edge display weights ---
-    # Initialize node raw sizes based on filtered edges
-    # node_raw_sizes = {node_id: 0.0 for node_id in nodes_in_filtered.keys()}
+    # --- Recalculate node sizes based on the visible edges ---
+    display_elements, node_raw_sizes, node_boundaries = (
+        recalculate_node_sizes_based_on_edges(
+            display_elements,
+            node_proportion_list,  # Use global node_proportion_list
+            node_size_list,  # Use global node_size_list
+        )
+    )
 
-    # for el in filtered_elements:
-    #     if "source" in el.get("data", {}):
-    #         src_id = el["data"]["source"]
-    #         tgt_id = el["data"]["target"]
-    #         # Use the updated display weight ('weight')
-    #         w = el["data"]["raw_weight"]
-    #         if src_id in node_raw_sizes:
-    #             node_raw_sizes[src_id] += w
-    #         if tgt_id in node_raw_sizes:
-    #             node_raw_sizes[tgt_id] += w
+    # --- Apply node fill colors based on visualization_mode ---
+    for el in display_elements:
+        if "source" not in el.get("data", {}):  # It's a node
+            node_id = el["data"]["id"]
+            risk_level = el["data"]["risk_level"]
+            raw_size = node_raw_sizes[node_id]
 
-    # # Get the list of raw sizes in the same order as nodes were added to filtered_elements
-    # current_node_raw_sizes = [
-    #     node_raw_sizes[el["data"]["id"]]
-    #     for el in filtered_elements
-    #     if "source" not in el.get("data", {})
-    # ]
-    # node_size_counter = Counter()
-    # # Recalculate node boundaries and update node sizes for visible nodes
-    # if current_node_raw_sizes:
-    #     # Assuming node_proportion_list and node_size_list are accessible in this scope
-    #     # (They are defined globally in the provided context)
-    #     node_proportion_list = [65, 30, 5]  # Define or ensure access to these
-    #     node_size_list = [1, 50, 120]  # Define or ensure access to these
+            if visualization_mode == "default":
+                node_fill_color = risk_level_color_map[risk_level]
+            else:  # "risk_focus"
+                # For risk_focus, color by edge count (level of raw_size)
+                # We need to re-evaluate the level based on the raw_size (which is the sum of filtered edge weights)
+                # and then map it to the edge_count_color_map
+                # The node_boundaries for color in "risk_focus" mode should reflect the distribution
+                # of raw_sizes calculated from the filtered edges.
 
-    #     node_boudaries = find_proportional_count_boundaries(
-    #         current_node_raw_sizes, node_proportion_list
-    #     )
+                level = get_level_from_boundaries(node_boundaries, raw_size)
+                level_for_color = level
+                if raw_size == 0:
+                    level_for_color = 0
+                # The edge_count_color_map uses 1-indexed levels
+                node_fill_color = edge_count_color_map.get(
+                    level_for_color + 1, "#CCCCCC"
+                )
+                # node_size depend on risk_level
+                node_size_for_risk_focus = [1] + node_size_list
 
-    #     node_idx = 0
-    #     for el in filtered_elements:
-    #         if "source" not in el.get("data", {}):
-    #             raw_size = current_node_raw_sizes[node_idx]
-    #             level = get_level_from_boundaries(node_boudaries, raw_size)
-    #             display_size = node_size_list[level - 1]
-    #             node_size_counter[level] += 1
-    #             el["data"]["size"] = display_size  # Update node size to display size
-    #             node_idx += 1
-    # --- End of new logic ---
-    # print(f"{node_size_counter=}")
-    return filtered_elements, node_edge_counter
+                node_size = node_size_for_risk_focus[risk_level - 1]
+                el["data"]["size"] = node_size
+
+            el["data"]["color"] = node_fill_color
+            el["data"]["size_level"] = (
+                level_for_color if visualization_mode == "risk_focus" else None
+            )  # Set size_level for risk_focus mode
+
+    # Count nodes and edges in the final display_elements
+    for el in display_elements:
+        if "source" in el.get("data", {}):
+            node_edge_counter["edge"] += 1
+        else:
+            node_edge_counter["node"] += 1
+
+    return display_elements, node_edge_counter
 
 
 # New function to process graph data for display
@@ -353,16 +390,9 @@ def process_graph_data_for_display(
 ):
     nodes = []
     edges = []
-    line_weight_list = []
+    line_weight_list = []  # Re-added: Used for calculating edge slider max/min
     node_size_multiplier = 10  # This might be superseded by node_size_list
     # number_of_scales = 4  # Now using 4 levels for default too
-    node_proportion_list = [50, 25, 15, 10]  # Proportions for node sizing (4 levels)
-    node_size_list = [
-        1,
-        40,
-        80,
-        120,
-    ]  # Actual sizes for nodes based on level (4 levels)
 
     company_graph_data: CompanyGraphData = None
     for k, v in graph_data_library.company_graph_datas.items():
@@ -373,25 +403,26 @@ def process_graph_data_for_display(
     if not company_graph_data:
         return [], [], 0, 0
 
-    node_raw_sizes_from_edges = {}
-    for node_data_with_embedding in company_graph_data.nodes:
-        node_id = node_data_with_embedding.data.id
-        node_raw_sizes_from_edges[node_id] = 0.0
+    # node_raw_sizes_from_edges = {} # Removed: Node raw sizes will be calculated after filtering
+    # for node_data_with_embedding in company_graph_data.nodes:
+    #     node_id = node_data_with_embedding.data.id
+    #     node_raw_sizes_from_edges[node_id] = 0.0
 
     # Calculate edge counts for each node for the 'risk_focus' mode once
-    node_edge_counts_for_color = Counter()
-    for edge_data in company_graph_data.edges:
-        node_edge_counts_for_color[edge_data.source] += 1
-        node_edge_counts_for_color[edge_data.target] += 1
+    # This might still be useful as raw data, but the application to color will move
+    # node_edge_counts_for_color = Counter()
+    # for edge_data in company_graph_data.edges:
+    #     node_edge_counts_for_color[edge_data.source] += 1
+    #     node_edge_counts_for_color[edge_data.target] += 1
 
     for edge_data in company_graph_data.edges:
         raw_weight = (
             1 + edge_data.cosine_similarity
         ) / 2  # raw_weight is 0 to 2 and 2 is the most similar
-        line_weight_list.append(raw_weight)
+        line_weight_list.append(raw_weight)  # Re-added: Populate line_weight_list
 
-        node_raw_sizes_from_edges[edge_data.source] += raw_weight
-        node_raw_sizes_from_edges[edge_data.target] += raw_weight
+        # node_raw_sizes_from_edges[edge_data.source] += raw_weight # Removed: Node raw sizes calculated later
+        # node_raw_sizes_from_edges[edge_data.target] += raw_weight # Removed: Node raw sizes calculated later
         if edge_data.direction == "A → B":
 
             edges.append(
@@ -407,6 +438,9 @@ def process_graph_data_for_display(
                         "source_risk_data": edge_data.risk_a_data.model_dump(),
                         "target_risk_data": edge_data.risk_b_data.model_dump(),
                         "arrow_weight": "triangle",
+                        "original_direction": edge_data.direction,
+                        # "weight": None, # Will be set later
+                        # "color": None, # Will be set later
                     }
                 }
             )
@@ -424,6 +458,9 @@ def process_graph_data_for_display(
                         "source_risk_data": edge_data.risk_b_data.model_dump(),
                         "target_risk_data": edge_data.risk_a_data.model_dump(),
                         "arrow_weight": "triangle",
+                        "original_direction": edge_data.direction,
+                        # "weight": None, # Will be set later
+                        # "color": None, # Will be set later
                     }
                 }
             )
@@ -441,6 +478,9 @@ def process_graph_data_for_display(
                         "source_risk_data": edge_data.risk_a_data.model_dump(),
                         "target_risk_data": edge_data.risk_b_data.model_dump(),
                         "arrow_weight": "triangle",
+                        "original_direction": edge_data.direction,
+                        # "weight": None, # Will be set later
+                        # "color": None, # Will be set later
                     }
                 }
             )
@@ -458,6 +498,9 @@ def process_graph_data_for_display(
                         "source_risk_data": edge_data.risk_b_data.model_dump(),
                         "target_risk_data": edge_data.risk_a_data.model_dump(),
                         "arrow_weight": "triangle",
+                        "original_direction": edge_data.direction,
+                        # "weight": None, # Will be set later
+                        # "color": None, # Will be set later
                     }
                 }
             )
@@ -475,89 +518,101 @@ def process_graph_data_for_display(
                         "source_risk_data": edge_data.risk_a_data.model_dump(),
                         "target_risk_data": edge_data.risk_b_data.model_dump(),
                         "arrow_weight": "none",
+                        "original_direction": edge_data.direction,
+                        # "weight": None, # Will be set later
+                        # "color": None, # Will be set later
                     }
                 }
             )
 
-    if line_weight_list:
-        edge_boundaries = find_proportional_count_boundaries(
-            line_weight_list, [60, 30, 10]  # Proportions for edge sizing
+    # if line_weight_list: # Removed: edge properties will be calculated later
+    #     edge_boundaries = find_proportional_count_boundaries(
+    #         line_weight_list, [60, 30, 10]  # Proportions for edge sizing
+    #     )
+
+    #     for edge_el in edges:
+    #         raw_weight = edge_el["data"]["raw_weight"]
+    #         level = get_level_from_boundaries(edge_boundaries, raw_weight)
+    #         display_weight = level * EDGE_SIZE_MULTIPLIER
+    #         edge_color = edge_rgb_color_list[level - 1]
+    #         edge_el["data"]["weight"] = display_weight
+    #         edge_el["data"]["color"] = edge_color
+
+    # current_node_raw_sizes = list(node_raw_sizes_from_edges.values()) # Removed: Node properties will be calculated later
+    # if current_node_raw_sizes: # Removed: Node properties will be calculated later
+    #     # Determine node_proportion_list and node_size_list based on visualization_mode
+    #     if visualization_mode == "default":
+    #         current_node_proportion_list = node_proportion_list
+    #         current_node_size_list = node_size_list
+    #     else:  # "risk_focus"
+    #         current_node_proportion_list = node_proportion_list
+    #         current_node_size_list = node_size_list
+
+    #     node_boundaries = find_proportional_count_boundaries(
+    #         current_node_raw_sizes, current_node_proportion_list
+    #     )
+
+    for node_data_with_embedding in company_graph_data.nodes:
+        node_id = node_data_with_embedding.data.id
+        risk_level = node_data_with_embedding.data.risk_level
+        risk_category = node_data_with_embedding.data.risk_cat
+        story = node_data_with_embedding.data.risk_desc_summary or ""
+        outline_color = risk_cat_color_dict.get(risk_category, "#CCCCCC")
+        outline_width = 3
+
+        # Determine node size and color based on visualization_mode # Removed: will be done later
+        # if visualization_mode == "default":
+        #     raw_size = node_raw_sizes_from_edges[node_id]
+        #     level = get_level_from_boundaries(node_boundaries, raw_size)
+        #     display_size = current_node_size_list[level - 1]
+        #     node_fill_color = risk_level_color_map[risk_level]
+        # else:  # "risk_focus"
+        #     raw_size = node_raw_sizes_from_edges[node_id]
+        #     level = get_level_from_boundaries(node_boundaries, raw_size)
+        #     print(f"raw_size: {raw_size}")
+        #     if raw_size == 0:
+        #         print(f"raw_size is 0 for node {node_id}")
+        #         level = 0
+        #     node_fill_color = edge_count_color_map.get(level + 1)
+
+        #     display_size = current_node_size_list[risk_level - 1]
+
+        nodes.append(
+            {
+                "data": {
+                    "id": node_id,
+                    "label": node_data_with_embedding.data.label,
+                    # "raw_size": node_raw_sizes_from_edges[
+                    #     node_id
+                    # ],  # Keep original raw size # Removed: raw_size calculated later
+                    # "size_level": ( # Removed: size_level calculated later
+                    #     level if visualization_mode == "default" else None
+                    # ),
+                    # "size": display_size, # Removed: size calculated later
+                    # "color": node_fill_color, # Removed: color calculated later
+                    "risk_level": risk_level,
+                    "risk_cat": risk_category,
+                    "story": story,
+                    "color_outline": outline_color,
+                    "outline_linewidth": outline_width,
+                },
+                "position": {
+                    "x": random.uniform(100, 700),
+                    "y": random.uniform(100, 700),
+                },
+            }
         )
-
-        for edge_el in edges:
-            raw_weight = edge_el["data"]["raw_weight"]
-            level = get_level_from_boundaries(edge_boundaries, raw_weight)
-            display_weight = level * EDGE_SIZE_MULTIPLIER
-            edge_color = edge_rgb_color_list[level - 1]
-            edge_el["data"]["weight"] = display_weight
-            edge_el["data"]["color"] = edge_color
-
-    current_node_raw_sizes = list(node_raw_sizes_from_edges.values())
-    if current_node_raw_sizes:
-        # Determine node_proportion_list and node_size_list based on visualization_mode
-        if visualization_mode == "default":
-            current_node_proportion_list = node_proportion_list
-            current_node_size_list = node_size_list
-        else:  # "risk_focus"
-            current_node_proportion_list = node_proportion_list
-            current_node_size_list = node_size_list
-
-        node_boundaries = find_proportional_count_boundaries(
-            current_node_raw_sizes, current_node_proportion_list
-        )
-
-        for node_data_with_embedding in company_graph_data.nodes:
-            node_id = node_data_with_embedding.data.id
-            risk_level = node_data_with_embedding.data.risk_level
-            risk_category = node_data_with_embedding.data.risk_cat
-            story = node_data_with_embedding.data.risk_desc_summary or ""
-            outline_color = risk_cat_color_dict.get(risk_category, "#CCCCCC")
-            outline_width = 3
-
-            # Determine node size and color based on visualization_mode
-            if visualization_mode == "default":
-                raw_size = node_raw_sizes_from_edges[node_id]
-                level = get_level_from_boundaries(node_boundaries, raw_size)
-                display_size = current_node_size_list[level - 1]
-                node_fill_color = risk_level_color_map[risk_level]
-            else:  # "risk_focus"
-                raw_size = node_raw_sizes_from_edges[node_id]
-                level = get_level_from_boundaries(node_boundaries, raw_size)
-
-                node_fill_color = edge_count_color_map.get(level)
-                display_size = current_node_size_list[risk_level - 1]
-
-            nodes.append(
-                {
-                    "data": {
-                        "id": node_id,
-                        "label": node_data_with_embedding.data.label,
-                        "raw_size": node_raw_sizes_from_edges[
-                            node_id
-                        ],  # Keep original raw size
-                        "size_level": (
-                            level if visualization_mode == "default" else None
-                        ),  # Only meaningful in default mode
-                        "size": display_size,
-                        "color": node_fill_color,
-                        "risk_level": risk_level,
-                        "risk_cat": risk_category,
-                        "story": story,
-                        "color_outline": outline_color,
-                        "outline_linewidth": outline_width,
-                    },
-                    "position": {
-                        "x": random.uniform(100, 700),
-                        "y": random.uniform(100, 700),
-                    },
-                }
-            )
     total_edges = len(edges)
     total_nodes = len(nodes)
     print(
         f"Generated {total_nodes} nodes and {total_edges} edges for company {company}."
     )
-    return nodes + edges, line_weight_list, total_edges, total_nodes
+    return (
+        nodes + edges,
+        line_weight_list,
+        total_edges,
+        total_nodes,
+    )  # Return line_weights
 
 
 # Capture total_edges in the initial call
@@ -893,7 +948,7 @@ def update_graph_and_output(
 
     if total_edges == 0:
         # No edges, threshold doesn't matter for filtering, but set a high value
-        slider_value = float("inf")
+        # slider_value = float("inf") # This is not needed as it's calculated by num_edges_to_show
         current_num_edges_shown = 0
     else:
         # Ensure num_edges_to_show is within the valid range [0, total_edges]
@@ -903,18 +958,25 @@ def update_graph_and_output(
         # print(f"{num_edges_to_show=}") # Keep for debugging if needed
 
         if num_edges_to_show == 0:
-            # If showing 0 edges, set threshold higher than max weight
-            slider_value = max(line_weights) + 1 if line_weights else float("-inf")
+            # If showing 0 edges, set threshold higher than max weight (if weights exist)
+            slider_value = max(line_weights) + 1 if line_weights else float("inf")
         elif num_edges_to_show == total_edges:
-            # If showing all edges, set threshold lower than min weight
+            # If showing all edges, set threshold lower than min weight (if weights exist)
             slider_value = min(line_weights) - 1 if line_weights else float("-inf")
         else:
             # Sort weights descending and find the weight at the index corresponding to the number of edges
             sorted_weights = sorted(line_weights, reverse=True)
-            # The threshold is the weight of the (num_edges_to_show)-th edge (0-indexed)
-            # Ensure index is within bounds
-            index = min(num_edges_to_show - 1, len(sorted_weights) - 1)
-            slider_value = sorted_weights[index]
+            # Check if sorted_weights is not empty before accessing by index
+            if sorted_weights:
+                # The threshold is the weight of the (num_edges_to_show)-th edge (0-indexed)
+                # Ensure index is within bounds
+                index = min(num_edges_to_show - 1, len(sorted_weights) - 1)
+                slider_value = sorted_weights[index]
+            else:
+                # If sorted_weights is empty but num_edges_to_show is not 0 or total_edges, fallback
+                slider_value = float(
+                    "inf"
+                )  # Or float("-inf") depending on desired behavior
         current_num_edges_shown = (
             num_edges_to_show  # The number of edges we intend to show
         )
@@ -937,10 +999,15 @@ def update_graph_and_output(
         marks = {0: "0"}
 
     # Filter elements based on the calculated slider value and recalculate edge properties
-    filtered_elements, node_edge_counter = (
-        filter_elements_by_weight_and_recalculate_edges(
-            elements, num_edges_to_show, edge_rgb_color_list
-        )
+    filtered_elements, node_edge_counter = apply_visual_styles_to_elements(
+        elements,
+        num_edges_to_show,
+        edge_rgb_color_list,
+        visualization_mode,
+        risk_level_color_map,
+        edge_count_color_map,
+        node_proportion_list,
+        node_size_list,
     )
 
     # --- Apply outline visibility based on toggle-node-outline checkbox ---
@@ -967,16 +1034,16 @@ def update_graph_and_output(
     # --- End of outline visibility logic ---
 
     # --- New logic to hide edges with arrow_weight == 0 if toggle is active ---
-    # We will modify the elements in place or create a new list with modified styles
-    def filter_hide_no_arrow_edges(filtered_elements):
+    # This should be the final filtering step before returning elements.
+    def filter_hide_no_arrow_edges(elements_to_filter):
         modified_elements = []
-        for el in filtered_elements:
+        for el in elements_to_filter:
             if "source" in el.get("data", {}):  # It's an edge
                 if (
                     "hide" in hide_no_arrow_edges
                     and el["data"].get("arrow_weight") == "none"
                 ):
-                    pass
+                    pass  # Do not append this edge
                 else:
                     # Ensure opacity is 1 for visible edges (or default)
                     el["style"] = {"opacity": 1}
@@ -986,25 +1053,12 @@ def update_graph_and_output(
         return modified_elements
 
     filtered_elements = filter_hide_no_arrow_edges(filtered_elements)
-    # Update edge count after potentially hiding (by opacity) edges
-    # The count should still reflect all edges that passed the weight filter, even if their opacity is 0
+
+    # After applying the hide filter, recount the edges for display purposes.
     node_edge_counter["edge"] = sum(
         1 for el in filtered_elements if "source" in el.get("data", {})
     )
-    # --- End of new logic ---
-
-    # --- New: Recalculate node sizes after filtering edges with no arrows ---
-
-    # All node size recalculations based on edges will now use the 4-level scheme.
-    current_node_proportion_list_for_recalc = node_proportion_list
-    current_node_size_list_for_recalc = node_size_list
-
-    filtered_elements = recalculate_node_sizes_based_on_edges(
-        filtered_elements,
-        current_node_proportion_list_for_recalc,
-        current_node_size_list_for_recalc,
-    )
-    # --- End of new node size recalculation ---
+    # The node count remains the same as nodes are not hidden by this filter.
 
     # --- Generate options for the node dropdown ---
     node_options = []
@@ -1019,20 +1073,20 @@ def update_graph_and_output(
                     "value": el["data"]["id"],
                 }
             )
-    print(f"\n\t{node_options=}")
+    # print(f"\n\t{node_options=}") # Debugging removed
     # Debugging: Print a sample of node data to verify risk_cat
     sample_nodes = [
         el for el in filtered_elements if "source" not in el.get("data", {})
     ][:5]
-    print("\n--- Sample Node Data (for risk_cat verification) ---")
-    for node in sample_nodes:
-        print(json.dumps(node["data"], indent=2))
-    print("---------------------------------------------------")
+    # print("\n--- Sample Node Data (for risk_cat verification) ---") # Debugging removed
+    # for node in sample_nodes:
+    #     print(json.dumps(node["data"], indent=2)) # Debugging removed
+    # print("---------------------------------------------------") # Debugging removed
 
     # --- End of node dropdown options generation ---
 
     # Update output text to reflect the number of edges shown and the threshold
-    output_text = f"Showing {node_edge_counter['edge']} out of {total_edges} edges. Threshold weight: {num_edges_to_show:.2f}. Nodes: {node_edge_counter['node']}"
+    output_text = f"Showing {node_edge_counter['edge']} out of {total_edges} edges. Nodes: {node_edge_counter['node']}"
 
     # Always use bezier_stylesheet with fixed values for "fcose"
     dynamic_stylesheet = bezier_stylesheet
