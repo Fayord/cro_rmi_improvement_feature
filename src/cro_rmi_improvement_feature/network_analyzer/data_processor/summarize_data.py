@@ -17,11 +17,14 @@ import pandas as pd
 from pydantic import BaseModel
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_community.callbacks import get_openai_callback
+from dotenv import load_dotenv
 
 dir_path = os.path.dirname(os.path.abspath(__file__))
 
 set_llm_cache(SQLiteCache(database_path=f"{dir_path}/.langchain.db"))
 # === LangChain Setup ===
+load_dotenv(os.path.join(dir_path, "../../../../.env"))
 
 
 def get_llm(model_name="o3-mini"):
@@ -269,7 +272,11 @@ def main():
 
     try:
         # Process summaries
-        df_with_summaries = process_summaries(input_data_path, output_data_path)
+        with get_openai_callback() as cb:
+            df_with_summaries = process_summaries(input_data_path, output_data_path)
+            print(cb)
+            thb = cb.total_cost * 35
+            print(f"total cost (THB): {thb}")
 
         print(f"Processing completed! Processed {len(df_with_summaries)} records")
         print(f"Summarized data saved to: {output_data_path}")

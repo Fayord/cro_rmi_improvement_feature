@@ -19,7 +19,7 @@ dir_path = os.path.dirname(os.path.abspath(__file__))
 
 set_llm_cache(SQLiteCache(database_path=f"{dir_path}/.langchain.db"))
 
-env_path = os.path.join(dir_path, "../../.env")
+env_path = os.path.join(dir_path, "../../../.env")
 load_dotenv(env_path)
 
 

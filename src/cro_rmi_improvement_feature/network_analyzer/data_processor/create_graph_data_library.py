@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 import sys
 from tqdm import tqdm
+from langchain_community.callbacks import get_openai_callback
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append("../")
@@ -206,117 +207,109 @@ def generate_graph_elements_for_company(
     ]
     print(f"embedding_keys: {embedding_keys}")
     for embedding_key in embedding_keys:
-        nodes = create_nodes_with_embedding(data_list, company_name, embedding_key)
-        (nodes, edges) = create_nodes_and_edges(nodes, company_name)
-        # calculate distance threshold
-        number_of_nodes = len(nodes)
-        number_of_displayed_edges = 2 * number_of_nodes
-        number_of_edges_search_space = high_priority_search_space * number_of_nodes
-        processed_edges = []
+        with get_openai_callback() as cb:
+            nodes = create_nodes_with_embedding(data_list, company_name, embedding_key)
+            (nodes, edges) = create_nodes_and_edges(nodes, company_name)
+            # calculate distance threshold
+            number_of_nodes = len(nodes)
+            number_of_displayed_edges = 2 * number_of_nodes
+            number_of_edges_search_space = high_priority_search_space * number_of_nodes
+            processed_edges = []
 
-        # 1. Calculate high_priority for all edges while it is less than high_priority_threshold_percentage
-        # high_priority is a list of edges that have high risk level >=3
-        # and if one high risk node have less than high_priority_atmost_number_edges edges,
-        # then we extend search space to high_priority_search_space * number of nodes
-        high_priority_node_counter = Counter()
-        for node in nodes:
-            if node.data.risk_level >= 3:
-                high_priority_node_counter[node.data.id] = 0
-        # check is high_priority_node have exceed high_priority_atmost_number_edges then pop it out
-        for edge in edges:
-            if edge["similarity_rank"] < number_of_displayed_edges:
-                if edge["risk_a_data"].id in high_priority_node_counter.keys():
-                    high_priority_node_counter[edge["risk_a_data"].id] += 1
-                if edge["risk_b_data"].id in high_priority_node_counter.keys():
-                    high_priority_node_counter[edge["risk_b_data"].id] += 1
-        print()
-        print(f"high_priority_node_counter: {high_priority_node_counter}")
-        print()
-        remain_high_priority_node_counter = Counter()
-        for node_id, count in high_priority_node_counter.items():
-            # if count is less than high_priority_atmost_number_edges then add it to high_priority_node_list
-            if count < high_priority_atmost_number_edges:
-                number_of_edges_to_extend = high_priority_atmost_number_edges - count
-                remain_high_priority_node_counter[node_id] = number_of_edges_to_extend
-        print(remain_high_priority_node_counter)
-        print()
-        # sort edges by similarity_rank
-        edges = sorted(edges, key=lambda x: x["similarity_rank"])
-        # set all edge high_priority to False
-        for edge in edges:
-            edge["high_priority"] = False
-        for edge in edges:
-            if (
-                number_of_displayed_edges
-                <= edge["similarity_rank"]
-                < number_of_edges_search_space
-            ):
-                if edge["risk_a_data"].id in remain_high_priority_node_counter.keys():
-                    if remain_high_priority_node_counter[edge["risk_a_data"].id] > 0:
-                        remain_high_priority_node_counter[edge["risk_a_data"].id] -= 1
-                        edge["high_priority"] = True
-                if edge["risk_b_data"].id in remain_high_priority_node_counter.keys():
-                    if remain_high_priority_node_counter[edge["risk_b_data"].id] > 0:
-                        remain_high_priority_node_counter[edge["risk_b_data"].id] -= 1
-                        edge["high_priority"] = True
-        # count all high priority edges
-        print(
-            f"Number of high priority edges: {len([edge for edge in edges if edge['high_priority']])}"
-        )
-        # print edge that have high_priority
-        high_priority_edges = [edge for edge in edges if edge["high_priority"]]
-        for edge in high_priority_edges:
+            # 1. Calculate high_priority for all edges while it is less than high_priority_threshold_percentage
+            # high_priority is a list of edges that have high risk level >=3
+            # and if one high risk node have less than high_priority_atmost_number_edges edges,
+            # then we extend search space to high_priority_search_space * number of nodes
+            high_priority_node_counter = Counter()
+            for node in nodes:
+                if node.data.risk_level >= 3:
+                    high_priority_node_counter[node.data.id] = 0
+            # check is high_priority_node have exceed high_priority_atmost_number_edges then pop it out
+            for edge in edges:
+                if edge["similarity_rank"] < number_of_displayed_edges:
+                    if edge["risk_a_data"].id in high_priority_node_counter.keys():
+                        high_priority_node_counter[edge["risk_a_data"].id] += 1
+                    if edge["risk_b_data"].id in high_priority_node_counter.keys():
+                        high_priority_node_counter[edge["risk_b_data"].id] += 1
+            print()
+            print(f"high_priority_node_counter: {high_priority_node_counter}")
+            print()
+            remain_high_priority_node_counter = Counter()
+            for node_id, count in high_priority_node_counter.items():
+                # if count is less than high_priority_atmost_number_edges then add it to high_priority_node_list
+                if count < high_priority_atmost_number_edges:
+                    number_of_edges_to_extend = (
+                        high_priority_atmost_number_edges - count
+                    )
+                    remain_high_priority_node_counter[node_id] = (
+                        number_of_edges_to_extend
+                    )
+            print(remain_high_priority_node_counter)
+            print()
+            # sort edges by similarity_rank
+            edges = sorted(edges, key=lambda x: x["similarity_rank"])
+            # set all edge high_priority to False
+            for edge in edges:
+                edge["high_priority"] = False
+            for edge in edges:
+                if (
+                    number_of_displayed_edges
+                    <= edge["similarity_rank"]
+                    < number_of_edges_search_space
+                ):
+                    if (
+                        edge["risk_a_data"].id
+                        in remain_high_priority_node_counter.keys()
+                    ):
+                        if (
+                            remain_high_priority_node_counter[edge["risk_a_data"].id]
+                            > 0
+                        ):
+                            remain_high_priority_node_counter[
+                                edge["risk_a_data"].id
+                            ] -= 1
+                            edge["high_priority"] = True
+                    if (
+                        edge["risk_b_data"].id
+                        in remain_high_priority_node_counter.keys()
+                    ):
+                        if (
+                            remain_high_priority_node_counter[edge["risk_b_data"].id]
+                            > 0
+                        ):
+                            remain_high_priority_node_counter[
+                                edge["risk_b_data"].id
+                            ] -= 1
+                            edge["high_priority"] = True
+            # count all high priority edges
             print(
-                f"high_priority_edges: {edge['risk_a_data'].risk} -> {edge['risk_b_data'].risk} similarity_rank: {edge['similarity_rank']}"
+                f"Number of high priority edges: {len([edge for edge in edges if edge['high_priority']])}"
             )
+            # print edge that have high_priority
+            high_priority_edges = [edge for edge in edges if edge["high_priority"]]
+            for edge in high_priority_edges:
+                print(
+                    f"high_priority_edges: {edge['risk_a_data'].risk} -> {edge['risk_b_data'].risk} similarity_rank: {edge['similarity_rank']}"
+                )
 
-        print(
-            f"Number of remain high priority node counter: {remain_high_priority_node_counter}"
-        )
-        print(f"high_priority_edges: {len(high_priority_edges)}")
-        low_priority_edges = sorted(
-            [edge for edge in edges if not edge["high_priority"]],
-            key=lambda x: x["similarity_rank"],
-        )
-        print(f"low_priority_edges: {len(low_priority_edges)}")
-        # raise
-        total_classifications_needed = 2 * number_of_nodes
-        classified_count = 0
-        direction_list = Counter()
-        # 3. Classify high-priority edges first
-        for edge in tqdm(
-            high_priority_edges,
-            desc=f"Classifying HIGH PRIORITY relationships for {company_name} ({embedding_key})",
-        ):
-            relationship_a_b = classify_relationship(
-                edge["risk_a_data"].model_dump(),
-                edge["risk_b_data"].model_dump(),
-                classify_model_name,
+            print(
+                f"Number of remain high priority node counter: {remain_high_priority_node_counter}"
             )
-            direction_list[relationship_a_b["direction"]] += 1
-
-            # For two-way processing, also classify B->A
-            if relation_process == "twoway_run":
-                relationship_b_a = classify_relationship(
-                    edge["risk_b_data"].model_dump(),
-                    edge["risk_a_data"].model_dump(),
-                    classify_model_name,
-                )
-                # dummy function always select a->b as a final data
-                edge["relationship"] = process_two_way_relationships(
-                    relationship_a_b, relationship_b_a
-                )
-            else:
-                edge["relationship"] = relationship_a_b
-            classified_count += 1
-            processed_edges.append(edge)  # Add to processed list early to keep track
-
-        # 4. Classify remaining edges from low-priority list until limit is reached
-        for edge in tqdm(
-            low_priority_edges,
-            desc=f"Classifying LOW PRIORITY relationships for {company_name} ({embedding_key})",
-        ):
-            if classified_count < total_classifications_needed:
+            print(f"high_priority_edges: {len(high_priority_edges)}")
+            low_priority_edges = sorted(
+                [edge for edge in edges if not edge["high_priority"]],
+                key=lambda x: x["similarity_rank"],
+            )
+            print(f"low_priority_edges: {len(low_priority_edges)}")
+            # raise
+            total_classifications_needed = 2 * number_of_nodes
+            classified_count = 0
+            direction_list = Counter()
+            # 3. Classify high-priority edges first
+            for edge in tqdm(
+                high_priority_edges,
+                desc=f"Classifying HIGH PRIORITY relationships for {company_name} ({embedding_key})",
+            ):
                 relationship_a_b = classify_relationship(
                     edge["risk_a_data"].model_dump(),
                     edge["risk_b_data"].model_dump(),
@@ -324,77 +317,112 @@ def generate_graph_elements_for_company(
                 )
                 direction_list[relationship_a_b["direction"]] += 1
 
+                # For two-way processing, also classify B->A
                 if relation_process == "twoway_run":
                     relationship_b_a = classify_relationship(
                         edge["risk_b_data"].model_dump(),
                         edge["risk_a_data"].model_dump(),
                         classify_model_name,
                     )
+                    # dummy function always select a->b as a final data
                     edge["relationship"] = process_two_way_relationships(
                         relationship_a_b, relationship_b_a
                     )
                 else:
                     edge["relationship"] = relationship_a_b
                 classified_count += 1
-                processed_edges.append(edge)
-            else:
-                # If not classified, set relationship to None and add to processed_edges
-                edge["relationship"] = {
-                    "interdependency_type": None,
-                    "direction": None,
-                    "rationale": None,
-                    "confidence": None,
-                }
-                processed_edges.append(edge)
-        print(f"direction_list: {direction_list}")
-        # raise
-        # 5. Process all edges (classified and unclassified) to create EdgeData objects
-        final_edge_data_list = []
-        for edge in processed_edges:
-            relationship = edge.get(
-                "relationship",
-                {  # Use .get with a default for unclassified edges
-                    "interdependency_type": None,
-                    "direction": None,
-                    "rationale": None,
-                    "confidence": None,
-                },
-            )
+                processed_edges.append(
+                    edge
+                )  # Add to processed list early to keep track
 
-            # Determine source and target based on classification only if relationship exists and has a direction
-            if relationship["direction"] in ["A → B", "Both"]:
-                source = edge["risk_a_data"].id
-                target = edge["risk_b_data"].id
-            elif relationship["direction"] == "B → A":
-                source = edge["risk_b_data"].id
-                target = edge["risk_a_data"].id
-            else:  # For unclassified or 'None' direction, default to A as source, B as target
-                source = edge["risk_a_data"].id
-                target = edge["risk_b_data"].id
+            # 4. Classify remaining edges from low-priority list until limit is reached
+            for edge in tqdm(
+                low_priority_edges,
+                desc=f"Classifying LOW PRIORITY relationships for {company_name} ({embedding_key})",
+            ):
+                if classified_count < total_classifications_needed:
+                    relationship_a_b = classify_relationship(
+                        edge["risk_a_data"].model_dump(),
+                        edge["risk_b_data"].model_dump(),
+                        classify_model_name,
+                    )
+                    direction_list[relationship_a_b["direction"]] += 1
 
-            final_edge_data_list.append(
-                EdgeData(
-                    source=source,
-                    target=target,
-                    interdependency_type=relationship["interdependency_type"],
-                    direction=relationship["direction"],
-                    rationale=relationship["rationale"],
-                    confidence=relationship["confidence"],
-                    risk_a_data=edge["risk_a_data"],
-                    risk_b_data=edge["risk_b_data"],
-                    distance=edge["distance"],
-                    similarity_rank=edge["similarity_rank"],
-                    cosine_similarity=edge["cosine_similarity"],
-                    high_priority=edge["high_priority"],
+                    if relation_process == "twoway_run":
+                        relationship_b_a = classify_relationship(
+                            edge["risk_b_data"].model_dump(),
+                            edge["risk_a_data"].model_dump(),
+                            classify_model_name,
+                        )
+                        edge["relationship"] = process_two_way_relationships(
+                            relationship_a_b, relationship_b_a
+                        )
+                    else:
+                        edge["relationship"] = relationship_a_b
+                    classified_count += 1
+                    processed_edges.append(edge)
+                else:
+                    # If not classified, set relationship to None and add to processed_edges
+                    edge["relationship"] = {
+                        "interdependency_type": None,
+                        "direction": None,
+                        "rationale": None,
+                        "confidence": None,
+                    }
+                    processed_edges.append(edge)
+            print(f"direction_list: {direction_list}")
+            # raise
+            # 5. Process all edges (classified and unclassified) to create EdgeData objects
+            final_edge_data_list = []
+            for edge in processed_edges:
+                relationship = edge.get(
+                    "relationship",
+                    {  # Use .get with a default for unclassified edges
+                        "interdependency_type": None,
+                        "direction": None,
+                        "rationale": None,
+                        "confidence": None,
+                    },
                 )
+
+                # Determine source and target based on classification only if relationship exists and has a direction
+                if relationship["direction"] in ["A → B", "Both"]:
+                    source = edge["risk_a_data"].id
+                    target = edge["risk_b_data"].id
+                elif relationship["direction"] == "B → A":
+                    source = edge["risk_b_data"].id
+                    target = edge["risk_a_data"].id
+                else:  # For unclassified or 'None' direction, default to A as source, B as target
+                    source = edge["risk_a_data"].id
+                    target = edge["risk_b_data"].id
+
+                final_edge_data_list.append(
+                    EdgeData(
+                        source=source,
+                        target=target,
+                        interdependency_type=relationship["interdependency_type"],
+                        direction=relationship["direction"],
+                        rationale=relationship["rationale"],
+                        confidence=relationship["confidence"],
+                        risk_a_data=edge["risk_a_data"],
+                        risk_b_data=edge["risk_b_data"],
+                        distance=edge["distance"],
+                        similarity_rank=edge["similarity_rank"],
+                        cosine_similarity=edge["cosine_similarity"],
+                        high_priority=edge["high_priority"],
+                    )
+                )
+            print(f"number_of_displayed_edges: {number_of_displayed_edges}")
+            company_graph_id = f"{company_name}|{embedding_key}|{relation_process}"
+            print(f"company_graph_id: {company_graph_id}")
+            print(cb)
+            thb = cb.total_cost * 35
+            print(f"total cost (THB): {thb}")
+            company_graph_datas[company_graph_id] = CompanyGraphData(
+                nodes=nodes,
+                edges=final_edge_data_list,
+                number_of_displayed_edges=number_of_displayed_edges,
             )
-        print(f"number_of_displayed_edges: {number_of_displayed_edges}")
-        company_graph_id = f"{company_name}|{embedding_key}|{relation_process}"
-        company_graph_datas[company_graph_id] = CompanyGraphData(
-            nodes=nodes,
-            edges=final_edge_data_list,
-            number_of_displayed_edges=number_of_displayed_edges,
-        )
 
     return company_graph_datas
 
