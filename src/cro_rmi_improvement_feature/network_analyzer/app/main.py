@@ -428,8 +428,8 @@ def process_graph_data_for_display(
             edges.append(
                 {
                     "data": {
-                        "source": edge_data.source,
-                        "target": edge_data.target,
+                        "source": edge_data.risk_a_data.model_dump()["id"],
+                        "target": edge_data.risk_b_data.model_dump()["id"],
                         "similarity_rank": edge_data.similarity_rank,
                         "raw_weight": raw_weight,
                         "high_priority": edge_data.high_priority,
@@ -448,8 +448,8 @@ def process_graph_data_for_display(
             edges.append(
                 {
                     "data": {
-                        "source": edge_data.target,
-                        "target": edge_data.source,
+                        "source": edge_data.risk_b_data.model_dump()["id"],
+                        "target": edge_data.risk_a_data.model_dump()["id"],
                         "similarity_rank": edge_data.similarity_rank,
                         "raw_weight": raw_weight,
                         "high_priority": edge_data.high_priority,
@@ -468,8 +468,8 @@ def process_graph_data_for_display(
             edges.append(
                 {
                     "data": {
-                        "source": edge_data.source,
-                        "target": edge_data.target,
+                        "source": edge_data.risk_a_data.model_dump()["id"],
+                        "target": edge_data.risk_b_data.model_dump()["id"],
                         "similarity_rank": edge_data.similarity_rank,
                         "raw_weight": raw_weight,
                         "high_priority": edge_data.high_priority,
@@ -488,8 +488,8 @@ def process_graph_data_for_display(
             edges.append(
                 {
                     "data": {
-                        "source": edge_data.target,
-                        "target": edge_data.source,
+                        "source": edge_data.risk_b_data.model_dump()["id"],
+                        "target": edge_data.risk_a_data.model_dump()["id"],
                         "similarity_rank": edge_data.similarity_rank,
                         "raw_weight": raw_weight,
                         "high_priority": edge_data.high_priority,
@@ -508,8 +508,8 @@ def process_graph_data_for_display(
             edges.append(
                 {
                     "data": {
-                        "source": edge_data.source,
-                        "target": edge_data.target,
+                        "source": edge_data.risk_a_data.model_dump()["id"],
+                        "target": edge_data.risk_b_data.model_dump()["id"],
                         "similarity_rank": edge_data.similarity_rank,
                         "raw_weight": raw_weight,
                         "high_priority": edge_data.high_priority,
@@ -998,9 +998,30 @@ def update_graph_and_output(
     else:
         marks = {0: "0"}
 
+    # --- New logic to hide edges with arrow_weight == 0 if toggle is active ---
+    # This should be the final filtering step before returning elements.
+    def filter_hide_no_arrow_edges(elements_to_filter):
+        modified_elements = []
+        for el in elements_to_filter:
+            if "source" in el.get("data", {}):  # It's an edge
+                if (
+                    "hide" in hide_no_arrow_edges
+                    and el["data"].get("arrow_weight") == "none"
+                ):
+                    pass  # Do not append this edge
+                else:
+                    # Ensure opacity is 1 for visible edges (or default)
+                    el["style"] = {"opacity": 1}
+                    modified_elements.append(el)
+            else:  # It's a node
+                modified_elements.append(el)
+        return modified_elements
+
+    elements_after_arrow_filter = filter_hide_no_arrow_edges(elements)
+
     # Filter elements based on the calculated slider value and recalculate edge properties
     filtered_elements, node_edge_counter = apply_visual_styles_to_elements(
-        elements,
+        elements_after_arrow_filter,
         num_edges_to_show,
         edge_rgb_color_list,
         visualization_mode,
@@ -1033,31 +1054,7 @@ def update_graph_and_output(
             el["data"]["outline_linewidth"] = 3
     # --- End of outline visibility logic ---
 
-    # --- New logic to hide edges with arrow_weight == 0 if toggle is active ---
-    # This should be the final filtering step before returning elements.
-    def filter_hide_no_arrow_edges(elements_to_filter):
-        modified_elements = []
-        for el in elements_to_filter:
-            if "source" in el.get("data", {}):  # It's an edge
-                if (
-                    "hide" in hide_no_arrow_edges
-                    and el["data"].get("arrow_weight") == "none"
-                ):
-                    pass  # Do not append this edge
-                else:
-                    # Ensure opacity is 1 for visible edges (or default)
-                    el["style"] = {"opacity": 1}
-                    modified_elements.append(el)
-            else:  # It's a node
-                modified_elements.append(el)
-        return modified_elements
-
-    filtered_elements = filter_hide_no_arrow_edges(filtered_elements)
-
     # After applying the hide filter, recount the edges for display purposes.
-    node_edge_counter["edge"] = sum(
-        1 for el in filtered_elements if "source" in el.get("data", {})
-    )
     # The node count remains the same as nodes are not hidden by this filter.
 
     # --- Generate options for the node dropdown ---
@@ -1213,6 +1210,7 @@ def display_edge_info(edge_data):
         edge_relation_reason = edge_data["data"].get("edge_relation_reason", "N/A")
         source_risk_data = edge_data["data"].get("source_risk_data", {})
         target_risk_data = edge_data["data"].get("target_risk_data", {})
+        direction = edge_data["data"].get("original_direction", "N/A")
         # You might want to look up the actual node labels here if needed
         # For simplicity, we'll just use the IDs for now
         source_risk_data = json.dumps(source_risk_data, indent=4, ensure_ascii=False)
@@ -1241,6 +1239,7 @@ def display_edge_info(edge_data):
                 html.P(f"Color: {color}"),
                 html.P(f"Arrow Weight: {arrow_weight}"),
                 html.P(f"Do Not Calculate Weight: {do_not_cal_weight}"),
+                html.P(f"Direction: {direction}"),
                 # Add more data fields as needed
             ]
         )
