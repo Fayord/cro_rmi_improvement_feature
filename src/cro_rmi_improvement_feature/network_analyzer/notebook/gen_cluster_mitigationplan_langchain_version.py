@@ -105,6 +105,125 @@ def filter_non_arrow_edges(edges):
     return [edge for edge in edges if edge["data"]["arrow_weight"] != "none"]
 
 
+def get_number_edges_to_show(total_nodes):
+    return 2 * total_nodes
+
+
+def filter_non_arrow_edges2(edges, slider_value):
+    new_edges = []
+    for edge in edges:
+        if edge["interdependency_type"] == "Causal":
+            # if edge["direction"] is not None:
+            # if edge["direction"] != "none":
+            if edge["cosine_similarity"] >= slider_value:
+                new_edges.append(edge)
+    return new_edges
+
+
+# multiple companies in one pickle file
+def find_graph_properties_newpickle(
+    data_path, company_name, CLUSTER_METHOD="leiden"
+):  # sink/source/central nodes; clusters
+    data_all = pickle.load(open(data_path, "rb"))
+
+    # data = data_all['company_graph_datas'][company_name]
+
+    all_data_list = []
+    # for i, company_name in enumerate(data_all['company_graph_datas'].keys()):
+    G = nx.DiGraph()
+
+    data = data_all["company_graph_datas"][company_name]
+    # data = pickle.load(open(data_path, "rb"))
+
+    nodes = data["nodes"]
+    edges = data["edges"]
+    line_weights = [edge["cosine_similarity"] for edge in edges]
+    num_edges_to_show = get_number_edges_to_show(len(nodes))
+    sorted_weights = sorted(line_weights, reverse=True)
+    # The threshold is the weight of the (num_edges_to_show)-th edge (0-indexed)
+    slider_value = sorted_weights[num_edges_to_show - 1]
+    filter_edges = filter_non_arrow_edges2(edges, slider_value)
+    for edge in filter_edges:
+        G.add_edge(
+            edge["source"],
+            edge["target"],
+            weight=edge["distance"],
+        )
+    in_degree_centrality_dict = nx.in_degree_centrality(G)
+    out_degree_centrality_dict = nx.out_degree_centrality(G)
+    betweenness_dict_weight = nx.betweenness_centrality(G, weight="weight")
+    betweenness_dict_non_weight = nx.betweenness_centrality(G)
+
+    # create list of data so I can convert to dataframe later
+    for node in nodes:
+        # in_deg = G.in_degree(node["data"]["id"])
+        # in_deg = 0 if in_deg in ([], (), None) else in_deg
+        row_data = {
+            # "company": company,
+            "risk_id": node["data"]["id"],
+            "risk_name": node["data"]["label"],
+            "risk_level": node["data"]["risk_level"],
+            # "in_degree": in_deg,
+            "in_degree": G.in_degree(node["data"]["id"]),
+            "out_degree": G.out_degree(node["data"]["id"]),
+            "in_degree_centrality": in_degree_centrality_dict.get(
+                node["data"]["id"], None
+            ),
+            "out_degree_centrality": out_degree_centrality_dict.get(
+                node["data"]["id"], None
+            ),
+            "betweenness_centrality_weight": betweenness_dict_weight.get(
+                node["data"]["id"], None
+            ),
+            "betweenness_centrality_non_weight": betweenness_dict_non_weight.get(
+                node["data"]["id"], None
+            ),
+        }
+        # if not row_data['out_degree'].is_integer():
+        #     print('should be 0')
+        all_data_list.append(row_data)
+
+    # === STEP 3: CLUSTER RISKS ===
+    # louvain
+    if CLUSTER_METHOD == "louvain":
+        clusters = louvain_communities(G)
+
+    # leiden
+    if CLUSTER_METHOD == "leiden":
+        # clusters = leiden_communities(G, backend="cugraph") # this method needs cugraph backend
+        # Step 3.2: Convert NetworkX to igraph
+        # G_ig = ig.Graph.TupleList(G.edges(), directed=False)
+        G_ig = ig.Graph.TupleList(G.edges(), directed=True, vertex_name_attr="name")
+
+        # Step 3.3: Run Leiden algorithm
+        # partition = leidenalg.find_partition(G_ig, leidenalg.CPMVertexPartition) # doesn't seem to work with directed graph
+        partition = leidenalg.find_partition(G_ig, leidenalg.RBERVertexPartition)
+        # partition = leidenalg.find_partition(G_ig, leidenalg.ModularityVertexPartition) # for non-directed
+
+        # Step 3.4: Extract communities (as lists of original node names)
+        clusters = [
+            [G_ig.vs[node]["name"] for node in community] for community in partition
+        ]
+
+        # print("Leiden communities:", clusters)
+
+        # # # === STEP 5: OUTPUT PROMPTS ===
+        # for i, cluster in enumerate(clusters, 1):
+        #     print(f"\n--- Cluster {i} Prompt ---\n")
+        #     print(generate_prompt(cluster, G, nodes))
+
+    all_data_df = pd.DataFrame(all_data_list)
+
+    all_data_df["in_degree"] = all_data_df["in_degree"].apply(
+        lambda x: np.nan if isinstance(x, InDegreeView) else int(x)
+    )
+    all_data_df["out_degree"] = all_data_df["out_degree"].apply(
+        lambda x: np.nan if isinstance(x, OutDegreeView) else int(x)
+    )
+    # all_data_df.head()
+    return [all_data_df, clusters, G, nodes]
+
+
 def find_graph_properties(
     data_path_dict, CLUSTER_METHOD="leiden"
 ):  # sink/source/central nodes; clusters
@@ -410,7 +529,7 @@ from textwrap import dedent
 # Y add more attributes to plan generation pydantic (DetailedActionPlanCluster) to match with Figma
 
 
-def get_response_control_cluster(cluster_risks):
+def get_response_control_cluster(cluster_risks, model="gpt-4o-mini"):
     # client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY")) # commented out for langchain
     # MODEL = "gpt-4.1" # "gpt-4o"
     # response = client.beta.chat.completions.parse(
@@ -437,7 +556,7 @@ def get_response_control_cluster(cluster_risks):
     #     response_format=RiskMitigationActionClusterPlan
     # )
 
-    llm = ChatOpenAI(model="gpt-4o", temperature=0.7)
+    llm = ChatOpenAI(model=model, temperature=0.7)
     structured_llm = llm.with_structured_output(RiskMitigationActionClusterPlan)
 
     # system_prompt = f"""
@@ -472,7 +591,7 @@ def get_response_control_cluster(cluster_risks):
 # print(response['choices'][0]['message']['content'])
 
 
-def get_response_test(cluster_risks):
+def get_response_test(cluster_risks, model="gpt-4o-mini"):
     # client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
     # MODEL = "gpt-4.1" # "gpt-4o"
     # response = client.beta.chat.completions.parse(
@@ -490,7 +609,7 @@ def get_response_test(cluster_risks):
     #     ],
     #     # response_format=RiskMitigationActionClusterPlan
     # )
-    llm = ChatOpenAI(model="gpt-4o", temperature=0.7)
+    llm = ChatOpenAI(model=model, temperature=0.7)
     structured_llm = llm.with_structured_output(RiskMitigationActionClusterPlan)
     messages = [
         SystemMessage("You will greet the other side."),
