@@ -13,7 +13,7 @@ import uvicorn
 
 from schemas import (
     RiskRecommendationRequest,
-    RecommendedRisk,
+    RiskDataWithTags,
     ErrorResponse,
     MitigationPlanResponse,
     MitigationPlanRequest,
@@ -143,43 +143,31 @@ async def recommend_risks_to_assess_api(request: RiskRecommendationRequest):
         return RiskRecommendationAssessmentResponse(
             id=request.id,
             recommendations=[
-                RecommendedRisk(
-                    risk_id="risk_001",
-                    risk_name="Risk 1",
-                    recommend_risk_list=[
-                        RiskData(
-                            id="risk_001",
-                            label="Risk 1",
-                            risk="Risk 1",
-                            risk_cat="Operational",
-                            risk_level=3,
-                            process="Process 1",
-                            risk_desc="Risk 1 description",
-                            rootcause="Rootcause 1",
-                            process_summary="Process 1 summary",
-                            rootcause_summary="Rootcause 1 summary",
-                            risk_desc_summary="Risk 1 description summary",
-                        )
-                    ],
+                RiskData(
+                    id="risk_001",
+                    label="Risk 1",
+                    risk="Risk 1",
+                    risk_cat="Operational",
+                    risk_level=3,
+                    process="Process 1",
+                    risk_desc="Risk 1 description",
+                    rootcause="Rootcause 1",
+                    process_summary="Process 1 summary",
+                    rootcause_summary="Rootcause 1 summary",
+                    risk_desc_summary="Risk 1 description summary",
                 ),
-                RecommendedRisk(
-                    risk_id="risk_002",
-                    risk_name="Risk 2",
-                    recommend_risk_list=[
-                        RiskData(
-                            id="risk_002",
-                            label="Risk 2",
-                            risk="Risk 2",
-                            risk_cat="Operational",
-                            risk_level=3,
-                            process="Process 2",
-                            risk_desc="Risk 2 description",
-                            rootcause="Rootcause 2",
-                            process_summary="Process 2 summary",
-                            rootcause_summary="Rootcause 2 summary",
-                            risk_desc_summary="Risk 2 description summary",
-                        )
-                    ],
+                RiskData(
+                    id="risk_002",
+                    label="Risk 2",
+                    risk="Risk 2",
+                    risk_cat="Operational",
+                    risk_level=3,
+                    process="Process 2",
+                    risk_desc="Risk 2 description",
+                    rootcause="Rootcause 2",
+                    process_summary="Process 2 summary",
+                    rootcause_summary="Rootcause 2 summary",
+                    risk_desc_summary="Risk 2 description summary",
                 ),
             ],
         )
@@ -434,55 +422,9 @@ def _generate_mock_mitigation_plan(
     )
 
 
-def _generate_mock_assessment_recommendations(
-    request: RiskRecommendationRequest,
-) -> List[RecommendedRisk]:
-    """
-    Generate mock risk recommendations for assessment based on existing risks.
-
-    In a real implementation, this would integrate with your existing
-    risk assessment logic from the network_analyzer or other modules.
-    """
-    # Analyze existing risks to generate relevant recommendations
-    existing_categories = set(risk.risk_category for risk in request.existing_risks)
-    existing_risk_names = set(risk.risk_name for risk in request.existing_risks)
-
-    # Mock risk data for assessment - replace with actual risk assessment logic
-    mock_risks = [
-        RecommendedRisk(
-            risk_id=f"risk_{uuid.uuid4().hex[:8]}",
-            risk_name="Cybersecurity Breach",
-        ),
-        RecommendedRisk(
-            risk_id=f"risk_{uuid.uuid4().hex[:8]}",
-            risk_name="Regulatory Compliance Failure",
-        ),
-        RecommendedRisk(
-            risk_id=f"risk_{uuid.uuid4().hex[:8]}",
-            risk_name="Data Privacy Violation",
-        ),
-        RecommendedRisk(
-            risk_id=f"risk_{uuid.uuid4().hex[:8]}",
-            risk_name="Third-Party Vendor Risk",
-        ),
-        RecommendedRisk(
-            risk_id=f"risk_{uuid.uuid4().hex[:8]}",
-            risk_name="Business Continuity Disruption",
-        ),
-    ]
-
-    # Filter out risks that already exist
-    filtered_risks = [
-        risk for risk in mock_risks if risk.risk_name not in existing_risk_names
-    ]
-
-    # Return all filtered risks
-    return filtered_risks
-
-
 def _generate_mock_mitigation_recommendations(
     request: RiskRecommendationRequest,
-) -> List[RecommendedRisk]:
+) -> List[RiskDataWithTags]:
     """
     Generate mock risk recommendations for mitigation based on existing risks.
 
@@ -495,23 +437,23 @@ def _generate_mock_mitigation_recommendations(
 
     # Mock risk data for mitigation - replace with actual risk mitigation logic
     mock_risks = [
-        RecommendedRisk(
+        RiskDataWithTags(
             risk_id=f"risk_{uuid.uuid4().hex[:8]}",
             risk_name="Supply Chain Disruption",
         ),
-        RecommendedRisk(
+        RiskDataWithTags(
             risk_id=f"risk_{uuid.uuid4().hex[:8]}",
             risk_name="Financial Market Volatility",
         ),
-        RecommendedRisk(
+        RiskDataWithTags(
             risk_id=f"risk_{uuid.uuid4().hex[:8]}",
             risk_name="Operational Inefficiency",
         ),
-        RecommendedRisk(
+        RiskDataWithTags(
             risk_id=f"risk_{uuid.uuid4().hex[:8]}",
             risk_name="Technology Infrastructure Risk",
         ),
-        RecommendedRisk(
+        RiskDataWithTags(
             risk_id=f"risk_{uuid.uuid4().hex[:8]}",
             risk_name="Human Resource Risk",
         ),

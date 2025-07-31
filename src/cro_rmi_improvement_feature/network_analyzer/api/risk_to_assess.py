@@ -14,7 +14,7 @@ Intended for import and use in main.py to power the /recommend_risk_to_assess en
 
 from schemas import (
     RiskRecommendationAssessmentResponse,
-    RecommendedRisk,
+    RiskDataWithTags,
     ExistingRisk,
 )
 from typing import List, Set
@@ -61,13 +61,13 @@ def recommend_risk_to_assesses(
     assessment_risks: List[ExistingRisk],
     assessment_version: str,
     timestamp: str = "20250513",
-) -> List[RecommendedRisk]:
+) -> List[RiskData]:
     # 1. Receiving all risk data for a given company. (Handled by input `risk_data`)
 
     # 2. Save and update risk data
     _save_or_update_risk_data(company_id, assessment_risks)
 
-    all_recommended_risks: List[RecommendedRisk] = []
+    all_recommended_risks: List[RiskData] = []
     # load it from graph data library
     graph_data_library = load_graph_data_library()
     # check if company_id is in graph_data_library.company_graph_datas
@@ -90,10 +90,5 @@ def recommend_risk_to_assesses(
             for risk in top_n_overlay_risks
             if risk.data.risk not in existing_risk_name_set
         ]
-        recommended_risks = {
-            "risk_id": risk.data.id,
-            "risk_name": risk.data.risk,
-            "recommend_risk_list": top_n_overlay_risks,
-        }
-        all_recommended_risks.append(recommended_risks)
+        all_recommended_risks.extend(top_n_overlay_risks)
     return all_recommended_risks

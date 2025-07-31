@@ -61,29 +61,31 @@ class RiskScore(BaseModel):
         }
 
 
-class RecommendedRisk(BaseModel):
-    """Schema for recommended risk items."""
+class RiskDataWithTags(BaseModel):
+    """Schema for recommended risk items with rationale."""
 
-    risk_id: str = Field(..., description="Unique identifier for the risk")
-    risk_name: str = Field(..., description="Name of the risk")
-    recommend_risk_list: List[RiskData] = Field(
-        ..., description="List of recommended risks"
+    risk_data: RiskData = Field(..., description="Risk data")
+    is_central_risk: bool = Field(..., description="Whether the risk is a central risk")
+    is_source_risk: bool = Field(..., description="Whether the risk is a source risk")
+    is_high_risk: bool = Field(
+        ..., description="Whether the risk is at least high risk (high, critical)"
     )
-
-    class Config:
-        schema_extra = {
-            "example": {
-                "risk_id": "risk_002",
-                "risk_name": "Cybersecurity Breach",
-            }
-        }
+    is_shared_root_cause: bool = Field(
+        ..., description="[Future feature] Whether the risk is shared root cause"
+    )
+    is_news_trended: bool = Field(
+        ..., description="[Future feature] Whether the risk is news trended"
+    )
+    is_emerging_risk: bool = Field(
+        ..., description="[Future feature] Whether the risk is emerging risk"
+    )
 
 
 class RiskRecommendationMitigationPlanResponse(BaseModel):
     """Response schema for risk recommendations."""
 
     id: str = Field(..., description="Company identifier")
-    recommendations: List[RecommendedRisk] = Field(
+    recommendations_with_tags: List[RiskDataWithTags] = Field(
         ..., description="List of recommended risks"
     )
     graph_id: str = Field(..., description="Graph identifier")
@@ -109,7 +111,7 @@ class RiskRecommendationAssessmentResponse(BaseModel):
     """Response schema for risk recommendations."""
 
     id: str = Field(..., description="Company identifier")
-    recommendations: List[RecommendedRisk] = Field(
+    recommendations: List[RiskData] = Field(
         ..., description="List of recommended risks"
     )
 
