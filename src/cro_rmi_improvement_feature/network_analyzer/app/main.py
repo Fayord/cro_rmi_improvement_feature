@@ -57,6 +57,52 @@ from utils import (  # Import needed utility functions
 cyto.load_extra_layouts()
 
 
+# fcose_layout_options = {
+#     "name": "fcose",
+#     # "quality": "default",
+#     # #   // False for random, true for greedy sampling
+#     # "samplingType": True,
+#     # #   // Sample size to construct distance matrix
+#     # "sampleSize": 25,
+#     # #   // Separation amount between nodes
+#     # "nodeSeparation": 4000,
+#     # #   // Power iteration tolerance
+#     # "piTol": 0.0000001,
+#     ## #######
+#     "quality": "proof",
+#     "nodeRepulsion": 10000,
+#     "idealEdgeLength": 150,
+#     "nodeSeparation": 200,
+#     "numIter": 4000,
+#     "gravity": 0.1,
+#     "packComponents": True,
+#     "tile": True,
+# }
+def adaptive_fcose_params(num_nodes: int, num_edges: int):
+    # check instance is int
+    if not isinstance(num_nodes, int):
+        raise ValueError("num_nodes must be an integer")
+    if not isinstance(num_edges, int):
+        raise ValueError("num_edges must be an integer")
+
+    scale_factor = max(num_nodes / 50, 1)
+
+    return {
+        "name": "fcose",
+        "quality": "proof" if num_nodes > 50 else "default",
+        "nodeRepulsion": 4000 * scale_factor,  # space out nodes
+        "idealEdgeLength": 80 + 2 * scale_factor,  # prevent edge clutter
+        "edgeElasticity": 0.3 if num_edges > 100 else 0.45,
+        "gravity": (0.1 if num_nodes > 100 else 0.25),  # smaller gravity = more spread
+        "numIter": 2000 + int(20 * num_nodes),  # more iterations for larger graphs
+        "tile": "true",
+        "packComponents": "true",
+        "nodeSeparation": 100 + 2 * scale_factor,
+        "samplingType": "random",
+        "randomize": "true",
+    }
+
+
 dir_path = os.path.dirname(os.path.realpath(__file__))
 new_data_path = f"{dir_path}/../data/graph/graph_data_library_no_embedding.pkl"
 
@@ -1092,6 +1138,15 @@ def update_graph_and_output(
     # Always use bezier_stylesheet with fixed values for "fcose"
     dynamic_stylesheet = bezier_stylesheet
 
+    cytoscape_layout = {}
+    if layout_name == "fcose":
+        cytoscape_layout = adaptive_fcose_params(
+            node_edge_counter["node"], node_edge_counter["edge"]
+        )
+
+    else:
+        cytoscape_layout = {"name": layout_name}
+
     return (
         filtered_elements,
         output_text,
@@ -1107,7 +1162,7 @@ def update_graph_and_output(
         marks,
         # Return node options
         node_options,
-        {"name": layout_name},  # Fixed layout
+        cytoscape_layout,
         dynamic_stylesheet,
     )
 
