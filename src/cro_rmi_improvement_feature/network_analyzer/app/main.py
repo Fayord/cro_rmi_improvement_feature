@@ -317,7 +317,9 @@ def apply_visual_styles_to_elements(  # Renamed function
     high_priority_edge_count = 0
     for el in elements:
         if "source" in el.get("data", {}):
-            if el["data"]["high_priority"]:
+            if el["data"]["high_priority"] and not el["data"].get(
+                "do_not_cal_weight", False
+            ):
                 high_priority_edge_count += 1
                 filtered_elements_with_edges.append(el)
                 # node_edge_counter["edge"] += 1 # Will count later after full filtering
@@ -332,7 +334,11 @@ def apply_visual_styles_to_elements(  # Renamed function
     # Sort all non-high_priority edges by similarity_rank to pick the top ones
     non_high_priority_edges = []
     for el in elements:
-        if "source" in el.get("data", {}) and not el["data"]["high_priority"]:
+        if (
+            "source" in el.get("data", {})
+            and not el["data"]["high_priority"]
+            and not el["data"].get("do_not_cal_weight", False)
+        ):
             non_high_priority_edges.append(el)
 
     # Sort by similarity_rank (lower rank means higher similarity/priority)
