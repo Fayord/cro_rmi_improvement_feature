@@ -129,7 +129,7 @@ risk_level_to_size_map = {
 edge_count_color_map = risk_level_color_map
 
 node_proportion_list = [60, 30, 10]
-node_size_list = [40, 80, 120]
+node_size_list = [30, 60, 120]
 
 
 # --- New function to calculate custom pyramid layout positions ---
