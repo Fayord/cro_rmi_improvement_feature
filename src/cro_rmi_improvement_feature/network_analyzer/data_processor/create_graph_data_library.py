@@ -335,6 +335,9 @@ def generate_graph_elements_for_company(
                     edge
                 )  # Add to processed list early to keep track
 
+            edge_label_counter = 0
+            edge_label_list = []
+            total_edge_label_counter = int(len(low_priority_edges) * 0.2)
             # 4. Classify remaining edges from low-priority list until limit is reached
             for edge in tqdm(
                 low_priority_edges,
@@ -357,6 +360,68 @@ def generate_graph_elements_for_company(
                         edge["relationship"] = process_two_way_relationships(
                             relationship_a_b, relationship_b_a
                         )
+                        edge_label_counter += 1
+                        if edge_label_counter < total_edge_label_counter:
+                            # direction_risk	analyze_model_name	target_risk	target_risk_data	source_risk	source_risk_data	interdependency_type	direction	rationale	confidence	final_interdependency_type	final_direction	count_possible_missing_direction_relation
+                            count_possible_missing_direction_relation = None
+                            if (
+                                edge["relationship"]["interdependency_type"]
+                                in ["Causal"]
+                            ) and (
+                                relationship_a_b["interdependency_type"]
+                                not in ["Causal"]
+                            ):
+                                count_possible_missing_direction_relation = True
+                            if relationship_a_b["interdependency_type"] in [
+                                "Causal",
+                            ]:
+                                count_possible_missing_direction_relation = False
+                            risk_a_data_str = ""
+                            for key, value in edge["risk_a_data"].model_dump().items():
+                                risk_a_data_str += f"{key}: {value}\n"
+                            risk_b_data_str = ""
+                            for key, value in edge["risk_b_data"].model_dump().items():
+                                risk_b_data_str += f"{key}: {value}\n"
+                            edge_label_data_a_b = {
+                                "direction_risk": "a->b",
+                                "analyze_model_name": "gpt-4.1-mini",
+                                "source_risk": edge["risk_a_data"].risk,
+                                "source_risk_data": risk_a_data_str,
+                                "target_risk": edge["risk_b_data"].risk,
+                                "target_risk_data": risk_b_data_str,
+                                "interdependency_type": relationship_a_b[
+                                    "interdependency_type"
+                                ],
+                                "direction": relationship_a_b["direction"],
+                                "rationale": relationship_a_b["rationale"],
+                                "confidence": relationship_a_b["confidence"],
+                                "final_interdependency_type": edge["relationship"][
+                                    "interdependency_type"
+                                ],
+                                "final_direction": edge["relationship"]["direction"],
+                                "count_possible_missing_direction_relation": count_possible_missing_direction_relation,
+                            }
+                            edge_label_data_b_a = {
+                                "direction_risk": "b->a",
+                                "analyze_model_name": "gpt-4.1-mini",
+                                "source_risk": edge["risk_a_data"].risk,
+                                "source_risk_data": risk_a_data_str,
+                                "target_risk": edge["risk_b_data"].risk,
+                                "target_risk_data": risk_b_data_str,
+                                "interdependency_type": relationship_b_a[
+                                    "interdependency_type"
+                                ],
+                                "direction": relationship_b_a["direction"],
+                                "rationale": relationship_b_a["rationale"],
+                                "confidence": relationship_b_a["confidence"],
+                                "final_interdependency_type": edge["relationship"][
+                                    "interdependency_type"
+                                ],
+                                "final_direction": edge["relationship"]["direction"],
+                                "count_possible_missing_direction_relation": count_possible_missing_direction_relation,
+                            }
+                            edge_label_list.append(edge_label_data_a_b)
+                            edge_label_list.append(edge_label_data_b_a)
                     else:
                         edge["relationship"] = relationship_a_b
                     classified_count += 1
@@ -370,6 +435,16 @@ def generate_graph_elements_for_company(
                         "confidence": None,
                     }
                     processed_edges.append(edge)
+            company_graph_id = f"{company_name}|{embedding_key}|{relation_process}"
+            if edge_label_list:
+                dir_path = os.path.dirname(os.path.abspath(__file__))
+                # convert edge_label_list to pandas dataframe
+                edge_label_list_df = pd.DataFrame(edge_label_list)
+
+                with open(
+                    f"{dir_path}/edge_label_list_{company_graph_id}.xlsx", "wb"
+                ) as f:
+                    edge_label_list_df.to_excel(f)
             print(f"direction_list: {direction_list}")
             # raise
             # 5. Process all edges (classified and unclassified) to create EdgeData objects
@@ -413,7 +488,6 @@ def generate_graph_elements_for_company(
                     )
                 )
             print(f"number_of_displayed_edges: {number_of_displayed_edges}")
-            company_graph_id = f"{company_name}|{embedding_key}|{relation_process}"
             print(f"company_graph_id: {company_graph_id}")
             print(cb)
             thb = cb.total_cost * 35
