@@ -327,11 +327,11 @@ class ExistingControl(BaseModel):
     )
     name: str = Field(..., description="Name of the control")
     description: str = Field(..., description="Description of the control")
-    process_answer: Dict[str, ProcessAnswerDetail] = Field(
-        ..., description="Dictionary of process answers, keyed by a unique identifier"
+    processes: List[Process] = Field(
+        ..., description="List of processes associated with the control"
     )
-    cause_answer: Dict[str, CauseAnswerDetail] = Field(
-        ..., description="Dictionary of cause answers, keyed by a unique identifier"
+    root_causes: List[RootCause] = Field(
+        ..., description="List of root causes associated with the control"
     )
     external_organization_answer: Dict = Field(
         ..., description="Dictionary for external organization answers"
