@@ -30,21 +30,23 @@ class BaseEmbeddingProvider:
             / f"{self.__class__.__name__}_{self.model_name}_{text_hash}.json"
         )
 
-    def get_embedding(self, text: str) -> np.ndarray:
-        cache_path = self._get_cache_path(text)
-        try:
-            if cache_path.exists():
-                with open(cache_path, "r") as f:
-                    return np.array(json.load(f))
-        except json.JSONDecodeError:
-            # Handle the case where the file is not valid JSON
-            print(f"Invalid JSON file: {cache_path}")
-            # remove that cache file
-            os.remove(cache_path)
+    def get_embedding(self, text: str, use_cache: bool = True) -> np.ndarray:
+        if use_cache:
+            cache_path = self._get_cache_path(text)
+            try:
+                if cache_path.exists():
+                    with open(cache_path, "r") as f:
+                        return np.array(json.load(f))
+            except json.JSONDecodeError:
+                # Handle the case where the file is not valid JSON
+                print(f"Invalid JSON file: {cache_path}")
+                # remove that cache file
+                os.remove(cache_path)
         embedding = self._get_embedding_impl(text)
 
-        with open(cache_path, "w") as f:
-            json.dump(embedding.tolist(), f)
+        if use_cache:
+            with open(cache_path, "w") as f:
+                json.dump(embedding.tolist(), f)
 
         return embedding
 
