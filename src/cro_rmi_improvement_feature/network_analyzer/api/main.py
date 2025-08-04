@@ -48,6 +48,7 @@ from risk_to_assess import (
     recommend_risk_to_assesses_old,
     recommend_risk_to_assesses,
     convert_existing_risk_to_risk_data,
+    save_and_update_company_graph_data,
 )
 from traceback import print_exc
 
@@ -157,7 +158,13 @@ async def recommend_risks_to_assess_api(request: RiskRecommendationRequest):
             risk_data_list = convert_existing_risk_to_risk_data(existing_risk_list)
         elif request.data_level == "company":
             # save data to graph data library
+            company_id = request.existing_risks[0].company_id
+            risk_data_list = convert_existing_risk_to_risk_data(existing_risk_list)
+            save_and_update_company_graph_data(risk_data_list, company_id)
             ...
+
+            company_id = request.existing_risks[0].company_id
+
         # pass list risk_data to recommend_risk_to_assesses
         all_recommended_risks = recommend_risk_to_assesses(risk_data_list)
         return RiskRecommendationAssessmentResponse(
