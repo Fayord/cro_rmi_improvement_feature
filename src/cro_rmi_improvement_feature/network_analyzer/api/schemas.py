@@ -10,41 +10,7 @@ from datetime import datetime
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append("../")
-from data_processor.create_graph_data_library import RiskData
-
-
-class Process(BaseModel):
-    """Schema for process data."""
-
-    id: str = Field(..., description="Unique identifier for the process")
-    name: str = Field(..., description="Name of the process")
-    description: str = Field(..., description="Description of the process")
-
-    class Config:
-        schema_extra = {
-            "example": {
-                "id": 1,
-                "name": "Procurement",
-                "description": "Vendor selection and management process",
-            }
-        }
-
-
-class RootCause(BaseModel):
-    """Schema for root cause data."""
-
-    id: str = Field(..., description="Unique identifier for the root cause")
-    name: str = Field(..., description="Name of the root cause")
-    description: str = Field(..., description="Description of the root cause")
-
-    class Config:
-        schema_extra = {
-            "example": {
-                "id": 1,
-                "name": "Single source dependency",
-                "description": "Over-reliance on single supplier",
-            }
-        }
+from core.models import Process, RootCause, RiskData
 
 
 class RiskScore(BaseModel):

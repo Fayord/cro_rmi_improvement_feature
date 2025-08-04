@@ -41,9 +41,14 @@ from data_processor.create_graph_data_library import (
     EdgeData,
     RiskOverlayData,
 )
+from core.models import Process, RootCause
 
 
-from risk_to_assess import recommend_risk_to_assesses_old
+from risk_to_assess import (
+    recommend_risk_to_assesses_old,
+    recommend_risk_to_assesses,
+    convert_existing_risk_to_risk_data,
+)
 from traceback import print_exc
 
 # Initialize FastAPI app
@@ -133,36 +138,28 @@ async def recommend_risks_to_assess_api(request: RiskRecommendationRequest):
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="At least one existing risk must be provided",
             )
-
+        # if request.data_level is in ["user", "company"], check all company is the same
+        if request.data_level in ["user", "company"]:
+            if not all(
+                risk.company_id == request.existing_risks[0].company_id
+                for risk in request.existing_risks
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="All company must be the same",
+                )
         existing_risk_list = request.existing_risks
-
         # for user level, we don't need to save and create graph
         # for company level, we need to save data
 
         if request.data_level == "user":
             # convert existing_risk to risk_data
-            risk_data_list = []
-            for risk in existing_risk_list:
-                risk_data_list.append(
-                    RiskData(
-                        id=risk.risk_id,
-                        label=risk.risk_name,
-                        risk=risk.risk_name,
-                        risk_cat=risk.risk_category,
-                        risk_level=risk.risk_level,
-                        process=risk.process,
-                        risk_desc=risk.risk_desc,
-                        rootcause=risk.rootcause,
-                        process_summary=risk.process_summary,
-                        rootcause_summary=risk.rootcause_summary,
-                        risk_desc_summary=risk.risk_desc_summary,
-                    )
-                )
+            risk_data_list = convert_existing_risk_to_risk_data(existing_risk_list)
         elif request.data_level == "company":
             # save data to graph data library
             ...
         # pass list risk_data to recommend_risk_to_assesses
-        all_recommended_risks = recommend_risk_to_assesses_old(risk_data_list)
+        all_recommended_risks = recommend_risk_to_assesses(risk_data_list)
         return RiskRecommendationAssessmentResponse(
             id=request.id, recommendations=all_recommended_risks
         )
@@ -178,9 +175,21 @@ async def recommend_risks_to_assess_api(request: RiskRecommendationRequest):
                     risk="Risk 1",
                     risk_cat="Operational",
                     risk_level=3,
-                    process="Process 1",
+                    process=[
+                        Process(
+                            id="process_001",
+                            name="Process 1",
+                            description="Process 1 description",
+                        )
+                    ],
                     risk_desc="Risk 1 description",
-                    rootcause="Rootcause 1",
+                    rootcause=[
+                        RootCause(
+                            id="rootcause_001",
+                            name="Rootcause 1",
+                            description="Rootcause 1 description",
+                        )
+                    ],
                     process_summary="Process 1 summary",
                     rootcause_summary="Rootcause 1 summary",
                     risk_desc_summary="Risk 1 description summary",
@@ -191,9 +200,21 @@ async def recommend_risks_to_assess_api(request: RiskRecommendationRequest):
                     risk="Risk 2",
                     risk_cat="Operational",
                     risk_level=3,
-                    process="Process 2",
+                    process=[
+                        Process(
+                            id="process_002",
+                            name="Process 2",
+                            description="Process 2 description",
+                        )
+                    ],
                     risk_desc="Risk 2 description",
-                    rootcause="Rootcause 2",
+                    rootcause=[
+                        RootCause(
+                            id="rootcause_002",
+                            name="Rootcause 2",
+                            description="Rootcause 2 description",
+                        )
+                    ],
                     process_summary="Process 2 summary",
                     rootcause_summary="Rootcause 2 summary",
                     risk_desc_summary="Risk 2 description summary",
@@ -498,4 +519,4 @@ def _generate_mock_mitigation_recommendations(
 
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=7900, reload=True, log_level="info")
+    uvicorn.run("main:app", host="0.0.0.0", port=7800, reload=True, log_level="info")

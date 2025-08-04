@@ -118,6 +118,9 @@ def create_nodes_with_embedding(
                     risk=data["risk"],
                     risk_cat=data["risk_cat"],
                     risk_level=data["risk_level"],
+                    risk_score=data["risk_score"],
+                    risk_impact=data["impact_combined"],
+                    risk_likelihood=data["likelihood_combined"],
                     risk_desc=data["risk_desc"],
                     process=data["process"],
                     rootcause=data["rootcause"],
@@ -501,6 +504,29 @@ def generate_graph_elements_for_company(
     return company_graph_datas
 
 
+def find_similar_embeddings(
+    input_embedding: np.ndarray,
+    reference_embeddings: np.ndarray,
+    top_n: Optional[int] = None,
+) -> List[int]:
+    """
+    Finds the indices of the most similar embeddings in reference_embeddings to the input_embedding.
+    Returns indices sorted from most similar to least similar.
+    """
+    # Reshape the input embedding to a 2D array if it's 1D, for dot product compatibility
+    cosine_similarities = np.dot(
+        input_embedding.reshape(1, -1), reference_embeddings.T
+    ).flatten()
+
+    # Argsort returns indices that would sort an array in ascending order.
+    # To get most similar first (highest cosine similarity), we sort in descending order.
+    sorted_indices = np.argsort(cosine_similarities)[::-1]
+
+    if top_n is not None:
+        return sorted_indices[:top_n].tolist()
+    return sorted_indices.tolist()
+
+
 def generate_risk_catalog_top_n_overlay_data(
     risk_catalog_name: str,
     risk_catalog_list: List[RiskDataWithEmbedding],
@@ -526,17 +552,17 @@ def generate_risk_catalog_top_n_overlay_data(
         # Use the actual numerical embedding, not the text used to generate it
         # calculate the cosine similarity between the embedding and the risk_catalog_list
         # Reshape the embedding to a 2D array if it's 1D, for dot product compatibility
-        cosine_similarities = np.dot(
-            embedding.reshape(1, -1), all_embeddings.T
-        ).flatten()
         # find the top n related risk data
-        top_n_related_risk_data = np.argsort(cosine_similarities)[-top_n:]
+        top_n_related_risk_data = find_similar_embeddings(
+            embedding, all_embeddings, top_n=top_n
+        )
         risk_catalog_top_n_overlay_data[risk_data.risk] = []
         for related_risk_data_index in top_n_related_risk_data:
             id = generate_risk_id(
                 risk_catalog_name, related_risk_data_index, time_stamp
             )
             label = risk_catalog_list[related_risk_data_index].data.risk
+
             risk_catalog_top_n_overlay_data[risk_data.risk].append(
                 RiskDataWithEmbedding(
                     data=RiskData(
@@ -549,6 +575,15 @@ def generate_risk_catalog_top_n_overlay_data(
                         risk_level=risk_catalog_list[
                             related_risk_data_index
                         ].data.risk_level,
+                        risk_score=risk_catalog_list[
+                            related_risk_data_index
+                        ].data.risk_score,
+                        risk_impact=risk_catalog_list[
+                            related_risk_data_index
+                        ].data.risk_impact,
+                        risk_likelihood=risk_catalog_list[
+                            related_risk_data_index
+                        ].data.risk_likelihood,
                         risk_desc=risk_catalog_list[
                             related_risk_data_index
                         ].data.risk_desc,
@@ -705,11 +740,15 @@ def create_and_save_graphs(data_path: Path, output_dir: Path) -> GraphDataLibrar
                     risk_data["company"], risk_data["date_stamp"], risk_data["risk"]
                 )
                 label = risk_data["risk"]
+                risk_impact = risk_data["impact_combined"]
+                risk_likelihood = risk_data["likelihood_combined"]
                 risk_catalog_reference_datas[timestamp].append(
                     RiskDataWithEmbedding(
                         data=RiskData(
                             id=id,
                             label=label,
+                            risk_impact=risk_impact,
+                            risk_likelihood=risk_likelihood,
                             **risk_data,
                         ),
                         embedding=risk_data[risk_catalog_embedding_key],

@@ -9,6 +9,40 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 from pydantic import BaseModel, Field
 
 
+class Process(BaseModel):
+    """Schema for process data."""
+
+    id: str = Field(..., description="Unique identifier for the process")
+    name: str = Field(..., description="Name of the process")
+    description: str = Field(..., description="Description of the process")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "id": "1",
+                "name": "Procurement",
+                "description": "Vendor selection and management process",
+            }
+        }
+
+
+class RootCause(BaseModel):
+    """Schema for root cause data."""
+
+    id: str = Field(..., description="Unique identifier for the root cause")
+    name: str = Field(..., description="Name of the root cause")
+    description: str = Field(..., description="Description of the root cause")
+
+    class Config:
+        schema_extra = {
+            "example": {
+                "id": 1,
+                "name": "Single source dependency",
+                "description": "Over-reliance on single supplier",
+            }
+        }
+
+
 class RiskData(BaseModel):
     id: str = Field(..., description="The id of the risk node.")
     label: str = Field(..., description="Text to display for the risk node.")
@@ -17,11 +51,14 @@ class RiskData(BaseModel):
     risk_desc: Union[List[str], str] = Field(
         ..., description="The description of the risk."
     )
+    risk_score: int = Field(..., description="The score of the risk.")
+    risk_impact: int = Field(..., description="The impact of the risk.")
+    risk_likelihood: int = Field(..., description="The likelihood of the risk.")
     risk_level: int = Field(..., description="The level of the risk.")
-    process: Union[List[str], str, None] = Field(
+    process: Union[List[Process], List[str], str, None] = Field(
         ..., description="The process of the risk."
     )
-    rootcause: Union[List[str], str, None] = Field(
+    rootcause: Union[List[RootCause], List[str], str, None] = Field(
         ..., description="The root cause of the risk."
     )
     process_summary: Optional[str] = Field(
