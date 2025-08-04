@@ -43,7 +43,7 @@ from data_processor.create_graph_data_library import (
 )
 
 
-from risk_to_assess import recommend_risk_to_assesses
+from risk_to_assess import recommend_risk_to_assesses_old
 from traceback import print_exc
 
 # Initialize FastAPI app
@@ -121,6 +121,11 @@ async def recommend_risks_to_assess_api(request: RiskRecommendationRequest):
     This endpoint analyzes the provided existing risks and user information to generate
     personalized risk recommendations that should be assessed.
     """
+    if request.data_level not in ["user", "company"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Data level must be user or company for now",
+        )
     try:
         # Validate input
         if not request.existing_risks:
@@ -129,15 +134,39 @@ async def recommend_risks_to_assess_api(request: RiskRecommendationRequest):
                 detail="At least one existing risk must be provided",
             )
 
-        # TODO: Integrate with your existing risk assessment logic
-        # For now, returning mock data
-        all_recommended_risks = recommend_risk_to_assesses(
-            request.id, request.existing_risks, request.year_quarter
-        )
+        existing_risk_list = request.existing_risks
+
+        # for user level, we don't need to save and create graph
+        # for company level, we need to save data
+
+        if request.data_level == "user":
+            # convert existing_risk to risk_data
+            risk_data_list = []
+            for risk in existing_risk_list:
+                risk_data_list.append(
+                    RiskData(
+                        id=risk.risk_id,
+                        label=risk.risk_name,
+                        risk=risk.risk_name,
+                        risk_cat=risk.risk_category,
+                        risk_level=risk.risk_level,
+                        process=risk.process,
+                        risk_desc=risk.risk_desc,
+                        rootcause=risk.rootcause,
+                        process_summary=risk.process_summary,
+                        rootcause_summary=risk.rootcause_summary,
+                        risk_desc_summary=risk.risk_desc_summary,
+                    )
+                )
+        elif request.data_level == "company":
+            # save data to graph data library
+            ...
+        # pass list risk_data to recommend_risk_to_assesses
+        all_recommended_risks = recommend_risk_to_assesses_old(risk_data_list)
         return RiskRecommendationAssessmentResponse(
             id=request.id, recommendations=all_recommended_risks
         )
-    except ValueError as e:
+    except (ValueError, AttributeError) as e:
         print_exc()
         # return mockup data for now
         return RiskRecommendationAssessmentResponse(

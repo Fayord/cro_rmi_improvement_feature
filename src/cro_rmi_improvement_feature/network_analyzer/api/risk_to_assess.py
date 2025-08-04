@@ -56,7 +56,7 @@ def filter_interested_risk(
     return [risk for risk in company_graph_data.nodes if risk.data.risk_level >= 3]
 
 
-def recommend_risk_to_assesses(
+def recommend_risk_to_assesses_old(
     company_id: str,
     assessment_risks: List[ExistingRisk],
     assessment_version: str,
