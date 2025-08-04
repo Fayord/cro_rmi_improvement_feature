@@ -16,7 +16,7 @@ from data_processor.create_graph_data_library import RiskData
 class Process(BaseModel):
     """Schema for process data."""
 
-    id: int = Field(..., description="Unique identifier for the process")
+    id: str = Field(..., description="Unique identifier for the process")
     name: str = Field(..., description="Name of the process")
     description: str = Field(..., description="Description of the process")
 
@@ -33,7 +33,7 @@ class Process(BaseModel):
 class RootCause(BaseModel):
     """Schema for root cause data."""
 
-    id: int = Field(..., description="Unique identifier for the root cause")
+    id: str = Field(..., description="Unique identifier for the root cause")
     name: str = Field(..., description="Name of the root cause")
     description: str = Field(..., description="Description of the root cause")
 
