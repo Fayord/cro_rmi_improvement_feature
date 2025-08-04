@@ -1,68 +1,105 @@
-from typing import List, Dict
-import numpy as np
-from openai import OpenAI
-from sentence_transformers import SentenceTransformer
-import json
-import hashlib
-import os
-from pathlib import Path
-from google import genai
+import random
 import time
+import logging
+import os
+from abc import ABC, abstractmethod
+from typing import List, Optional
+
+import numpy as np
+from openai import OpenAI, RateLimitError
+from google import genai
+from sentence_transformers import SentenceTransformer
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+# Configure logging to output to console
+handler = logging.StreamHandler()
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 
 
-class BaseEmbeddingProvider:
-    def __init__(
-        self,
-        cache_dir: str = os.path.join(
-            os.path.dirname(os.path.abspath(__file__)), ".cache/embeddings"
-        ),
-    ):
-        self.cache_dir = Path(cache_dir)
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
-
-    def _get_cache_path(self, text: str) -> Path:
-        text_hash = hashlib.md5(text.encode()).hexdigest()
-        if self.model_name is None:
-            # raise
-            raise Exception("self.model_name is None")
-        return (
-            self.cache_dir
-            / f"{self.__class__.__name__}_{self.model_name}_{text_hash}.json"
-        )
+class BaseEmbeddingProvider(ABC):
+    def __init__(self, cache_dir: str = ".embedding_cache", **kwargs):
+        self.cache_dir = cache_dir
+        os.makedirs(cache_dir, exist_ok=True)
 
     def get_embedding(self, text: str, use_cache: bool = True) -> np.ndarray:
-        if use_cache:
-            cache_path = self._get_cache_path(text)
+        cache_key = self._generate_cache_key(text)
+        cache_file = os.path.join(self.cache_dir, f"{cache_key}.npy")
+
+        if use_cache and os.path.exists(cache_file):
             try:
-                if cache_path.exists():
-                    with open(cache_path, "r") as f:
-                        return np.array(json.load(f))
-            except json.JSONDecodeError:
-                # Handle the case where the file is not valid JSON
-                print(f"Invalid JSON file: {cache_path}")
-                # remove that cache file
-                os.remove(cache_path)
+                return np.load(cache_file)
+            except Exception as e:
+                logger.warning(
+                    f"Error loading from cache: {e}. Re-generating embedding."
+                )
+
         embedding = self._get_embedding_impl(text)
+        if embedding is not None:
+            if use_cache:
+                np.save(cache_file, embedding)
+            return embedding
+        return np.array([])
 
-        if use_cache:
-            with open(cache_path, "w") as f:
-                json.dump(embedding.tolist(), f)
-
-        return embedding
-
+    @abstractmethod
     def _get_embedding_impl(self, text: str) -> np.ndarray:
-        raise NotImplementedError
+        pass
+
+    def _generate_cache_key(self, text: str) -> str:
+        import hashlib
+
+        return hashlib.md5(text.encode()).hexdigest()
 
 
 class OpenAIEmbeddingProvider(BaseEmbeddingProvider):
-    def __init__(self, model_name: str = "text-embedding-3-small", **kwargs):
+    def __init__(
+        self,
+        model_name: str = "text-embedding-3-large",
+        api_key: str = None,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
         self.model_name = model_name
-        self.client = OpenAI()
+        api_key = api_key or os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError(
+                "OPENAI_API_KEY must be provided either as an argument or environment variable"
+            )
+        self.client = OpenAI(api_key=api_key)
 
     def _get_embedding_impl(self, text: str) -> np.ndarray:
-        response = self.client.embeddings.create(input=text, model=self.model_name)
-        return np.array(response.data[0].embedding)
+        max_retries = 5
+        base_delay = 1  # Initial delay in seconds
+
+        for attempt in range(max_retries):
+            try:
+                response = self.client.embeddings.create(
+                    input=[text],
+                    model=self.model_name,
+                )
+                return np.array(response.data[0].embedding)
+            except RateLimitError as e:
+                if attempt < max_retries - 1:
+                    delay = base_delay * (2**attempt) + (
+                        random.random() * 0.1
+                    )  # Exponential backoff with jitter
+                    logger.warning(
+                        f"Rate limit exceeded for OpenAI. Retrying in {delay:.2f} seconds... (Attempt {attempt + 1}/{max_retries})"
+                    )
+                    time.sleep(delay)
+                else:
+                    logger.error(
+                        f"Failed to get embedding after {max_retries} attempts due to rate limit: {e}"
+                    )
+                    raise  # Re-raise the exception if out of retries
+            except Exception as e:
+                logger.error(
+                    f"An unexpected error occurred while getting embedding: {e}"
+                )
+                raise
 
 
 # embedding_providers for gemini google
@@ -109,8 +146,7 @@ class GeminiEmbeddingProvider(BaseEmbeddingProvider):
 class SentenceTransformerProvider(BaseEmbeddingProvider):
     def __init__(self, model_name: str, **kwargs):
         super().__init__(**kwargs)
-        self.model_name = model_name
         self.model = SentenceTransformer(model_name)
 
     def _get_embedding_impl(self, text: str) -> np.ndarray:
-        return self.model.encode([text])[0]
+        return self.model.encode(text)

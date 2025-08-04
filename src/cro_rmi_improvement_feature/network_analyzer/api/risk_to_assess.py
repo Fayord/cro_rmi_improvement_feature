@@ -24,6 +24,7 @@ import sys
 import os
 import numpy as np
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append("../")
@@ -135,7 +136,7 @@ def create_embedding_text_raw_user_data(risk: RiskData) -> str:
     return f"Risk: {risk.risk} | Description: {risk.risk_desc} | Processes: {processes_str} | Root Causes: {root_causes_str}"
 
 
-def create_embedding(text: str) -> List[float]:
+def create_embedding(text: str, use_cache: bool = True) -> List[float]:
     provider = OpenAIEmbeddingProvider(model_name="text-embedding-3-large")
 
     def get_openai_large_embedding(text: str) -> List[float]:
@@ -143,7 +144,7 @@ def create_embedding(text: str) -> List[float]:
         if not text or text.strip() == "":
             return None
         try:
-            embedding = provider.get_embedding(text)
+            embedding = provider.get_embedding(text, use_cache=use_cache)
             return embedding.tolist()
         except Exception as e:
             print(f"Error getting embedding for text: {e}")
@@ -185,9 +186,13 @@ def recommend_risk_to_assesses(
     embedding_text_list = [
         create_embedding_text_raw_user_data(risk) for risk in interested_risks
     ]
-    embedding_risk_data_list = [
-        create_embedding(embedding_text) for embedding_text in embedding_text_list
-    ]
+    # Parallelize embedding creation
+    embedding_risk_data_list = []
+    with ThreadPoolExecutor(max_workers=32) as executor:
+        embedding_risk_data_list = list(
+            executor.map(create_embedding, embedding_text_list)
+        )
+
     end_create_embeddings_time = time.perf_counter()
     print(
         f"Time to create embeddings for interested risks: {end_create_embeddings_time - end_get_reference_data_time:.4f} seconds"
