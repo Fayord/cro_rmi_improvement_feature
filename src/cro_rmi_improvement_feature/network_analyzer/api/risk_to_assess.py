@@ -18,13 +18,14 @@ from schemas import (
     ExistingRisk,
 )
 
-from typing import List, Set, Optional
+from typing import List, Set, Optional, Dict, Tuple
 import pickle
 import sys
 import os
 import numpy as np
 import time
 from concurrent.futures import ThreadPoolExecutor
+from collections import Counter
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append("../")
@@ -42,6 +43,11 @@ from data_processor.create_graph_data_library import (
     EdgeData,
     RiskOverlayData,
     find_similar_embeddings,
+    _process_edges,
+    create_nodes_and_edges,
+    _prioritize_edges,
+    _classify_edges,
+    _create_final_edge_data,
 )
 
 
@@ -114,7 +120,7 @@ def create_embedding_text_risk_desc_catalog(risk: RiskData, timestamp: str) -> s
     text_parts.append(f"Description: {risk.risk_desc}")
     for risk_cat in risk_catalog_reference_data:
         if risk_cat.data.risk == risk.risk:
-            text_parts.append(f"Catalog Description: {risk_cat.data.risk_desc_catalog}")
+            text_parts.append(f"Catalog Description: {risk_cat.data.risk_desc}")
             break
     return " | ".join(text_parts)
 
@@ -136,9 +142,18 @@ def create_embedding(text: str, use_cache: bool = True) -> List[float]:
     return get_openai_large_embedding(text)
 
 
-def create_company_graph_data(risk_data_list: List[RiskData]) -> CompanyGraphData:
+def create_company_graph_data(
+    risk_data_list: List[RiskData],
+    company_name: str = "User Company",
+    embedding_key: str = "embedding_risk_desc_catalog",
+    classify_model_name: str = "gpt-4.1-mini",
+    high_priority_search_space: float = 4.0,
+    high_priority_atmost_number_edges: int = 3,
+    relation_process: str = "oneway_run",
+) -> CompanyGraphData:
     embedding_text_list = [
-        create_embedding_text_risk_desc_catalog(risk) for risk in risk_data_list
+        create_embedding_text_risk_desc_catalog(risk, "20250513")
+        for risk in risk_data_list
     ]
     embedding_risk_data_list = []
     with ThreadPoolExecutor(max_workers=32) as executor:
@@ -149,8 +164,31 @@ def create_company_graph_data(risk_data_list: List[RiskData]) -> CompanyGraphDat
         RiskDataWithEmbedding(data=risk, embedding=embedding_risk_data_list[i])
         for i, risk in enumerate(risk_data_list)
     ]
-    edges = []
-    return CompanyGraphData(nodes=nodes, edges=edges)
+
+    (
+        processed_edges,
+        direction_list,
+        edge_label_list,
+        classified_count,
+        final_edge_data_list,
+    ) = _process_edges(
+        nodes,
+        company_name,
+        embedding_key,
+        classify_model_name,
+        relation_process,
+        high_priority_search_space,
+        high_priority_atmost_number_edges,
+    )
+
+    # The original function had `edges = []` here.
+    # Now, `final_edge_data_list` contains the processed edges.
+    # print(f"direction_list: {direction_list}") # Commented out, as this is for debugging/logging
+    return CompanyGraphData(
+        nodes=nodes,
+        edges=final_edge_data_list,
+        number_of_displayed_edges=2 * len(nodes),
+    )
 
 
 def load_existing_company_graph_data(
