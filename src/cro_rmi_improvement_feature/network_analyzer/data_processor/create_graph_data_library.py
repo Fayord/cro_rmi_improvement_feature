@@ -352,6 +352,8 @@ def generate_graph_elements_for_company(
                         edge["risk_b_data"].model_dump(),
                         classify_model_name,
                     )
+                    if edge.risk_b_data.id == "risk_PCG_20250513_38":
+                        print("\n\n\n here relationship_a_b", relationship_a_b)
                     direction_list[relationship_a_b["direction"]] += 1
 
                     if relation_process == "twoway_run":

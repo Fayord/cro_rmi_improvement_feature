@@ -103,6 +103,22 @@ def create_embedding_text_raw_user_data(risk: RiskData) -> str:
     return f"Risk: {risk.risk} | Description: {risk.risk_desc} | Processes: {processes_str} | Root Causes: {root_causes_str}"
 
 
+def create_embedding_text_risk_desc_catalog(risk: RiskData, timestamp: str) -> str:
+    graph_data_library: GraphDataLibrary = load_graph_data_library()
+    risk_catalog_reference_data: List[RiskDataWithEmbedding] = (
+        graph_data_library.risk_catalog_reference_datas[timestamp]
+    )
+    # find risk catalog that have risk name same as risk.risk
+    text_parts = []
+    text_parts.append(f"Risk: {risk.risk}")
+    text_parts.append(f"Description: {risk.risk_desc}")
+    for risk_cat in risk_catalog_reference_data:
+        if risk_cat.data.risk == risk.risk:
+            text_parts.append(f"Catalog Description: {risk_cat.data.risk_desc_catalog}")
+            break
+    return " | ".join(text_parts)
+
+
 def create_embedding(text: str, use_cache: bool = True) -> List[float]:
     provider = OpenAIEmbeddingProvider(model_name="text-embedding-3-large")
 
@@ -122,7 +138,7 @@ def create_embedding(text: str, use_cache: bool = True) -> List[float]:
 
 def create_company_graph_data(risk_data_list: List[RiskData]) -> CompanyGraphData:
     embedding_text_list = [
-        create_embedding_text_raw_user_data(risk) for risk in risk_data_list
+        create_embedding_text_risk_desc_catalog(risk) for risk in risk_data_list
     ]
     embedding_risk_data_list = []
     with ThreadPoolExecutor(max_workers=32) as executor:

@@ -317,10 +317,12 @@ def apply_visual_styles_to_elements(  # Renamed function
     high_priority_edge_count = 0
     for el in elements:
         if "source" in el.get("data", {}):
-            if el["data"]["high_priority"] and not el["data"].get(
-                "do_not_cal_weight", False
-            ):
-                high_priority_edge_count += 1
+            # if el["data"]["high_priority"] and not el["data"].get(
+            #     "do_not_cal_weight", False
+            # ):
+            if el["data"]["high_priority"]:
+                if not el["data"].get("do_not_cal_weight", False):
+                    high_priority_edge_count += 1
                 filtered_elements_with_edges.append(el)
                 # node_edge_counter["edge"] += 1 # Will count later after full filtering
                 line_weights_of_visible_edges.append(el["data"]["raw_weight"])
@@ -337,7 +339,7 @@ def apply_visual_styles_to_elements(  # Renamed function
         if (
             "source" in el.get("data", {})
             and not el["data"]["high_priority"]
-            and not el["data"].get("do_not_cal_weight", False)
+            # and not el["data"].get("do_not_cal_weight", False)
         ):
             non_high_priority_edges.append(el)
 
@@ -347,8 +349,11 @@ def apply_visual_styles_to_elements(  # Renamed function
     )
 
     # Add the top 'remaining_edges_to_show' non-high_priority edges
-    for i, el in enumerate(non_high_priority_edges_sorted):
-        if i < remaining_edges_to_show:
+    non_high_priority_edge_count = 0
+    for el in non_high_priority_edges_sorted:
+        if non_high_priority_edge_count < remaining_edges_to_show:
+            if not el["data"].get("do_not_cal_weight", False):
+                non_high_priority_edge_count += 1
             filtered_elements_with_edges.append(el)
             line_weights_of_visible_edges.append(el["data"]["raw_weight"])
         else:

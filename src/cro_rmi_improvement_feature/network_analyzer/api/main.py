@@ -169,7 +169,7 @@ async def recommend_risks_to_assess_api(request: RiskRecommendationRequest):
             # 2. save the graph data to graph data library
 
             company_id = request.existing_risks[0].company_id
-            company_graph_id = f"{company_id}|embedding_raw_user_data|oneway_run"
+            company_graph_id = f"{company_id}|embedding_risk_desc_catalog|oneway_run"
             risk_data_list = convert_existing_risk_to_risk_data(existing_risk_list)
             company_graph_data = create_company_graph_data(risk_data_list)
             save_company_graph_data(company_graph_data, company_graph_id)
