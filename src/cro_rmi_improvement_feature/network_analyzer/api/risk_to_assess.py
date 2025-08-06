@@ -172,9 +172,18 @@ def save_company_graph_data(
     # load graph data library
     graph_data_library: GraphDataLibrary = load_graph_data_library()
     # update graph data library
+    # save individual company graph data
+    graph_data_library_path = get_graph_data_library_path()
+    graph_data_library_folder_path = os.path.dirname(graph_data_library_path)
+    individual_company_graph_data_path = os.path.join(
+        graph_data_library_folder_path,
+        "company_graph_data-" + company_graph_id + ".pkl",
+    )
+    with open(individual_company_graph_data_path, "wb") as f:
+        pickle.dump(company_graph_data, f)
+    # update graph data library
     graph_data_library.company_graph_datas[company_graph_id] = company_graph_data
     # save graph data library
-    graph_data_library_path = get_graph_data_library_path()
     with open(graph_data_library_path, "wb") as f:
         pickle.dump(graph_data_library, f)
 
