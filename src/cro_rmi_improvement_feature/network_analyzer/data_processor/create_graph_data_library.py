@@ -352,7 +352,12 @@ def generate_graph_elements_for_company(
                         edge["risk_b_data"].model_dump(),
                         classify_model_name,
                     )
-                    if edge.risk_b_data.id == "risk_PCG_20250513_38":
+                    if (
+                        embedding_key == "embedding_risk_desc_catalog"
+                        and edge["risk_b_data"].id == "risk_PCG_20250513_38"
+                        and relation_process == "oneway_run"
+                        and relationship_a_b["interdependency_type"] == "Causal"
+                    ):
                         print("\n\n\n here relationship_a_b", relationship_a_b)
                     direction_list[relationship_a_b["direction"]] += 1
 
