@@ -22,6 +22,8 @@ dependencies = [
     "scipy>=1.16.0",
     "langchain-openai>=0.3.28",
     "langchain-community>=0.3.27",
+    "google-generativeai>=0.8.5",
+    "google>=3.0.0",
 ]
 license = {text = "MIT"}
 

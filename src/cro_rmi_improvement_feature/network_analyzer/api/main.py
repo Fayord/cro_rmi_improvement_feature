@@ -4,6 +4,7 @@ FastAPI application for risk recommendation service.
 
 from datetime import datetime
 
+from json import load
 from typing import List
 import uuid
 
@@ -45,10 +46,13 @@ from core.models import Process, RootCause
 
 
 from risk_to_assess import (
-    recommend_risk_to_assesses_old,
     recommend_risk_to_assesses,
     convert_existing_risk_to_risk_data,
     save_and_update_company_graph_data,
+    load_existing_company_graph_data,
+    update_risk_data_list,
+    create_company_graph_data,
+    save_company_graph_data,
 )
 from traceback import print_exc
 
@@ -157,20 +161,27 @@ async def recommend_risks_to_assess_api(request: RiskRecommendationRequest):
             # convert existing_risk to risk_data
             risk_data_list = convert_existing_risk_to_risk_data(existing_risk_list)
         elif request.data_level == "company":
-            # save data to graph data library
-            company_id = request.existing_risks[0].company_id
-            risk_data_list = convert_existing_risk_to_risk_data(existing_risk_list)
-            save_and_update_company_graph_data(risk_data_list, company_id)
-            ...
+            # for company level we can do it in 2 phrase by
+            # phrase one
+            # 1. get embedding of input risk data
+            # phrase two
+            # 1. after return result we need to update the graph data with new risk data
+            # 2. save the graph data to graph data library
 
             company_id = request.existing_risks[0].company_id
+            company_graph_id = f"{company_id}|embedding_raw_user_data|oneway_run"
+            risk_data_list = convert_existing_risk_to_risk_data(existing_risk_list)
+            company_graph_data = create_company_graph_data(risk_data_list)
+            save_company_graph_data(company_graph_data, company_graph_id)
 
         # pass list risk_data to recommend_risk_to_assesses
-        all_recommended_risks = recommend_risk_to_assesses(risk_data_list)
+        all_recommended_risks = recommend_risk_to_assesses(
+            risk_data_list, request.year_quarter
+        )
         return RiskRecommendationAssessmentResponse(
             id=request.id, recommendations=all_recommended_risks
         )
-    except (ValueError, AttributeError) as e:
+    except (ValueError, AttributeError, UnboundLocalError) as e:
         print_exc()
         # return mockup data for now
         return RiskRecommendationAssessmentResponse(
@@ -526,4 +537,4 @@ def _generate_mock_mitigation_recommendations(
 
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=7800, reload=True, log_level="info")
+    uvicorn.run("main:app", host="0.0.0.0", port=7900, reload=False, log_level="info")

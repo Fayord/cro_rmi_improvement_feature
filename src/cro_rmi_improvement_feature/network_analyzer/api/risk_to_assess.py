@@ -18,7 +18,7 @@ from schemas import (
     ExistingRisk,
 )
 
-from typing import List, Set
+from typing import List, Set, Optional
 import pickle
 import sys
 import os
@@ -50,13 +50,18 @@ def _save_or_update_risk_data(
 ) -> None: ...
 
 
-def load_graph_data_library() -> GraphDataLibrary:
-    """Loads the graph data library from the data directory."""
+def get_graph_data_library_path() -> str:
     dir_path = os.path.dirname(os.path.abspath(__file__))
     GRAPH_DATA_PATH = os.path.join(
         dir_path, "..", "data", "graph", "graph_data_library.pkl"
     )
-    with open(GRAPH_DATA_PATH, "rb") as f:
+    return GRAPH_DATA_PATH
+
+
+def load_graph_data_library() -> GraphDataLibrary:
+    """Loads the graph data library from the data directory."""
+    graph_data_library_path = get_graph_data_library_path()
+    with open(graph_data_library_path, "rb") as f:
         return pickle.load(f)
 
 
@@ -84,44 +89,6 @@ def filter_interested_risk(
         ]
         interested_risks.extend(highest_risk_score_with_highest_risk_impact_risk_list)
     return interested_risks
-
-
-def recommend_risk_to_assesses_old(
-    company_id: str,
-    assessment_risks: List[ExistingRisk],
-    assessment_version: str,
-    timestamp: str = "20250513",
-) -> List[RiskData]:
-    # 1. Receiving all risk data for a given company. (Handled by input `risk_data`)
-
-    # 2. Save and update risk data
-    _save_or_update_risk_data(company_id, assessment_risks)
-
-    all_recommended_risks: List[RiskData] = []
-    # load it from graph data library
-    graph_data_library = load_graph_data_library()
-    # check if company_id is in graph_data_library.company_graph_datas
-    if company_id not in graph_data_library.company_graph_datas:
-        raise ValueError(f"Company {company_id} not found in graph data library")
-    company_graph_data = graph_data_library.company_graph_datas[company_id]
-    existing_risk_name_set = {risk.data.risk for risk in company_graph_data.nodes}
-    interested_risks = filter_interested_risk(company_graph_data)
-    overlay_top_n_risk_id = f"risk_catalog_top_n_overlay|{timestamp}|{company_id}"
-    overlay_top_n_graph_data = graph_data_library.risk_overlay_datas[
-        overlay_top_n_risk_id
-    ]
-    overlay_data = overlay_top_n_graph_data.overlay_data
-    for risk in interested_risks:
-        risk_name = risk.risk
-        top_n_overlay_risks = overlay_data[risk_name]
-        # filter out the risks that are already in the existing_risk_name_set
-        top_n_overlay_risks = [
-            risk.data
-            for risk in top_n_overlay_risks
-            if risk.data.risk not in existing_risk_name_set
-        ]
-        all_recommended_risks.extend(top_n_overlay_risks)
-    return all_recommended_risks
 
 
 def create_embedding_text_raw_user_data(risk: RiskData) -> str:
@@ -153,10 +120,87 @@ def create_embedding(text: str, use_cache: bool = True) -> List[float]:
     return get_openai_large_embedding(text)
 
 
-def recommend_risk_to_assesses(
-    risk_data_list: List[RiskData],
-    timestamp: str = "20250513",
+def create_company_graph_data(risk_data_list: List[RiskData]) -> CompanyGraphData:
+    embedding_text_list = [
+        create_embedding_text_raw_user_data(risk) for risk in risk_data_list
+    ]
+    embedding_risk_data_list = []
+    with ThreadPoolExecutor(max_workers=32) as executor:
+        embedding_risk_data_list = list(
+            executor.map(create_embedding, embedding_text_list)
+        )
+    nodes = [
+        RiskDataWithEmbedding(data=risk, embedding=embedding_risk_data_list[i])
+        for i, risk in enumerate(risk_data_list)
+    ]
+    edges = []
+    return CompanyGraphData(nodes=nodes, edges=edges)
+
+
+def load_existing_company_graph_data(
+    company_graph_id: str,
+) -> Optional[CompanyGraphData]:
+    graph_data_library: GraphDataLibrary = load_graph_data_library()
+    if company_graph_id in graph_data_library.company_graph_datas:
+        company_graph_data = graph_data_library.company_graph_datas[company_graph_id]
+    else:
+        company_graph_data = None
+    return company_graph_data
+
+
+def update_company_graph_data(
+    prev_company_graph_data: Optional[CompanyGraphData],
+    new_company_graph_data: CompanyGraphData,
+) -> CompanyGraphData:
+    if prev_company_graph_data is None:
+        return new_company_graph_data
+    else:
+        ...
+
+
+def update_risk_data_list(
+    prev_risk_data_list: List[RiskData],
+    new_risk_data_list: List[RiskData],
 ) -> List[RiskData]:
+    # union
+    ...
+
+
+def save_company_graph_data(
+    company_graph_data: CompanyGraphData, company_graph_id: str
+) -> None:
+    # load graph data library
+    graph_data_library: GraphDataLibrary = load_graph_data_library()
+    # update graph data library
+    graph_data_library.company_graph_datas[company_graph_id] = company_graph_data
+    # save graph data library
+    graph_data_library_path = get_graph_data_library_path()
+    with open(graph_data_library_path, "wb") as f:
+        pickle.dump(graph_data_library, f)
+
+
+def save_and_update_company_graph_data(
+    risk_data_list: List[RiskData], company_graph_id: str
+) -> List[RiskData]:
+    prev_company_graph_data = load_existing_company_graph_data(company_graph_id)
+    new_company_graph_data = create_company_graph_data(risk_data_list)
+    updated_company_graph_data: CompanyGraphData = update_company_graph_data(
+        prev_company_graph_data, new_company_graph_data
+    )
+    save_company_graph_data(updated_company_graph_data)
+    risk_data_list = [i.data for i in updated_company_graph_data.nodes]
+    return risk_data_list
+
+
+def recommend_risk_to_assesses(
+    risk_data_list: List[RiskData], year_quarter: str
+) -> List[RiskData]:
+    year_quarter_to_timestamp_dict = {
+        "2025-Q1": "20250513",
+        "2025-Q2": "20250513",
+        "2025-Q3": "20250513",
+    }
+    timestamp = year_quarter_to_timestamp_dict[year_quarter]
     start_time = time.perf_counter()
     all_recommended_risks: List[RiskData] = []
     graph_data_library: GraphDataLibrary = load_graph_data_library()
