@@ -5,7 +5,7 @@ FastAPI application for risk recommendation service.
 from datetime import datetime
 
 from json import load
-from typing import List
+from typing import List, Optional, Literal
 import uuid
 
 from fastapi import FastAPI, HTTPException, status
@@ -28,6 +28,8 @@ from schemas import (
     GraphDataRetrievalRequest,
     GraphDataRetrievalResponse,
     ClusterMitigationPlanRequest,
+    LatestGraphIdRequest,
+    LatestGraphIdResponse,
 )
 import os
 import sys
@@ -53,6 +55,10 @@ from risk_to_assess import (
     update_risk_data_list,
     create_company_graph_data,
     save_company_graph_data,
+    get_source_and_central_risk,
+    update_tags_risk_data,
+    remove_existing_risk_with_mitigation_plan,
+    load_graph_data_library,
 )
 from traceback import print_exc
 
@@ -282,12 +288,56 @@ async def recommend_risks_to_mitigate(request: List[RiskRecommendationRequest]):
     This endpoint analyzes the provided existing risks and user information to generate
     personalized risk recommendations that should be mitigated.
     """
+    if request.data_level not in ["company"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Data level must be company for now",
+        )
     try:
         # Validate input
         if not request.existing_risks:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="At least one existing risk must be provided",
+            )
+        existing_risk_list = request.existing_risks
+        if request.data_level == "company":
+            if not all(
+                risk.company_id == request.existing_risks[0].company_id
+                for risk in request.existing_risks
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="All company must be the same",
+                )
+            # create new graph data
+            # then find the source and central risk from graph data
+            # save the updated graph data
+            company_id = request.existing_risks[0].company_id
+            company_graph_id = f"{company_id}|embedding_risk_desc_catalog|oneway_run"
+            risk_data_list = convert_existing_risk_to_risk_data(existing_risk_list)
+            company_graph_data = create_company_graph_data(
+                risk_data_list,
+                company_name=company_id,
+                embedding_key="embedding_risk_desc_catalog",
+                classify_model_name="gpt-4.1-mini",
+                high_priority_search_space=4.0,
+                high_priority_atmost_number_edges=3,
+                relation_process="oneway_run",
+            )
+
+            save_company_graph_data(company_graph_data, company_graph_id)
+
+            # convert company_graph_data to nx.DiGraph() and dataframe
+            # use it to find the source and central risk with existing code from notebook
+            source_risks, central_risks = get_source_and_central_risk(
+                company_graph_data
+            )
+            # then update tags (it can be multiple tags)
+            # then remove the risk that already have mitigation plan
+            recommendations_risks = update_tags_risk_data(source_risks, central_risks)
+            recommendations_risks = remove_existing_risk_with_mitigation_plan(
+                recommendations_risks, risk_data_list
             )
 
         # TODO: Integrate with your existing risk mitigation logic
@@ -296,7 +346,7 @@ async def recommend_risks_to_mitigate(request: List[RiskRecommendationRequest]):
 
         response = RiskRecommendationMitigationPlanResponse(
             user_id=request.user_id,
-            recommendations=recommendations,
+            recommendations=recommendations_risks,
             graph_id=uuid.uuid4().hex[:8],
         )
 
@@ -550,6 +600,72 @@ def _generate_mock_mitigation_recommendations(
 
     # Return all filtered risks
     return filtered_risks
+
+
+def get_latest_graph_id_from_library(
+    data_level: Literal["company", "country", "multi_country"],
+    id: str,
+) -> Optional[str]:
+    """Retrieves the latest graph ID from the GraphDataLibrary based on data level and ID."""
+    graph_data_library: GraphDataLibrary = load_graph_data_library()
+
+    # The graph IDs are stored in the format "company_id|embedding_key|relation_process"
+    # We need to filter based on data_level and then find the latest one (e.g., by timestamp or a similar mechanism)
+    # For simplicity, let's assume the IDs are already in a sortable format or we can extract a timestamp.
+    # For now, let's assume a direct match for the 'id' part of the graph_id and that the latest is the one with highest version, e.g. timestamp
+
+    # collect all graph ids that match the data_level and id
+    matching_graph_ids = []
+    for graph_id_key in graph_data_library.company_graph_datas.keys():
+        parts = graph_id_key.split("|")
+        if len(parts) >= 1 and parts[0] == id:  # Assuming id is the first part for now
+            matching_graph_ids.append(graph_id_key)
+
+    if not matching_graph_ids:
+        return None
+
+    # Sort to get the latest. This assumes a convention like timestamp in the graph_id.
+    # If no timestamp, then a more complex logic is needed, or a simple alphabetical sort.
+    # For this implementation, we'll assume a temporal component or version is implicitly sortable.
+    # For example, if graph_id is 'company_id|embedding_key|timestamp'
+    # The exact sorting logic might need to be refined based on actual graph ID structure.
+    return sorted(matching_graph_ids)[
+        -1
+    ]  # Return the latest one alphabetically/lexicographically
+
+
+@app.post(
+    "/retrieve_latest_graph_id",
+    response_model=LatestGraphIdResponse,
+    status_code=status.HTTP_200_OK,
+    responses={
+        400: {"model": ErrorResponse, "description": "Bad Request"},
+        500: {"model": ErrorResponse, "description": "Internal Server Error"},
+    },
+)
+async def retrieve_latest_graph_id_api(request: LatestGraphIdRequest):
+    """Retrieve the latest graph ID for a given company/country/multi_country."""
+    try:
+        latest_graph_id = get_latest_graph_id_from_library(
+            request.data_level, request.id
+        )
+
+        if latest_graph_id:
+            return LatestGraphIdResponse(
+                graph_id=latest_graph_id,
+                message=f"Successfully retrieved latest graph ID for {request.data_level} {request.id}.",
+            )
+        else:
+            return LatestGraphIdResponse(
+                graph_id=None,
+                message=f"No graph ID found for {request.data_level} {request.id}.",
+            )
+    except Exception as e:
+        print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Error retrieving latest graph ID: {str(e)}",
+        )
 
 
 if __name__ == "__main__":

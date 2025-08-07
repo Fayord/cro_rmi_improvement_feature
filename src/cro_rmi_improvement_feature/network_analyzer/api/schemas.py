@@ -52,7 +52,8 @@ class RiskRecommendationMitigationPlanResponse(BaseModel):
 
     id: str = Field(..., description="Company identifier")
     recommendations_with_tags: List[RiskDataWithTags] = Field(
-        ..., description="List of recommended risks"
+        ...,
+        description="List of recommended risks to mitigate from existing user's data, for Example user data is List_A and List of recommended risks to mitigate is anything that in List_A",
     )
     graph_id: str = Field(..., description="Graph identifier")
 
@@ -78,7 +79,8 @@ class RiskRecommendationAssessmentResponse(BaseModel):
 
     id: str = Field(..., description="Company identifier")
     recommendations: List[RiskData] = Field(
-        ..., description="List of recommended risks"
+        ...,
+        description="List of additional risks to assess, for Example user data is List_A and List of additional risks is anything that not in List_A",
     )
 
     class Config:
@@ -485,3 +487,24 @@ class MitigationPlanRequest(BaseModel):
         ...,
         description="Year and quarter of the risk (e.g., '2024-Q1', '2024-Q2')",
     )
+
+
+class LatestGraphIdRequest(BaseModel):
+    """Request schema for retrieving the latest graph ID."""
+
+    data_level: Literal["company", "country", "multi_country"] = Field(
+        ...,
+        description="Level of the request (company, country, multi_country)",
+    )
+    id: str = Field(
+        ..., description="Unique identifier for the company/country/multi_country"
+    )
+
+
+class LatestGraphIdResponse(BaseModel):
+    """Response schema for the latest graph ID."""
+
+    graph_id: Optional[str] = Field(
+        None, description="The latest graph identifier, if found"
+    )
+    message: str = Field(..., description="Status message")
