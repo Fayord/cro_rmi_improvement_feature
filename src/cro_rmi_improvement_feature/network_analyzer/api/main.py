@@ -45,14 +45,11 @@ from data_processor.create_graph_data_library import (
     RiskOverlayData,
 )
 from core.models import Process, RootCause
-
+from time import time
 
 from risk_to_assess import (
     recommend_risk_to_assesses,
     convert_existing_risk_to_risk_data,
-    save_and_update_company_graph_data,
-    load_existing_company_graph_data,
-    update_risk_data_list,
     create_company_graph_data,
     save_company_graph_data,
     load_graph_data_library,
@@ -165,6 +162,7 @@ async def recommend_risks_to_assess_api(request: RiskRecommendationRequest):
         # for user level, we don't need to save and create graph
         # for company level, we need to save data
 
+        graph_data_library = load_graph_data_library()
         if request.data_level == "user":
             # convert existing_risk to risk_data
             risk_data_list = convert_existing_risk_to_risk_data(existing_risk_list)
@@ -179,6 +177,8 @@ async def recommend_risks_to_assess_api(request: RiskRecommendationRequest):
             company_id = request.existing_risks[0].company_id
             company_graph_id = f"{company_id}|embedding_risk_desc_catalog|oneway_run"
             risk_data_list = convert_existing_risk_to_risk_data(existing_risk_list)
+
+            start_time = time()
             company_graph_data = create_company_graph_data(
                 risk_data_list,
                 company_name=company_id,
@@ -187,12 +187,24 @@ async def recommend_risks_to_assess_api(request: RiskRecommendationRequest):
                 high_priority_search_space=4.0,
                 high_priority_atmost_number_edges=3,
                 relation_process="oneway_run",
+                graph_data_library=graph_data_library,
             )
-            save_company_graph_data(company_graph_data, company_graph_id)
+            end_time = time()
+            print(
+                f"Time taken to create company graph data: {end_time - start_time} seconds"
+            )
+            start_time = time()
+            save_company_graph_data(
+                company_graph_data, company_graph_id, graph_data_library
+            )
+            end_time = time()
+            print(
+                f"Time taken to save company graph data: {end_time - start_time} seconds"
+            )
 
         # pass list risk_data to recommend_risk_to_assesses
         all_recommended_risks = recommend_risk_to_assesses(
-            risk_data_list, request.year_quarter
+            risk_data_list, request.year_quarter, graph_data_library
         )
         return RiskRecommendationAssessmentResponse(
             id=request.id, recommendations=all_recommended_risks

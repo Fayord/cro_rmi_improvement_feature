@@ -109,8 +109,10 @@ def create_embedding_text_raw_user_data(risk: RiskData) -> str:
     return f"Risk: {risk.risk} | Description: {risk.risk_desc} | Processes: {processes_str} | Root Causes: {root_causes_str}"
 
 
-def create_embedding_text_risk_desc_catalog(risk: RiskData, timestamp: str) -> str:
-    graph_data_library: GraphDataLibrary = load_graph_data_library()
+def create_embedding_text_risk_desc_catalog(
+    risk: RiskData, timestamp: str, graph_data_library: GraphDataLibrary
+) -> str:
+
     risk_catalog_reference_data: List[RiskDataWithEmbedding] = (
         graph_data_library.risk_catalog_reference_datas[timestamp]
     )
@@ -144,6 +146,7 @@ def create_embedding(text: str, use_cache: bool = True) -> List[float]:
 
 def create_company_graph_data(
     risk_data_list: List[RiskData],
+    graph_data_library: GraphDataLibrary,
     company_name: str = "User Company",
     embedding_key: str = "embedding_risk_desc_catalog",
     classify_model_name: str = "gpt-4.1-mini",
@@ -152,7 +155,7 @@ def create_company_graph_data(
     relation_process: str = "oneway_run",
 ) -> CompanyGraphData:
     embedding_text_list = [
-        create_embedding_text_risk_desc_catalog(risk, "20250513")
+        create_embedding_text_risk_desc_catalog(risk, "20250513", graph_data_library)
         for risk in risk_data_list
     ]
     embedding_risk_data_list = []
@@ -191,17 +194,6 @@ def create_company_graph_data(
     )
 
 
-def load_existing_company_graph_data(
-    company_graph_id: str,
-) -> Optional[CompanyGraphData]:
-    graph_data_library: GraphDataLibrary = load_graph_data_library()
-    if company_graph_id in graph_data_library.company_graph_datas:
-        company_graph_data = graph_data_library.company_graph_datas[company_graph_id]
-    else:
-        company_graph_data = None
-    return company_graph_data
-
-
 def update_company_graph_data(
     prev_company_graph_data: Optional[CompanyGraphData],
     new_company_graph_data: CompanyGraphData,
@@ -221,10 +213,10 @@ def update_risk_data_list(
 
 
 def save_company_graph_data(
-    company_graph_data: CompanyGraphData, company_graph_id: str
+    company_graph_data: CompanyGraphData,
+    company_graph_id: str,
+    graph_data_library: GraphDataLibrary,
 ) -> None:
-    # load graph data library
-    graph_data_library: GraphDataLibrary = load_graph_data_library()
     # update graph data library
     # save individual company graph data
     graph_data_library_path = get_graph_data_library_path()
@@ -242,21 +234,10 @@ def save_company_graph_data(
         pickle.dump(graph_data_library, f)
 
 
-def save_and_update_company_graph_data(
-    risk_data_list: List[RiskData], company_graph_id: str
-) -> List[RiskData]:
-    prev_company_graph_data = load_existing_company_graph_data(company_graph_id)
-    new_company_graph_data = create_company_graph_data(risk_data_list)
-    updated_company_graph_data: CompanyGraphData = update_company_graph_data(
-        prev_company_graph_data, new_company_graph_data
-    )
-    save_company_graph_data(updated_company_graph_data)
-    risk_data_list = [i.data for i in updated_company_graph_data.nodes]
-    return risk_data_list
-
-
 def recommend_risk_to_assesses(
-    risk_data_list: List[RiskData], year_quarter: str
+    risk_data_list: List[RiskData],
+    year_quarter: str,
+    graph_data_library: GraphDataLibrary,
 ) -> List[RiskData]:
     year_quarter_to_timestamp_dict = {
         "2025-Q1": "20250513",
@@ -266,7 +247,7 @@ def recommend_risk_to_assesses(
     timestamp = year_quarter_to_timestamp_dict[year_quarter]
     start_time = time.perf_counter()
     all_recommended_risks: List[RiskData] = []
-    graph_data_library: GraphDataLibrary = load_graph_data_library()
+
     end_load_graph_data_library_time = time.perf_counter()
     print(
         f"Time to load graph data library: {end_load_graph_data_library_time - start_time:.4f} seconds"
