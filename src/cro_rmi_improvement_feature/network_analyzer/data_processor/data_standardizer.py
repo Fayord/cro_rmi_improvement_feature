@@ -366,10 +366,12 @@ def process_catalog_data(
         risk_desc = row["Description-EN"]
         risk_name = row["Risk-EN"]
         risk_rootcause = row["Root cause-EN"]
+        risk_id = row["Code"]
         data = {
             "company": f"risk_catalog-{date_stamp}",
             "risk_cat": risk_cat,
             "risk": risk_name,
+            "risk_id": risk_id,
             "risk_desc": risk_desc,
             "rootcause": risk_rootcause,
             "process": "",
@@ -517,7 +519,8 @@ def process_risk_data(
         catalog_data_path, date_stamp, selected_risk_cat
     )
     print(f"catalog_df columns: {list(catalog_df.columns)}")
-
+    # merge risk_id from catalog_df to df7 base on "risk" column
+    df7 = df7.merge(catalog_df[["risk", "risk_id"]], on="risk", how="left")
     # Merge with catalog descriptions
     df8 = df7.copy()
     df8["risk"] = df8["risk"].str.strip()

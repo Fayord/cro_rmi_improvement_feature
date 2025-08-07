@@ -116,6 +116,7 @@ def create_nodes_with_embedding(
                     id=node_id,
                     label=data["risk"],
                     risk=data["risk"],
+                    risk_id=node_id,
                     risk_cat=data["risk_cat"],
                     risk_level=data["risk_level"],
                     risk_score=data["risk_score"],
@@ -649,6 +650,7 @@ def generate_risk_catalog_top_n_overlay_data(
                         id=id,
                         label=label,
                         risk=risk_catalog_list[related_risk_data_index].data.risk,
+                        risk_id=risk_catalog_list[related_risk_data_index].data.risk_id,
                         risk_cat=risk_catalog_list[
                             related_risk_data_index
                         ].data.risk_cat,

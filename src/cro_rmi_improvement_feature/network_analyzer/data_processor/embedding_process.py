@@ -22,9 +22,14 @@ import sys
 import os
 
 # Add the find_similar_risk directory to the path
-current_dir = os.path.dirname(os.path.abspath(__file__))
-find_similar_risk_path = os.path.join(current_dir, "../../../find_similar_risk")
+dir_path = os.path.dirname(os.path.abspath(__file__))
+find_similar_risk_path = os.path.join(dir_path, "../../../find_similar_risk")
 sys.path.insert(0, find_similar_risk_path)
+from dotenv import load_dotenv
+
+env_path = os.path.join(dir_path, "../../../../.env")
+
+load_dotenv(env_path)
 try:
     from embedding_providers import (  # type: ignore
         OpenAIEmbeddingProvider,
@@ -36,7 +41,7 @@ except ImportError as e:
     print(f"Current sys.path: {sys.path}")
 
     # Try alternative path
-    alt_path = os.path.join(current_dir, "../../find_similar_risk")
+    alt_path = os.path.join(dir_path, "../../find_similar_risk")
     sys.path.insert(0, alt_path)
     try:
         from embedding_providers import (  # type: ignore
