@@ -55,10 +55,12 @@ from risk_to_assess import (
     update_risk_data_list,
     create_company_graph_data,
     save_company_graph_data,
+    load_graph_data_library,
+)
+from risk_to_mitigate import (
     get_source_and_central_risk,
     update_tags_risk_data,
     remove_existing_risk_with_mitigation_plan,
-    load_graph_data_library,
 )
 from traceback import print_exc
 
@@ -281,7 +283,7 @@ async def recommend_risks_to_assess_api(request: RiskRecommendationRequest):
         500: {"model": ErrorResponse, "description": "Internal Server Error"},
     },
 )
-async def recommend_risks_to_mitigate(request: List[RiskRecommendationRequest]):
+async def recommend_risks_to_mitigate_api(request: RiskRecommendationRequest):
     """
     Generate risk recommendations for mitigation based on existing risks and user context.
 
@@ -328,25 +330,27 @@ async def recommend_risks_to_mitigate(request: List[RiskRecommendationRequest]):
 
             save_company_graph_data(company_graph_data, company_graph_id)
 
-            # convert company_graph_data to nx.DiGraph() and dataframe
-            # use it to find the source and central risk with existing code from notebook
             source_risks, central_risks = get_source_and_central_risk(
                 company_graph_data
             )
             # then update tags (it can be multiple tags)
             # then remove the risk that already have mitigation plan
-            recommendations_risks = update_tags_risk_data(source_risks, central_risks)
-            recommendations_risks = remove_existing_risk_with_mitigation_plan(
-                recommendations_risks, risk_data_list
+            risk_data_dict = {
+                "is_source_risk": source_risks,
+                "is_central_risk": central_risks,
+            }
+            recommendations_risks: List[RiskDataWithTags] = update_tags_risk_data(
+                risk_data_dict
+            )
+            recommendations_risks: List[RiskDataWithTags] = (
+                remove_existing_risk_with_mitigation_plan(
+                    recommendations_risks, existing_risk_list
+                )
             )
 
-        # TODO: Integrate with your existing risk mitigation logic
-        # For now, returning mock data
-        recommendations = _generate_mock_mitigation_recommendations(request)
-
         response = RiskRecommendationMitigationPlanResponse(
-            user_id=request.user_id,
-            recommendations=recommendations_risks,
+            id=request.id,
+            recommendations_with_tags=recommendations_risks,
             graph_id=uuid.uuid4().hex[:8],
         )
 
@@ -646,17 +650,18 @@ def get_latest_graph_id_from_library(
 async def retrieve_latest_graph_id_api(request: LatestGraphIdRequest):
     """Retrieve the latest graph ID for a given company/country/multi_country."""
     try:
-        latest_graph_id = get_latest_graph_id_from_library(
-            request.data_level, request.id
-        )
+        # TODO: Implement the logic to retrieve the latest graph ID
+        latest_graph_id = "DUMMY_GRAPH_ID"
 
         if latest_graph_id:
             return LatestGraphIdResponse(
+                id=request.id,
                 graph_id=latest_graph_id,
                 message=f"Successfully retrieved latest graph ID for {request.data_level} {request.id}.",
             )
         else:
             return LatestGraphIdResponse(
+                id=request.id,
                 graph_id=None,
                 message=f"No graph ID found for {request.data_level} {request.id}.",
             )

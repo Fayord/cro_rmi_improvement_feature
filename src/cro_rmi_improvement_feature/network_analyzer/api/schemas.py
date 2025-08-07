@@ -31,19 +31,21 @@ class RiskDataWithTags(BaseModel):
     """Schema for recommended risk items with rationale."""
 
     risk_data: RiskData = Field(..., description="Risk data")
-    is_central_risk: bool = Field(..., description="Whether the risk is a central risk")
-    is_source_risk: bool = Field(..., description="Whether the risk is a source risk")
+    is_central_risk: bool = Field(
+        False, description="Whether the risk is a central risk"
+    )
+    is_source_risk: bool = Field(False, description="Whether the risk is a source risk")
     is_high_risk: bool = Field(
-        ..., description="Whether the risk is at least high risk (high, critical)"
+        False, description="Whether the risk is at least high risk (high, critical)"
     )
     is_shared_root_cause: bool = Field(
-        ..., description="[Future feature] Whether the risk is shared root cause"
+        False, description="[Future feature] Whether the risk is shared root cause"
     )
     is_news_trended: bool = Field(
-        ..., description="[Future feature] Whether the risk is news trended"
+        False, description="[Future feature] Whether the risk is news trended"
     )
     is_emerging_risk: bool = Field(
-        ..., description="[Future feature] Whether the risk is emerging risk"
+        False, description="[Future feature] Whether the risk is emerging risk"
     )
 
 
@@ -492,18 +494,26 @@ class MitigationPlanRequest(BaseModel):
 class LatestGraphIdRequest(BaseModel):
     """Request schema for retrieving the latest graph ID."""
 
+    id: str = Field(..., description="Unique identifier requested")
     data_level: Literal["company", "country", "multi_country"] = Field(
         ...,
         description="Level of the request (company, country, multi_country)",
     )
-    id: str = Field(
-        ..., description="Unique identifier for the company/country/multi_country"
+    company_name: Optional[str] = Field(None, description="Name of the company")
+    country_name: Optional[str] = Field(None, description="Name of the country")
+    multi_country_name: Optional[str] = Field(
+        None, description="Name of the multi-country"
+    )
+    year_quarter: str = Field(
+        ...,
+        description="Year and quarter of the risk (e.g., '2024-Q1', '2024-Q2')",
     )
 
 
 class LatestGraphIdResponse(BaseModel):
     """Response schema for the latest graph ID."""
 
+    id: str = Field(..., description="Unique identifier requested")
     graph_id: Optional[str] = Field(
         None, description="The latest graph identifier, if found"
     )
