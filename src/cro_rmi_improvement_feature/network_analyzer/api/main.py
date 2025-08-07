@@ -219,6 +219,7 @@ async def recommend_risks_to_assess_api(request: RiskRecommendationRequest):
                     id="risk_001",
                     label="Risk 1",
                     risk="Risk 1",
+                    risk_id="risk_001",
                     risk_cat="Operational",
                     risk_level=3,
                     risk_score=3,
@@ -248,6 +249,7 @@ async def recommend_risks_to_assess_api(request: RiskRecommendationRequest):
                     id="risk_002",
                     label="Risk 2",
                     risk="Risk 2",
+                    risk_id="risk_002",
                     risk_cat="Operational",
                     risk_level=3,
                     risk_score=3,
@@ -314,6 +316,7 @@ async def recommend_risks_to_mitigate_api(request: RiskRecommendationRequest):
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="At least one existing risk must be provided",
             )
+        graph_data_library = load_graph_data_library()
         existing_risk_list = request.existing_risks
         if request.data_level == "company":
             if not all(
@@ -338,9 +341,12 @@ async def recommend_risks_to_mitigate_api(request: RiskRecommendationRequest):
                 high_priority_search_space=4.0,
                 high_priority_atmost_number_edges=3,
                 relation_process="oneway_run",
+                graph_data_library=graph_data_library,
             )
 
-            save_company_graph_data(company_graph_data, company_graph_id)
+            save_company_graph_data(
+                company_graph_data, company_graph_id, graph_data_library
+            )
 
             source_risks, central_risks = get_source_and_central_risk(
                 company_graph_data

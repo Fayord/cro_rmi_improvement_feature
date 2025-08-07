@@ -240,6 +240,7 @@ def recommend_risk_to_assesses(
     graph_data_library: GraphDataLibrary,
 ) -> List[RiskData]:
     year_quarter_to_timestamp_dict = {
+        "2024-Q4": "20250513",
         "2025-Q1": "20250513",
         "2025-Q2": "20250513",
         "2025-Q3": "20250513",
@@ -336,6 +337,7 @@ def convert_existing_risk_to_risk_data(
                 id=risk.risk_id,
                 label=risk.risk_name,
                 risk=risk.risk_name,
+                risk_id=risk.risk_id,
                 risk_cat=risk.risk_category,
                 risk_level=risk.score.risk_level,
                 risk_score=risk.score.score,
