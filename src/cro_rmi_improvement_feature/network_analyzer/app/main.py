@@ -1324,7 +1324,7 @@ if __name__ == "__main__":
         "--port", type=int, default=6060, help="Port to run the Dash app on"
     )
     args = parser.parse_args()
-    app.run(debug=True, port=args.port)
+    app.run(debug=True, port=args.port, dev_tools_hot_reload=False)
 
 
 # Add callback to toggle explanation visibility
