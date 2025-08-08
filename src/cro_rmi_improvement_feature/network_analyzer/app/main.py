@@ -91,7 +91,7 @@ def adaptive_fcose_params(num_nodes: int, num_edges: int):
     return {
         "name": "fcose",
         "quality": "proof" if num_nodes > 50 else "default",
-        "nodeRepulsion": 4000 * scale_factor,  # space out nodes
+        "nodeRepulsion": 5500 * scale_factor,  # space out nodes
         "idealEdgeLength": 80 + 2 * scale_factor,  # prevent edge clutter
         "edgeElasticity": 0.3 if num_edges > 100 else 0.45,
         "gravity": (0.1 if num_nodes > 100 else 0.25),  # smaller gravity = more spread
