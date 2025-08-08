@@ -8,6 +8,10 @@ import os
 
 dir_path = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(dir_path, ".env"))
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 SECRET_KEY = os.getenv("JWT_SECRET_KEY")
 
@@ -35,6 +39,28 @@ def verify_access_token(token: str):
         return "Invalid token"
 
 
+def verify_access_token_fastapi(token: str = Depends(oauth2_scheme)):
+    """
+    Decodes and verifies a JWT access token.
+    Raises an HTTPException if the token is invalid or expired.
+    """
+    try:
+        decoded_token = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        return decoded_token
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has expired",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    except jwt.InvalidTokenError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
 def generate_permanent_token_no_exp(user_id: str):
     payload = {
         "sub": user_id,
@@ -57,7 +83,7 @@ if __name__ == "__main__":
     decoded = verify_access_token(token)
     print("Decoded:", decoded)
 
-    token = generate_permanent_token_no_exp("api_user_001")
+    token = generate_permanent_token_no_exp(1)
     print("Permanent Token:", token)
 
     # Later, validate it

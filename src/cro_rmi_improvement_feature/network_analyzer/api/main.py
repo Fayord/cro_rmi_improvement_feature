@@ -7,8 +7,8 @@ from datetime import datetime
 from json import load
 from typing import List, Optional, Literal
 import uuid
-
-from fastapi import FastAPI, HTTPException, status
+from typing import Dict
+from fastapi import FastAPI, HTTPException, status, Depends
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
@@ -44,6 +44,7 @@ from data_processor.create_graph_data_library import (
     EdgeData,
     RiskOverlayData,
 )
+from test_jwt import verify_access_token_fastapi
 from core.models import Process, RootCause
 from time import time
 
@@ -114,7 +115,10 @@ def retrieve_graph_data(graph_id: str) -> GraphDataRetrievalResponse:
         500: {"model": ErrorResponse, "description": "Internal Server Error"},
     },
 )
-async def retrieve_graph_data_api(request: GraphDataRetrievalRequest):
+async def retrieve_graph_data_api(
+    request: GraphDataRetrievalRequest,
+    payload: Dict = Depends(verify_access_token_fastapi),
+):
     """Retrieve graph data for a given graph identifier."""
     return retrieve_graph_data(request.graph_id)
 
@@ -128,7 +132,10 @@ async def retrieve_graph_data_api(request: GraphDataRetrievalRequest):
         500: {"model": ErrorResponse, "description": "Internal Server Error"},
     },
 )
-async def recommend_risks_to_assess_api(request: RiskRecommendationRequest):
+async def recommend_risks_to_assess_api(
+    request: RiskRecommendationRequest,
+    payload: Dict = Depends(verify_access_token_fastapi),
+):
     """
     Expected to use all data in the same year and quarter
     Generate risk recommendations for assessment based on existing risks and user context.
@@ -297,7 +304,10 @@ async def recommend_risks_to_assess_api(request: RiskRecommendationRequest):
         500: {"model": ErrorResponse, "description": "Internal Server Error"},
     },
 )
-async def recommend_risks_to_mitigate_api(request: RiskRecommendationRequest):
+async def recommend_risks_to_mitigate_api(
+    request: RiskRecommendationRequest,
+    payload: Dict = Depends(verify_access_token_fastapi),
+):
     """
     Generate risk recommendations for mitigation based on existing risks and user context.
 
@@ -394,7 +404,9 @@ async def recommend_risks_to_mitigate_api(request: RiskRecommendationRequest):
         500: {"model": ErrorResponse, "description": "Internal Server Error"},
     },
 )
-async def generate_mitigation_plan(request: MitigationPlanRequest):
+async def generate_mitigation_plan(
+    request: MitigationPlanRequest, payload: Dict = Depends(verify_access_token_fastapi)
+):
     """
     Future Feature: Generate a mitigation plan for a given risks.
     """
@@ -410,7 +422,10 @@ async def generate_mitigation_plan(request: MitigationPlanRequest):
         500: {"model": ErrorResponse, "description": "Internal Server Error"},
     },
 )
-async def generate_cluster_mitigation_plan(request: List[ClusterMitigationPlanRequest]):
+async def generate_cluster_mitigation_plan(
+    request: List[ClusterMitigationPlanRequest],
+    payload: Dict = Depends(verify_access_token_fastapi),
+):
     """
     Generate a mitigation plan for a given risk. anything with a dropdown/Literal type eg. priority_level, status, etc. Need to review the schema later
     """
@@ -665,7 +680,9 @@ def get_latest_graph_id_from_library(
         500: {"model": ErrorResponse, "description": "Internal Server Error"},
     },
 )
-async def retrieve_latest_graph_id_api(request: LatestGraphIdRequest):
+async def retrieve_latest_graph_id_api(
+    request: LatestGraphIdRequest, payload: Dict = Depends(verify_access_token_fastapi)
+):
     """Retrieve the latest graph ID for a given company/country/multi_country."""
     try:
         # TODO: Implement the logic to retrieve the latest graph ID
@@ -689,6 +706,15 @@ async def retrieve_latest_graph_id_api(request: LatestGraphIdRequest):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error retrieving latest graph ID: {str(e)}",
         )
+
+
+@app.get("/protected")
+def protected_route(payload: Dict = Depends(verify_access_token_fastapi)):
+    """
+    A protected endpoint that requires a valid access token.
+    The `payload` variable will contain the decoded JWT data.
+    """
+    return {"message": "Access granted", "user_info": payload}
 
 
 if __name__ == "__main__":
