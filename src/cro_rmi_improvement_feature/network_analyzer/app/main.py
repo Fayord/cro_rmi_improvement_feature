@@ -53,6 +53,7 @@ from utils import (  # Import needed utility functions
     get_number_edges_to_show,
 )
 
+from dash import Dash, dcc, html, Input, Output, ctx, callback
 
 cyto.load_extra_layouts()
 
@@ -96,6 +97,8 @@ def adaptive_fcose_params(num_nodes: int, num_edges: int):
         "gravity": (0.1 if num_nodes > 100 else 0.25),  # smaller gravity = more spread
         "numIter": 2000 + int(20 * num_nodes),  # more iterations for larger graphs
         "tile": "true",
+        "animate": False,
+        "tilingPaddingHorizontal": 100,
         "packComponents": "true",
         "nodeSeparation": 100 + 2 * scale_factor,
         "samplingType": "random",
@@ -685,6 +688,16 @@ elements, line_weights, total_edges, total_nodes = process_graph_data_for_displa
 app = dash.Dash(__name__, url_base_pathname="/plot_network/")
 
 
+tab_styles = {
+    "output": {
+        "overflow-y": "scroll",
+        "overflow-wrap": "break-word",
+        "height": "calc(100% - 25px)",
+        "border": "thin lightgrey solid",
+    },
+    "tab": {"height": "calc(98vh - 115px)"},
+}
+
 app.layout = html.Div(
     [
         # --- Add explanation notes ---
@@ -870,6 +883,7 @@ app.layout = html.Div(
             style={
                 "margin": "20px",
                 "padding": "10px",
+                "background-color": "#ffffff",
             },
         ),
         # --- Add a Div to display clicked edge info ---
@@ -914,6 +928,29 @@ app.layout = html.Div(
                 "margin": "20px",
                 "padding": "10px",
             },
+        ),
+        html.Div(
+            className="four columns",
+            children=[
+                dcc.Tabs(
+                    id="tabs-image-export",
+                    children=[
+                        dcc.Tab(label="generate jpg", value="jpg", id="tab-jpg"),
+                        dcc.Tab(label="generate png", value="png", id="tab-png"),
+                    ],
+                ),
+                html.Button("as svg", id="btn-get-svg"),
+                html.Div(
+                    style=tab_styles["tab"],
+                    children=[
+                        html.Div(
+                            id="image-text",
+                            children="image data will appear here",
+                            style=tab_styles["output"],
+                        ),
+                    ],
+                ),
+            ],
         ),
     ]
 )
@@ -1314,6 +1351,43 @@ def display_edge_info(edge_data):
             ]
         )
     return ""  # Return empty string if no edge is tapped
+
+
+@app.callback(
+    Output("cytospace", "generateImage"),
+    [
+        Input("tabs-image-export", "value"),
+        # Input("btn-get-jpg", "n_clicks"),
+        # Input("btn-get-png", "n_clicks"),
+        Input("btn-get-svg", "n_clicks"),
+    ],
+)
+def get_image(tab, get_svg_clicks):
+
+    # File type to output of 'svg, 'png', 'jpg', or 'jpeg' (alias of 'jpg')
+    ftype = tab
+
+    # 'store': Stores the image data in 'imageData' !only jpg/png are supported
+    # 'download'`: Downloads the image as a file with all data handling
+    # 'both'`: Stores image data and downloads image as file.
+    # show which button was clicked
+    print(f"Button clicked: {ctx.triggered_id}")
+    action = "store"
+
+    if ctx.triggered:
+        if ctx.triggered_id != "tabs-image-export":
+            action = "download"
+            ftype = ctx.triggered_id.split("-")[-1]
+
+    return {"type": ftype, "action": action}
+
+
+@callback(
+    Output("image-text", "children"),
+    Input("cytospace", "imageData"),
+)
+def put_image_string(data):
+    return data
 
 
 if __name__ == "__main__":
