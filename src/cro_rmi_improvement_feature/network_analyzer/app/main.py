@@ -406,7 +406,7 @@ def apply_visual_styles_to_elements(  # Renamed function
 
             if visualization_mode == "default":
                 node_fill_color = risk_level_color_map[risk_level]
-            else:  # "risk_focus"
+            elif visualization_mode == "risk_focus":
                 # For risk_focus, color by edge count (level of raw_size)
                 # We need to re-evaluate the level based on the raw_size (which is the sum of filtered edge weights)
                 # and then map it to the edge_count_color_map
@@ -427,6 +427,20 @@ def apply_visual_styles_to_elements(  # Renamed function
                 node_size = node_size_for_risk_focus[risk_level - 1]
                 el["data"]["size"] = node_size
 
+            elif visualization_mode == "cluster_focus":
+                # For cluster_focus, color by cluster group
+                # We need to re-evaluate the level based on the raw_size (which is the sum of filtered edge weights)
+                # and then map it to the edge_count_color_map
+                # The node_boundaries for color in "cluster_focus" mode should reflect the distribution
+                # of raw_sizes calculated from the filtered edges.
+                level = get_level_from_boundaries(node_boundaries, raw_size)
+                level_for_color = level
+                if raw_size == 0:
+                    level_for_color = 0
+                node_fill_color = risk_level_color_map[risk_level]
+                node_size = node_size_list[risk_level - 1]
+            else:
+                raise ValueError(f"Invalid visualization_mode: {visualization_mode}")
             el["data"]["color"] = node_fill_color
             el["data"]["size_level"] = (
                 level_for_color if visualization_mode == "risk_focus" else None
@@ -771,6 +785,10 @@ app.layout = html.Div(
                 {
                     "label": "Risk Focus (Size by Risk Level, Color by Edges)",
                     "value": "risk_focus",
+                },
+                {
+                    "label": "Cluster Focus (Size by Cluster Group, Color by Risk Level)",
+                    "value": "cluster_focus",
                 },
             ],
             value="default",  # Default visualization mode

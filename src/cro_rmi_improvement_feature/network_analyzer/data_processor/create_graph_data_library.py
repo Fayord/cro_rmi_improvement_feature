@@ -35,6 +35,9 @@ from core.models import (
     GraphDataLibraryNoEmbedding,
     RiskOverlayDataNoEmbedding,
 )
+import igraph as ig
+import leidenalg
+from api.utils import get_networkx_graph_from_company_graph_data
 
 
 def load_embedded_data(file_path: Path) -> pd.DataFrame:
@@ -513,6 +516,36 @@ def _process_edges(
     )
 
 
+def find_cluster_group_for_nodes(
+    company_graph_data: CompanyGraphData,
+    cluster_method: str = "leiden",
+) -> List[RiskDataWithEmbedding]:
+    """Finds the cluster group for each node."""
+    # find the cluster group for each node
+    # return the nodes with the cluster group
+    nx_graph = get_networkx_graph_from_company_graph_data(company_graph_data)
+    if cluster_method == "leiden":
+        # clusters = leiden_communities(G, backend="cugraph") # this method needs cugraph backend
+        # Step 3.2: Convert NetworkX to igraph
+        # G_ig = ig.Graph.TupleList(G.edges(), directed=False)
+        G_ig = ig.Graph.TupleList(
+            nx_graph.edges(), directed=True, vertex_name_attr="name"
+        )
+
+        # Step 3.3: Run Leiden algorithm
+        # partition = leidenalg.find_partition(G_ig, leidenalg.CPMVertexPartition) # doesn't seem to work with directed graph
+        partition = leidenalg.find_partition(G_ig, leidenalg.RBERVertexPartition)
+        # partition = leidenalg.find_partition(G_ig, leidenalg.ModularityVertexPartition) # for non-directed
+
+        # Step 3.4: Extract communities (as lists of original node names)
+        clusters = [
+            [G_ig.vs[node]["name"] for node in community] for community in partition
+        ]
+    print(f"clusters: {clusters}")
+    raise Exception("stop here")
+    return nodes
+
+
 def generate_graph_elements_for_company(
     company_data: pd.DataFrame,
     company_name: str,
@@ -573,7 +606,7 @@ def generate_graph_elements_for_company(
             print(cb)
             thb = cb.total_cost * 35
             print(f"total cost (THB): {thb}")
-            company_graph_datas[company_graph_id] = CompanyGraphData(
+            company_graph_data = CompanyGraphData(
                 nodes=nodes,
                 edges=final_edge_data_list,
                 number_of_displayed_edges=2
@@ -581,6 +614,8 @@ def generate_graph_elements_for_company(
                     nodes
                 ),  # Changed to reflect dynamic calculation within _process_edges
             )
+            nodes = find_cluster_group_for_nodes(company_graph_data)
+            company_graph_datas[company_graph_id] = company_graph_data
 
     return company_graph_datas
 
