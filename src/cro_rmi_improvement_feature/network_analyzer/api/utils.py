@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Tuple
 import networkx as nx
 import pandas as pd
 import numpy as np
@@ -33,7 +33,7 @@ def filter_non_arrow_edges2(edges: List[EdgeData]) -> List[EdgeData]:
 
 def get_networkx_graph_from_company_graph_data(
     company_graph_data: CompanyGraphData,
-) -> nx.DiGraph:
+) -> Tuple[nx.DiGraph, pd.DataFrame]:
     nx_graph = nx.DiGraph()
     nodes: List[RiskDataWithEmbedding] = company_graph_data.nodes
     edges: List[EdgeData] = company_graph_data.edges

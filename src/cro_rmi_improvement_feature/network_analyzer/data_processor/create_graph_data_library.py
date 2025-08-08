@@ -519,11 +519,11 @@ def _process_edges(
 def find_cluster_group_for_nodes(
     company_graph_data: CompanyGraphData,
     cluster_method: str = "leiden",
-) -> List[RiskDataWithEmbedding]:
+) -> CompanyGraphData:
     """Finds the cluster group for each node."""
     # find the cluster group for each node
     # return the nodes with the cluster group
-    nx_graph = get_networkx_graph_from_company_graph_data(company_graph_data)
+    nx_graph, _ = get_networkx_graph_from_company_graph_data(company_graph_data)
     if cluster_method == "leiden":
         # clusters = leiden_communities(G, backend="cugraph") # this method needs cugraph backend
         # Step 3.2: Convert NetworkX to igraph
@@ -541,9 +541,17 @@ def find_cluster_group_for_nodes(
         clusters = [
             [G_ig.vs[node]["name"] for node in community] for community in partition
         ]
-    print(f"clusters: {clusters}")
-    raise Exception("stop here")
-    return nodes
+        # make sure to sort len member of each cluster by len of cluster
+        clusters.sort(key=lambda x: len(x), reverse=True)
+    nodes = company_graph_data.nodes
+    for cluster_id, cluster in enumerate(clusters):
+        for node in nodes:
+            if node.data.id in cluster:
+                node.data.cluster_id = cluster_id
+
+    # update nodes back to company_graph_data
+    company_graph_data.nodes = nodes
+    return company_graph_data
 
 
 def generate_graph_elements_for_company(
@@ -614,7 +622,7 @@ def generate_graph_elements_for_company(
                     nodes
                 ),  # Changed to reflect dynamic calculation within _process_edges
             )
-            nodes = find_cluster_group_for_nodes(company_graph_data)
+            company_graph_data = find_cluster_group_for_nodes(company_graph_data)
             company_graph_datas[company_graph_id] = company_graph_data
 
     return company_graph_datas

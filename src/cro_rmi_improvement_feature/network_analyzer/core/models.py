@@ -52,6 +52,9 @@ class RiskData(BaseModel):
     risk_desc: Union[List[str], str] = Field(
         ..., description="The description of the risk."
     )
+    cluster_id: int = Field(
+        -1, description="The cluster id of the risk. -1 means not in any cluster."
+    )
     risk_score: int = Field(..., description="The score of the risk.")
     risk_impact: int = Field(..., description="The impact of the risk.")
     risk_likelihood: int = Field(..., description="The likelihood of the risk.")
