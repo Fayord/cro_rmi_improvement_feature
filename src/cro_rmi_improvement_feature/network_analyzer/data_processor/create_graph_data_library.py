@@ -7,7 +7,7 @@ import os
 import pickle
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
-
+import math
 import numpy as np
 import pandas as pd
 import sys
@@ -464,6 +464,11 @@ def _create_final_edge_data(processed_edges: List[Dict]) -> List[EdgeData]:
     return final_edge_data_list
 
 
+def get_number_displayed_edges(number_of_nodes: int) -> int:
+    """Get the number of displayed edges based on the number of nodes."""
+    return math.ceil(number_of_nodes * 2)
+
+
 def _process_edges(
     nodes: List[RiskDataWithEmbedding],
     company_name: str,
@@ -476,7 +481,7 @@ def _process_edges(
     """Processes edges for graph generation, including prioritization, classification, and final EdgeData creation."""
     (nodes, edges) = create_nodes_and_edges(nodes, company_name)
     number_of_nodes = len(nodes)
-    number_of_displayed_edges = 2 * number_of_nodes
+    number_of_displayed_edges = get_number_displayed_edges(number_of_nodes)
 
     edges = _prioritize_edges(
         nodes,
@@ -502,7 +507,7 @@ def _process_edges(
         embedding_key,
         classify_model_name,
         relation_process,
-        2 * number_of_nodes,
+        get_number_displayed_edges(number_of_nodes),
     )
 
     final_edge_data_list = _create_final_edge_data(processed_edges)
