@@ -26,6 +26,8 @@ set_llm_cache(SQLiteCache(database_path=f"{dir_path}/.langchain.db"))
 # === LangChain Setup ===
 load_dotenv(os.path.join(dir_path, "../../../../.env"))
 
+from masked_data import create_mask_dict_from_excel, mask_data  # type: ignore
+
 
 def get_llm(model_name="o3-mini"):
     if model_name == "gpt-4.1-mini":
@@ -52,7 +54,14 @@ class RiskSummary(BaseModel):
     process_summary: Optional[str] = None
 
 
-def summarize_risk(risk_data: Dict[str, Any]) -> Dict[str, Any]:
+def summarize_risk(risk_data: Dict[str, Any], is_masked: bool = True) -> Dict[str, Any]:
+    mask_dict = create_mask_dict_from_excel()
+    if is_masked:
+        risk_data["risk"] = mask_data(risk_data["risk"], mask_dict)
+        risk_data["risk_desc"] = mask_data(risk_data["risk_desc"], mask_dict)
+        risk_data["rootcause_data"] = mask_data(risk_data["rootcause_data"], mask_dict)
+        risk_data["process_data"] = mask_data(risk_data["process_data"], mask_dict)
+
     llm = get_llm(model_name="gpt-4.1-mini")
     risk_name = risk_data["risk"]
     risk_desc = risk_data["risk_desc"]

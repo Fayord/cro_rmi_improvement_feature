@@ -20,10 +20,18 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 
+# import masked_data from /Users/ford/Documents/coding_trae/cro_rmi_improvement_feature/src/cro_rmi_improvement_feature/network_analyzer/data_processor/masked_data.py
+import sys
+
+sys.path.append("../network_analyzer/data_processor")
+from masked_data import create_mask_dict_from_excel, mask_data  # type: ignore
+
+
 class BaseEmbeddingProvider(ABC):
     def __init__(self, cache_dir: str = ".embedding_cache", **kwargs):
         self.cache_dir = cache_dir
         os.makedirs(cache_dir, exist_ok=True)
+        self.mask_dict = create_mask_dict_from_excel()
 
     def get_embedding(self, text: str, use_cache: bool = True) -> np.ndarray:
         cache_key = self._generate_cache_key(text)
@@ -59,6 +67,7 @@ class OpenAIEmbeddingProvider(BaseEmbeddingProvider):
         self,
         model_name: str = "text-embedding-3-large",
         api_key: str = None,
+        is_masked: bool = True,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -69,6 +78,7 @@ class OpenAIEmbeddingProvider(BaseEmbeddingProvider):
                 "OPENAI_API_KEY must be provided either as an argument or environment variable"
             )
         self.client = OpenAI(api_key=api_key)
+        self.is_masked = is_masked
 
     def _get_embedding_impl(self, text: str) -> np.ndarray:
         max_retries = 5
@@ -76,6 +86,8 @@ class OpenAIEmbeddingProvider(BaseEmbeddingProvider):
 
         for attempt in range(max_retries):
             try:
+                if self.is_masked:
+                    text = mask_data(text, self.mask_dict)
                 response = self.client.embeddings.create(
                     input=[text],
                     model=self.model_name,

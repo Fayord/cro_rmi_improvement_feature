@@ -18,6 +18,8 @@ from typing import Dict, Any
 
 dir_path = os.path.dirname(os.path.abspath(__file__))
 
+from masked_data import create_mask_dict_from_excel, mask_data  # type: ignore
+
 set_llm_cache(SQLiteCache(database_path=f"{dir_path}/.relationship_classifier.db"))
 
 env_path = os.path.join(dir_path, "../../../../.env")
@@ -79,8 +81,21 @@ def get_llm(model_name="o3-mini"):
 
 
 def classify_relationship(
-    risk_a: Dict[str, Any], risk_b: Dict[str, Any], analyze_model_name: str
+    risk_a: Dict[str, Any],
+    risk_b: Dict[str, Any],
+    analyze_model_name: str,
+    is_masked: bool = True,
 ) -> Dict[str, Any]:
+    mask_dict = create_mask_dict_from_excel()
+    if is_masked:
+        risk_a["risk"] = mask_data(risk_a["risk"], mask_dict)
+        risk_a["risk_desc_summary"] = mask_data(risk_a["risk_desc_summary"], mask_dict)
+        risk_a["rootcause_summary"] = mask_data(risk_a["rootcause_summary"], mask_dict)
+        risk_a["process_summary"] = mask_data(risk_a["process_summary"], mask_dict)
+        risk_b["risk"] = mask_data(risk_b["risk"], mask_dict)
+        risk_b["risk_desc_summary"] = mask_data(risk_b["risk_desc_summary"], mask_dict)
+        risk_b["rootcause_summary"] = mask_data(risk_b["rootcause_summary"], mask_dict)
+        risk_b["process_summary"] = mask_data(risk_b["process_summary"], mask_dict)
     try:
         llm = get_llm(model_name=analyze_model_name)
 
