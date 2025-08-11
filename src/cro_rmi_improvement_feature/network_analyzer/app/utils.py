@@ -18,6 +18,9 @@ import math
 # import re
 from langchain_community.cache import SQLiteCache
 from langchain.globals import set_llm_cache
+from default_value import (
+    EDGE_SIZE_MULTIPLIER,
+)
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 set_llm_cache(SQLiteCache(database_path=f"{dir_path}/.langchain.db"))
