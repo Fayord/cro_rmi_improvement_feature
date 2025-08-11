@@ -1,6 +1,28 @@
 FONT_SIZE = 5
 EDGE_SIZE_MULTIPLIER = 2
 
+node_color_cluster_group_list = [
+    "rgb(230, 25, 75)",  # Red
+    "rgb(60, 180, 75)",  # Green
+    "rgb(255, 225, 25)",  # Yellow
+    "rgb(67, 99, 216)",  # Blue
+    "rgb(245, 130, 49)",  # Orange
+    "rgb(145, 30, 180)",  # Purple
+    "rgb(66, 212, 244)",  # Cyan
+    "rgb(240, 50, 230)",  # Magenta
+    "rgb(191, 239, 69)",  # Lime
+    "rgb(250, 190, 212)",  # Pink
+    "rgb(70, 153, 144)",  # Teal
+    "rgb(220, 190, 255)",  # Lavender
+    "rgb(154, 99, 36)",  # Brown
+    "rgb(255, 250, 200)",  # Beige
+    "rgb(128, 0, 0)",  # Maroon
+    "rgb(170, 255, 195)",  # Mint
+    "rgb(128, 128, 0)",  # Olive
+    "rgb(255, 216, 177)",  # Apricot
+    "rgb(0, 0, 117)",  # Navy
+    "rgb(169, 169, 169)",  # Grey
+]
 
 rgb_color_list = [
     "rgb(255, 99, 132)",  # Red

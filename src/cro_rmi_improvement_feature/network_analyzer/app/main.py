@@ -46,6 +46,7 @@ from default_value import (  # Import needed constants
     round_segment_stylesheet,
     taxi_stylesheet,
     risk_level_color_map,  # Import the new risk_level_color_map
+    node_color_cluster_group_list,
 )
 from utils import (  # Import needed utility functions
     find_proportional_count_boundaries,
@@ -437,8 +438,17 @@ def apply_visual_styles_to_elements(  # Renamed function
                 level_for_color = level
                 if raw_size == 0:
                     level_for_color = 0
-                node_fill_color = risk_level_color_map[risk_level]
-                node_size = node_size_list[risk_level - 1]
+                cluster_id = el["data"]["cluster_id"]
+                if cluster_id == -1:
+                    cluster_id = 19
+                else:
+                    # mod cluster_id to 0-18
+                    cluster_id = cluster_id % 19
+                node_size_for_risk_focus = [1] + node_size_list
+
+                node_fill_color = node_color_cluster_group_list[cluster_id]
+                node_size = node_size_for_risk_focus[risk_level - 1]
+                el["data"]["size"] = node_size
             else:
                 raise ValueError(f"Invalid visualization_mode: {visualization_mode}")
             el["data"]["color"] = node_fill_color
@@ -667,6 +677,7 @@ def process_graph_data_for_display(
                     # ),
                     # "size": display_size, # Removed: size calculated later
                     # "color": node_fill_color, # Removed: color calculated later
+                    "cluster_id": node_data_with_embedding.data.cluster_id,
                     "risk_level": risk_level,
                     "risk_cat": risk_category,
                     "story": story,
