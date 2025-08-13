@@ -35,6 +35,7 @@ from embedding_providers import (  # type: ignore
     OpenAIEmbeddingProvider,
 )
 from core.models import Process, RootCause
+from config.settings import NUMBER_OF_WORKERS
 from data_processor.create_graph_data_library import (
     GraphDataLibrary,
     CompanyGraphData,
@@ -160,7 +161,7 @@ def create_company_graph_data(
         for risk in risk_data_list
     ]
     embedding_risk_data_list = []
-    with ThreadPoolExecutor(max_workers=32) as executor:
+    with ThreadPoolExecutor(max_workers=NUMBER_OF_WORKERS) as executor:
         embedding_risk_data_list = list(
             executor.map(create_embedding, embedding_text_list)
         )
@@ -278,7 +279,7 @@ def recommend_risk_to_assesses(
     ]
     # Parallelize embedding creation
     embedding_risk_data_list = []
-    with ThreadPoolExecutor(max_workers=32) as executor:
+    with ThreadPoolExecutor(max_workers=NUMBER_OF_WORKERS) as executor:
         embedding_risk_data_list = list(
             executor.map(create_embedding, embedding_text_list)
         )

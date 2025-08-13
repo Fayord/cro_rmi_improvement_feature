@@ -14,6 +14,7 @@ import sys
 from tqdm import tqdm
 from langchain_community.callbacks import get_openai_callback
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from config.settings import NUMBER_OF_WORKERS
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append("../")
@@ -422,7 +423,7 @@ def _classify_edges_parallel(
     classify_model_name: str,
     relation_process: str,
     total_classifications_needed: int,
-    node_workers: int = 32,
+    node_workers: int = NUMBER_OF_WORKERS,
 ) -> Tuple[List[Dict], Counter, List[Dict], int]:
     """
     Parallel version of _classify_edges.
