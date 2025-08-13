@@ -24,7 +24,7 @@ logger.addHandler(handler)
 import sys
 
 sys.path.append("../network_analyzer/data_processor")
-from masked_data import create_mask_dict_from_excel, mask_data  # type: ignore
+from data_processor.masked_data import create_mask_dict_from_excel, mask_data  # type: ignore
 
 
 class BaseEmbeddingProvider(ABC):

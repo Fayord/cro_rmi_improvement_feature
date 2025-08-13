@@ -24,10 +24,16 @@ dir_path = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(dir_path, "../../../../.env"))
 USE_CACHED_LLM = os.getenv("USE_CACHED_LLM", True)
 print(f"USE_CACHED_LLM: {USE_CACHED_LLM}")
-if USE_CACHED_LLM:
-    set_llm_cache(SQLiteCache(database_path=f"{dir_path}/.langchain.db"))
+USE_CACHED_LLM = os.getenv("USE_CACHED_LLM")
+if USE_CACHED_LLM is None:
+    USE_CACHED_LLM = True
+elif USE_CACHED_LLM == "False":
+    USE_CACHED_LLM = False
+elif USE_CACHED_LLM == "True":
+    USE_CACHED_LLM = True
 else:
-    set_llm_cache(None)
+    raise ValueError(f"Unknown USE_CACHED_LLM: {USE_CACHED_LLM}")
+
 
 # === LangChain Setup ===
 
