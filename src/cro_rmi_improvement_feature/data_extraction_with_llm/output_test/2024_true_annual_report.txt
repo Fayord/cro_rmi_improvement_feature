@@ -1,0 +1,275 @@
+2. RISK MANAGEMENT
+
+2.1 Risk management policy and plan
+
+True group is committed to effective risk management which includes the culture, processes and structures that are directed towards the effective management of potential opportunities and adverse effects. The purpose of risk management policy is to ensure that risks in the Company are identified, assessed, and treated in a way that supports the Company in achieving its goals and to ensure that the Company has risk-based information to support business decision-making.
+
+The Company has adopted the frameworks developed by the Committee of Sponsoring Organizations of the Treadway Commission (COSO), namely the COSO 2017 Enterprise Risk Management–Integrating with Strategy and Performance. In addition, the Company follows the standards as set out in the International Organization for Standardization (ISO) 31000 – Risk Management.
+
+2.1.1 Risk Management Framework
+
+The Company’s risk management framework is adopted from COSO 2017 Enterprise Risk Management framework which consists of 5 main components:
+
+• Governance and Culture  
+Governance sets the Company’s tone, reinforcing the importance of, and establishing oversight responsibilities for, enterprise-wide risk management. Culture pertains to ethical values, desired behaviors, and understanding of risk.
+
+• Strategy and Objective Setting  
+Enterprise-wide risk management, strategy, and objective-setting work together in the strategic-planning process. A risk appetite is established and aligned with strategy; business objectives put strategy into practice while serving as a basis for identifying, assessing, and responding to risk.
+
+• Performance  
+Risks that may impact the achievement of strategy and business objectives need to be identified and assessed. Risks are prioritized by severity in the context of risk appetite. The Company then selects risk responses and takes a portfolio view of the amount of risk it has assumed. The results of this process are reported to key risk stakeholders.
+
+• Review and Revision  
+By reviewing performance, the Company can consider how well the risk management components are functioning over time and any revisions needed are identified.
+
+• Information, Communication and Reporting  
+Risk management requires a continual process of obtaining and sharing necessary information, from both internal and external sources, which flows up, down, and across the organization.
+
+Part 1 Risk Management Topic 2 - Page 1
+
+These 5 components are supported by a set of 20 principles as shown in Figure 1 Risk Management Framework below. These principles cover everything from governance to monitoring.
+
+# ENTERPRISE RISK MANAGEMENT FRAMEWORK
+
+- **Governance & Culture**
+  1. Exercises Board Oversight
+  2. Establishes Operating Structures
+  3. Defines Desired Culture
+  4. Demonstrates Commitment to Core Values
+  5. Attracts, Develops, and Retains Capable Individuals.
+
+- **Information, Communication, & Reporting**
+  18. Leverages Information and Technology
+  13. Communicates Risk Information
+  20. Reports on Risk, Culture, and Performance
+
+- **Strategy & Objective Setting**
+  6. Analyzes Business Context
+  7. Defines Risk Appetite
+  8. Establishes Alternative Strategies
+  9. Formulates Business Objective
+
+- **Performance**
+  10. Identifies Risks
+  11. Assesses Severity of Risk
+  12. Prioritizes Risks
+  13. Implements Risk Responses
+  14. Develops Portfolio View
+
+- **Review & Revision**
+  15. Assesses Substantial Change
+  16. Reviews Risk and Performance
+  17. Pursues Improvement
+  Enterprise Risk Management.
+
+_Source: COSO2017 Enterprise Risk Management: Integrating with Strategy and Performance_
+
+## 2.1.2 Risk Management Process
+
+The Company’s Risk Management process is adopted from ISO 31000 - Risk Management which sets out 6 steps to managing risks systematically where this process must be performed continuously. Further guidance provided in the Risk Management Procedure, state below.
+
+- **Scope, Context, Criteria**
+  To define the scope of the process and understand the external and internal context.
+
+- **Risk Assessment**
+  To identify, analysis, and evaluate risk.
+
+- **Risk Treatment**
+  To select and implement options for addressing risk.
+
+- **Recording & Reporting**
+  To document and report the risk management process and its outcome.
+
+- **Monitoring & Review**
+  To assure and improve the quality and effectiveness of process design, implementation, and outcome.
+
+- **Communication & Consultation**
+  To assist relevant stakeholders in understanding risk, the basis of decision making, and the reason of action required. To promote awareness and understanding of risk.
+
+---
+
+Part I Risk Management Topic 2 - Page 2
+
+2.2 Risk factors in business operation
+
+2.2.1 Risk factors in business operation
+
+(1) Risk of revenue erosion due to market and socio-economic situation
+
+Risk of economic situation  
+Thailand economy is recovering, driven by momentum from government spending, export and the tourism sector expected to reach pre-Covid-19 levels in 2025 (as per estimates). However, Thailand still faces substantial risks, due to global economic volatility, possible changes to new US Government policies, intense competition, pressures from global mega trends, and structural challenges within the country.
+
+As Thailand’s leading telecommunications and technology Company, True Group aims to empower people and businesses to reach their full potential with connectivity solutions that drive society forward sustainably. True and dtac networks provide superior call and data experiences to Thais. With connectivity services that create an unrivaled user experience, along with intelligent solutions that advance digital technology to elevate lives for the better in learning, entertainment and work.
+
+Moreover, True has been forward for opportunities to elevate service efficiency. AI technology is integrated for the analysis, improvement, and development of services to enrich customers’ experience on the Company products and services, under the policy of Responsible AI (RAI).
+
+(2) Risk from amalgamation and change in the regulatory compliance
+
+Risks from operation associated with the regulatory agencies.  
+The notification of the NBTC on the Regulatory Measures for Merger in Telecommunications Business has determined the conditions or specific
+
+
+measures for the amalgamation. Such conditions or specific measures may bring certain limitations to the business operation by the Company Group which include the increased responsibilities and business expenses arising out of the Company Group complying such conditions or specific measures. The NBTC may also determine additional conditions or specific measures in the event of substantial change in the telecommunications business.
+
+Risks from changes in regulatory compliance
+
+Presently, the business operations of the Company Group are under the rules and regulations of several government agencies such as the NBTC and the Electronic Transactions Development Agency (ETDA), etc. These government agencies have promulgated and revised many rules and regulations which may affect the business operation of the Company Group and put the Company Group in a regulatory risk from enforcement or different interpretations between the Company and its subsidiaries and different government agencies. In addition, as the regulatory policies of the NBTC directly impact on the structure and competition in telecommunications market, the changes of which might result the Company Group to increasingly obtain the costs of business operation and to encounter higher competition.
+
+(3) Risk of Delay in synergy realization
+
+Delays in efficiently integrating operations can result in adverse impacts to the Company and inability to benefit from subsequent synergies.
+
+True Corporation continues to deliver on its synergy realization ambition with good progress on integration plans. With a strong start to 2024, the Company continues to deliver value to society and shareholders through acceleration of value creation initiatives, for example, network modernization, IT transformation on operating model, partnership with a global IT services, consulting and business solutions Company, seamless integration with touchpoints along with AI capability to serve our customers better.
+
+(4) Risk of Cybersecurity Attacks
+
+The exponential increase in customer data usage and online transactions has significantly heightened digital inter-dependencies. The Company is continuously enhancing and expanding services and digital platform to serve this growing demand. However, the rise in complex and frequent cyberattacks, utilizing advanced techniques including malware, ransomware, phishing and other means to obtaining unauthorized access to our telecom networks and systems has elevated cybersecurity risks. This necessitates the implementation of more advanced defense architectures to protect our telecom networks and systems.
+
+
+Cybersecurity failures cause data loss, sensitive personal data leakage as well as equipment failures and network interruption, could result in business disruption, financial loss, reputation damage and legal liability.
+
+To cope with Cybersecurity threats, True has mitigation actions in terms of:
+
+GOVERNANCE
+
+- Appoint Business Security Officer and team to detect cybersecurity risks and to ensure the operation of Information System Security.
+- Implement personal data protection system and procedure following NIST Cybersecurity Framework and other international standard like ISO/IEC 27000, and GSMA.
+- Cooperate with National Cyber Security Agency (NCSA) and relevant international agencies, namely GSMA, and T-ISAC.
+- Develop a robust incident response plan that outlines the steps to be taken in the event of a cybersecurity incident to include procedure for detecting, containing, and mitigating the impact of an incident, as well as for communicating with stakeholders and reporting the incident to relevant authorities.
+- Conduct the Responsible AI Framework in terms of ethical, transparent, and accountable to mitigate risks associated with AI and enhanced Trust and Transparency.
+
+INFRASTRUCTURE AND TECHNOLOGIES
+
+- Continual improvement of network security, data security system, and digital infrastructure according to ISO and CIS standard.
+- Establish and continuously enhance the Security Operation Center (SOC) while upgrading to the certified ISO/IEC 27001:2022 standard.
+- Implement Security Orchestration Automation Response and apply advanced Security Operation Center (SOC) threat modelling to improve identification of cybersecurity threats, prioritize, and perform risk mitigation as well as to develop Incident Response (IR) procedures for handling incident types such as malware, business email compromise, phishing, and Advanced Persistent Threat (APT), etc.
+- Continuous Monitoring and Improvement to detect and respond to cybersecurity threats in real-time and adopt of Machine Learning for incident detection and Threat Intelligence Service as a threat hunting to detect emerging threats in the wild. Regularly review and update security measures to adapt to evolving threats and technologies.
+- Automated security checks: Vulnerability Assessment scan is performed on internal (monthly) and external systems (weekly), having Penetration testing on timely basis, all findings to be tracked and mitigated in a timeframe according to its risk level.
+- Secure data protection for sensitive/personal data at both in-transit and at-rest data by having access control, authentication mechanism and encryption of data.
+
+Part 1    Risk Management    Topic 2 - Page 5
+
+- Implement rigorous cyber hygiene processes to ensure comprehensive protection and resilience against evolving cybersecurity threats.
+
+CAPACITY AND CULTURE
+
+- Capacity building for IT workforce about evolving cybersecurity, including advanced technologies such as AI, NFT, crypto currency payment.
+
+- Cybersecurity architecture forum and Cybersecurity Ambassador were set up to make sure all employees adhere to the policies and practices and comply with the Personal Data Protection Act and other related laws. Employees can consult Data & Security Governance and Data Privacy Center team.
+
+- Continue building a culture for cybersecurity through internal communication media, cybersecurity hub, online and onsite training in both intermediate and advance journey projects to staff and managements.
+
+(5) Risk of Data Privacy
+
+True is subject to obligations under the Personal Data Protection Act 2019 (PDPA) with the full effectiveness on June 1, 2022. With over 50 million subscribers and a vast network of interconnected devices and platforms, the Company recognizes risks such as data breaches, unauthorized access, and non-compliance with the PDPA, and has emphasized to ensure that all processing of personal data is lawful and transparent with data subjects (customers and employees).
+
+This includes risk mitigation measures as follows:
+
+- Designate a dedicated Data Protection Officer (DPO) for each subsidiary to oversee compliance, and provide affiliates with clear, actionable guidelines aligned with applicable laws and regulations.
+
+- Collaborate across governance departments, including Legal, IT Security, and Compliance, to enforce comprehensive privacy measures in data collection, processing, and disclosure.
+
+- Prioritize privacy as a fundamental requirement for any personal data usage and implement technical solutions and controls to ensure transparency in all personal data utilization.
+
+- Ensure compliance with third-party service providers and have all parties sign Data Processing Agreements.
+
+- Create a strong data privacy culture through ongoing internal communication campaigns, online and on-site training, and targeted workshops. These initiatives address topics such as secure data handling, phishing awareness, and role-specific responsibilities, tailored for both staff and management.
+
+
+(6) Financial risk
+
+Risks Relating to Leveraged Position
+
+According to the consolidated financial statements, the Company had interest-bearing debt (including lease liabilities) totaling Baht 436.0 billion at the end of 2024, decreasing from Baht 477.5 billion at the end of 2023 due to lower outstanding of debentures. The Company’s funding sources may include additional borrowing and/or debenture issuance. As such, it may be at risk of not being able to obtain reasonable funding for principal repayments and interest payments or its future business expansion plan could be affected. Nevertheless, the Company should be able to raise new borrowings to repay existing debts and adjust their principal repayments to be in line with their cash flows. In addition, the Company has various funding sources including cash flows from operations, debenture and B/E issuance, loan from various financial institutions – both domestic and international, and vendor financing. The Company is committed to maintain its financial discipline and will select an optimal mix of capital structure to support future expansion.
+
+In this regard, the Company Group has never defaulted on debt payments with financial institutions and any other creditors. Also, the Company Group has complied with the conditions to maintain relevant financial ratios (if any).
+
+Risks of the Debenture
+
+Credit risk: Credit risk refers to the risk that the issuer may be unable to pay interest (if any), or principal for no matter of any reason. Cessation by the issuer of paying interest or principal constitutes default under the debentures. If the issuer is declared bankrupt or in default of payment under the debentures, the debenture holders' right to apply for debt payment will rank pari passu with that of other unsubordinated and unsecured creditors of the issuer. Investors can consider the credit ratings prepared by credit rating agencies to assess the issuer's credit risk, to support their investment decisions. The risk of the debentures reflects on their credit rating, the higher level of the risk, the lower level of the credit rating, and the greater probability of the higher return.
+
+In addition to the issue’s credit rating or issuer's credit rating, investors should study the issuer’s performance before making an investment. Investors should also follow up on the updated information about the issuer, and the revisions to credit ratings published on the websites of the Office of the Securities and Exchange Commission, the Credit-rating agencies, and the Thai Bond Market Association.
+
+Price risk: The investors who sell the debentures before the maturity date may face with the lower yield earning during times of rising market interest rates, and vice versa. The change on the market interest rate will have more effect on the debentures which have the longer time to maturity.
+
+Liquidity risk: Liquidity risk refers to the risk that occurs when debenture holders wish to sell the debentures in the secondary market prior to the maturity date. Debenture holders may be unable to sell the debentures immediately at their preferred price due to low liquidity of the debt instrument in the secondary market. The issuer will not trade the debentures on any exchanges. Debenture holders may trade the debentures at commercial banks, securities companies, or any other juristic entities having debt instruments dealing license.
+
+Risks from Foreign Exchange Rate Fluctuation
+
+The Company’s principle revenues are denominated in Thai Baht. Capital expenditures account for the majority of the Company’s expenses, and the Company has agreements with most suppliers to pay in Thai Baht.
+
+To manage foreign currency exposures, the Company utilizes foreign currency income from international roaming to partially offset with expenses (Natural Hedge). Additionally, the Company enter FX hedging transactions when deem appropriated.
+
+Apart from capital expenditures, the Company also has loans denominated in foreign currencies, these facilities are fully hedged into Thai Baht at the time of utilization.
+
+(7) Emerging Risk
+
+7.1 Risks of threats from Artificial Intelligence (AI)
+
+RISK CATEGORY : TECHNOLOGICAL
+
+RISK FACTOR : Lack of proper governance and user awareness
+
+Artificial intelligence (AI) technology is advancing rapidly, particularly with the development of Generative AI and Agentic AI, which are being applied across various fields. These technologies drive innovation, enhance operational efficiency, reduce costs, and create new opportunities for businesses and society.
+
+When implemented responsibly within a strong ethical framework, AI can generate widespread positive economic and social impacts. However, to maximize AI’s potential while mitigating risks, its development and deployment must be approached with caution, ensuring responsible use and alignment with ethical principles.
+
+Potential Impact:
+
+As a critical infrastructure sector, the telecommunications industry faces increasing risks from AI-driven threats. These risks include cyberattacks using AI to detect vulnerabilities in network systems, leading to intrusions, system outages, or malfunctions. AI-generated deepfake videos and synthetic voices can deceive customers or employees, leading to social engineering attacks and unauthorized access to sensitive data.
+
+Part 1 Risk Management Topic 2 - Page 8
+
+Furthermore, the use of AI in elevating personalized experiences may carry risks from improper algorithm configurations or biased data processing (AI bias), leading to unfair or inaccurate outcomes. The consequences of these risks not only affect the Company's revenue but also damage customer and partner trust, as well as the Company’s reputation as a secure and reliable service provider.
+
+Mitigation Actions:
+
+True Corporation has established a Responsible AI (RAI) Framework based on five fundamental principles:
+
+1. Vision, Values, and Strategic Objectives – Aligning AI initiatives with the organization’s mission and long-term goals.
+2. Operational Model and AI Governance – Ensuring AI governance is integrated into all business operations.
+3. Technical Compliance and Regulatory Requirements – Implementing AI controls that adhere to legal and regulatory standards.
+4. Collaboration with Third-Party Ecosystems – Engaging with external partners to ensure responsible AI adoption.
+5. Change Management and Communication Strategies – Facilitating smooth AI integration while maintaining transparency.
+
+In addition to these governance pillars, True Group incorporates key ethical factors into its AI strategy, including human oversight, fairness, privacy, security, accountability, and environmental impact assessments.
+
+The Company utilizes AI technology for anomaly detection and responds to cyberattacks in real time, protecting possible vulnerabilities in network systems and minimizing potential damage. True Group has implemented data encryption and multi-factor authentication (MFA) to protect customer information, along with awareness programs on AI-based cyber threats such as phishing and deepfakes to reduce the risk of becoming a target. The Company continuously reviews and improves the AI algorithms used to analyze customer data to ensure accuracy and privacy, while maintaining the ability to meet customer needs with high-quality service.
+
+7.2 Risk from Resource Rivalries (required by telecommunication network equipment)
+Risk Category: Technology
+Risk Factor: Limited Natural Resources in Value Chain
+
+The scarcity of certain metals used in the electronics industry is currently growing due to increased usage, limited availability, and capabilities for recovery and recycling. Metals have been used in various industries in large quantities, and usage continues to rise as the world transitions towards technological innovations and clean energy which necessitate the use of electronics and electricity networks. This demand leads to the classification of metals as critical, which are prone to experiencing supply-demand imbalances.
+
+Part 1 Risk Management Topic 2 - Page 9
+
+These metals are key raw materials in manufacturing of electronics components that the telco sector depends on to develop and operate its network. Scarcity and competition for these metals can impact availability and cost of such components. Since True’s operations rely on these components, this risk poses significant challenge for True and supply chain to ensure business continuity, maintain our competitive edge, and provide reliable telecommunication services.
+
+## Potential Impact
+
+Resource constraints create supply-demand imbalances, potentially disrupting the supply chain of vital IT and other electronics components. The telecommunications industry heavily relies on metals such as copper, aluminum, and rare earth elements for utilization of essential equipment like cables, antennas, and electronic components. As the supply of these critical materials becomes increasingly constrained, companies that depend on those components will face significant challenges in maintaining infrastructure and expanding services. The increasing demand and unpredictable nature of resource availability could result in resource crises, straining supply chains, disrupting network operation, sparking geopolitical tensions, and triggering conflicts and trade disputes. This could increase the cost of network equipment supplied to True, driving up costs and consequently higher prices to consumers and businesses that depend on telecommunication services.
+
+## Mitigation Action
+
+### Risk Assessment and Contingency Planning:
+
+- **Conduct regular risk assessments to identify potential threats related to resource scarcity and rivalries and develop contingency plans to mitigate disruptions.**
+
+- **Diversify Resource Sourcing:** Reduce reliance on a single region or supplier and build adaptable supply chains to navigate resource challenges.
+
+### Collaboration and Partnerships:
+
+- **Engage with suppliers to implement measures to optimize resource use and explore opportunities to recycle or reuse resources within the production process to extend their lifespan and reduce the need for new resources.**
+
+- **Collaborate with partners in research and development to find alternative materials or technologies that are less resource-intensive or more readily available.**
+
+- **Engage with other companies, industry associations, and government agencies to share best practices, pool resources, and develop collective solutions to resource scarcity challenges.**
+
+2.2.2 Investment risk imposed on the securities holders  
+Risks from having majority shareholders collectively holding more than 50% of the total shares in the Company  
+
+Refer to the list of shareholders as at 8 March 2024., the major shareholder group of the Company consists of: (1) Charoen Pokphand Group Co., Ltd. and its affiliated companies holding a combined percentage of 26.32 and holds through Citrine Global Company Limited at 4.06%, totaling 30.38% of the total issued and paid-up shares of the Company (2) Telenor Group holds 26.32% and holds through Citrine Global Company Limited at 3.90%, totaling 30.22% of the total issued and paid-up shares of the Company. Considering that the collective shareholdings exceed the 50% threshold, this could potentially have an impact on decisions that require a majority vote during shareholder meetings.  
+
+2.2.3 Foreign Investment Risk  
+- None-  
