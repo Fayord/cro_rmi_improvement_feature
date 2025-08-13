@@ -39,6 +39,7 @@ from core.models import (
 import igraph as ig
 import leidenalg
 from api.utils import get_networkx_graph_from_company_graph_data
+from networkx.algorithms.community import louvain_communities
 
 
 def load_embedded_data(file_path: Path) -> pd.DataFrame:
@@ -668,7 +669,7 @@ def _create_final_edge_data(processed_edges: List[Dict]) -> List[EdgeData]:
 
 def get_number_displayed_edges(number_of_nodes: int) -> int:
     """Get the number of displayed edges based on the number of nodes."""
-    return math.ceil(2.5 * number_of_nodes)
+    return math.ceil(2 * number_of_nodes)
 
 
 def _process_edges(
@@ -726,7 +727,7 @@ def _process_edges(
 
 def find_cluster_group_for_nodes(
     company_graph_data: CompanyGraphData,
-    cluster_method: str = "leiden",
+    cluster_method: str = "louvain",
 ) -> CompanyGraphData:
     """Finds the cluster group for each node."""
     # find the cluster group for each node
@@ -751,6 +752,8 @@ def find_cluster_group_for_nodes(
         ]
         # make sure to sort len member of each cluster by len of cluster
         clusters.sort(key=lambda x: len(x), reverse=True)
+    elif cluster_method == "louvain":
+        clusters = louvain_communities(nx_graph)
     nodes = company_graph_data.nodes
     for cluster_id, cluster in enumerate(clusters):
         for node in nodes:

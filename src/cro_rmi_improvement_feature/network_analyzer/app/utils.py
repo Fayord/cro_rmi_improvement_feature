@@ -56,7 +56,7 @@ except Exception:
 
 def get_number_displayed_edges(number_of_nodes: int) -> int:
     """Get the number of displayed edges based on the number of nodes."""
-    return math.ceil(2.5 * number_of_nodes)
+    return math.ceil(2 * number_of_nodes)
 
 
 def get_llm(provider: str = "openai", model_name: Optional[str] = None):
