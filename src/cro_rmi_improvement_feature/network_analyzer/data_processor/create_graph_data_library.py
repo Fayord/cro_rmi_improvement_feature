@@ -466,7 +466,7 @@ def _create_final_edge_data(processed_edges: List[Dict]) -> List[EdgeData]:
 
 def get_number_displayed_edges(number_of_nodes: int) -> int:
     """Get the number of displayed edges based on the number of nodes."""
-    return math.ceil(number_of_nodes * 2)
+    return math.ceil(2.5 * number_of_nodes)
 
 
 def _process_edges(
@@ -613,7 +613,7 @@ def generate_graph_elements_for_company(
             # 5. Process all edges (classified and unclassified) to create EdgeData objects
 
             print(
-                f"number_of_displayed_edges: {2 * len(nodes)}"
+                f"number_of_displayed_edges: {get_number_displayed_edges(len(nodes))}"
             )  # Changed to reflect dynamic calculation within _process_edges
             print(f"company_graph_id: {company_graph_id}")
             print(cb)
@@ -622,10 +622,7 @@ def generate_graph_elements_for_company(
             company_graph_data = CompanyGraphData(
                 nodes=nodes,
                 edges=final_edge_data_list,
-                number_of_displayed_edges=2
-                * len(
-                    nodes
-                ),  # Changed to reflect dynamic calculation within _process_edges
+                number_of_displayed_edges=get_number_displayed_edges(len(nodes)),
             )
             company_graph_data = find_cluster_group_for_nodes(company_graph_data)
             company_graph_datas[company_graph_id] = company_graph_data

@@ -40,9 +40,9 @@ except Exception:
     assert api_key, "2.API key is missing"
 
 
-def get_number_edges_to_show(total_nodes):
-    # can change later
-    return math.ceil(total_nodes * 2)
+def get_number_displayed_edges(number_of_nodes: int) -> int:
+    """Get the number of displayed edges based on the number of nodes."""
+    return math.ceil(2.5 * number_of_nodes)
 
 
 def get_llm(provider: str = "openai", model_name: Optional[str] = None):

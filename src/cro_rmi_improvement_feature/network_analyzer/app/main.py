@@ -51,7 +51,7 @@ from default_value import (  # Import needed constants
 from utils import (  # Import needed utility functions
     find_proportional_count_boundaries,
     get_level_from_boundaries,
-    get_number_edges_to_show,
+    get_number_displayed_edges,
 )
 
 from dash import Dash, dcc, html, Input, Output, ctx, callback
@@ -871,8 +871,8 @@ app.layout = html.Div(
                     min=0,
                     max=total_edges,  # Set max to total edges
                     step=1,
-                    value=math.ceil(
-                        get_number_edges_to_show(total_nodes)
+                    value=get_number_displayed_edges(
+                        total_nodes
                     ),  # Default to 10% of total edges, rounded up
                     # Marks will be generated dynamically in the callback
                     # marks={i: str(i) for i in range(0, total_edges + 1, max(1, total_edges // 10))},
@@ -1070,7 +1070,7 @@ def update_graph_and_output(
 
     # If the company dropdown triggered the callback, reset num_edges_to_show
     if triggered_id == "company-dropdown":
-        num_edges_to_show = get_number_edges_to_show(total_nodes)
+        num_edges_to_show = get_number_displayed_edges(total_nodes)
 
     if total_edges == 0:
         # No edges, threshold doesn't matter for filtering, but set a high value
@@ -1080,7 +1080,7 @@ def update_graph_and_output(
         # Ensure num_edges_to_show is within the valid range [0, total_edges]
         # Use the slider's value, or default to 2 * total_nodes if slider value is None/invalid
         if num_edges_to_show is None or not (0 <= num_edges_to_show <= total_edges):
-            num_edges_to_show = get_number_edges_to_show(total_nodes)
+            num_edges_to_show = get_number_displayed_edges(total_nodes)
         # print(f"{num_edges_to_show=}") # Keep for debugging if needed
 
         if num_edges_to_show == 0:

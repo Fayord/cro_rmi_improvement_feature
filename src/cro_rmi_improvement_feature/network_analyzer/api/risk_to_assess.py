@@ -48,6 +48,7 @@ from data_processor.create_graph_data_library import (
     _prioritize_edges,
     _classify_edges,
     _create_final_edge_data,
+    get_number_displayed_edges,
 )
 
 
@@ -190,7 +191,7 @@ def create_company_graph_data(
     return CompanyGraphData(
         nodes=nodes,
         edges=final_edge_data_list,
-        number_of_displayed_edges=2 * len(nodes),
+        number_of_displayed_edges=get_number_displayed_edges(len(nodes)),
     )
 
 
