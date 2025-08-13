@@ -750,10 +750,12 @@ def find_cluster_group_for_nodes(
         clusters = [
             [G_ig.vs[node]["name"] for node in community] for community in partition
         ]
-        # make sure to sort len member of each cluster by len of cluster
-        clusters.sort(key=lambda x: len(x), reverse=True)
     elif cluster_method == "louvain":
         clusters = louvain_communities(nx_graph)
+
+    # make sure to sort len member of each cluster by len of cluster
+    clusters.sort(key=lambda x: len(x), reverse=True)
+
     nodes = company_graph_data.nodes
     for cluster_id, cluster in enumerate(clusters):
         for node in nodes:
