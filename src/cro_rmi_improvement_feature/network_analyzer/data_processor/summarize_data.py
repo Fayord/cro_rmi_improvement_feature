@@ -21,10 +21,15 @@ from langchain_community.callbacks import get_openai_callback
 from dotenv import load_dotenv
 
 dir_path = os.path.dirname(os.path.abspath(__file__))
-
-set_llm_cache(SQLiteCache(database_path=f"{dir_path}/.langchain.db"))
-# === LangChain Setup ===
 load_dotenv(os.path.join(dir_path, "../../../../.env"))
+USE_CACHED_LLM = os.getenv("USE_CACHED_LLM", True)
+print(f"USE_CACHED_LLM: {USE_CACHED_LLM}")
+if USE_CACHED_LLM:
+    set_llm_cache(SQLiteCache(database_path=f"{dir_path}/.langchain.db"))
+else:
+    set_llm_cache(None)
+
+# === LangChain Setup ===
 
 from masked_data import create_mask_dict_from_excel, mask_data  # type: ignore
 

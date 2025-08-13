@@ -13,6 +13,7 @@ import pandas as pd
 import sys
 from tqdm import tqdm
 from langchain_community.callbacks import get_openai_callback
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append("../")
@@ -412,6 +413,207 @@ def _classify_edges(
     return processed_edges, direction_list, edge_label_list, classified_count
 
 
+def _classify_edges_parallel(
+    high_priority_edges: List[Dict],
+    low_priority_edges: List[Dict],
+    company_name: str,
+    embedding_key: str,
+    classify_model_name: str,
+    relation_process: str,
+    total_classifications_needed: int,
+    node_workers: int = 32,
+) -> Tuple[List[Dict], Counter, List[Dict], int]:
+    """
+    Parallel version of _classify_edges.
+
+    Executes classify_relationship calls concurrently with a default of 32 workers.
+
+    Behavior parity with _classify_edges:
+      - Always classify all high-priority edges
+      - Classify only up to the remaining budget of low-priority edges
+      - Generate edge label samples for up to 20% of low-priority edges (twoway only)
+      - Increment direction counts using the A->B result
+      - Unclassified low-priority edges receive empty relationship fields
+    """
+
+    def _classify_single_edge(edge: Dict) -> Tuple[Dict, Optional[Dict], Dict]:
+        relationship_a_b = classify_relationship(
+            edge["risk_a_data"].model_dump(),
+            edge["risk_b_data"].model_dump(),
+            classify_model_name,
+        )
+        if relation_process == "twoway_run":
+            relationship_b_a = classify_relationship(
+                edge["risk_b_data"].model_dump(),
+                edge["risk_a_data"].model_dump(),
+                classify_model_name,
+            )
+            final_rel = process_two_way_relationships(
+                relationship_a_b, relationship_b_a
+            )
+            return relationship_a_b, relationship_b_a, final_rel
+        else:
+            return relationship_a_b, None, relationship_a_b
+
+    processed_edges: List[Dict] = []
+    direction_list: Counter = Counter()
+    edge_label_list: List[Dict] = []
+    classified_count = 0
+
+    # 1) Classify all HIGH PRIORITY edges in parallel
+    high_results: List[Optional[Tuple[int, Dict, Optional[Dict], Dict]]] = [None] * len(
+        high_priority_edges
+    )
+    with ThreadPoolExecutor(max_workers=node_workers) as executor:
+        future_to_idx = {
+            executor.submit(_classify_single_edge, edge): (idx, edge)
+            for idx, edge in enumerate(high_priority_edges)
+        }
+        for future in tqdm(
+            as_completed(future_to_idx),
+            total=len(future_to_idx),
+            desc=f"Classifying HIGH PRIORITY relationships for {company_name} ({embedding_key}) [parallel]",
+        ):
+            idx, original_edge = future_to_idx[future]
+            relationship_a_b, relationship_b_a, final_relationship = future.result()
+            # update direction counts based on A->B
+            direction_list[relationship_a_b["direction"]] += 1
+            updated_edge = original_edge
+            updated_edge["relationship"] = final_relationship
+            high_results[idx] = (idx, updated_edge, relationship_a_b, relationship_b_a)
+
+    # extend processed edges in original order
+    for _, updated_edge, _, _ in high_results:
+        processed_edges.append(updated_edge)
+    classified_count += len(high_priority_edges)
+
+    # 2) Classify LOW PRIORITY edges up to remaining budget in parallel
+    total_edge_label_counter = int(len(low_priority_edges) * 0.2)
+    remaining_budget = max(0, total_classifications_needed - classified_count)
+    num_to_classify_low = min(remaining_budget, len(low_priority_edges))
+
+    low_results: List[Optional[Tuple[int, Dict, Dict, Optional[Dict], Dict]]] = [
+        None
+    ] * num_to_classify_low
+
+    with ThreadPoolExecutor(max_workers=node_workers) as executor:
+        future_to_idx = {
+            executor.submit(_classify_single_edge, edge): (idx, edge)
+            for idx, edge in enumerate(low_priority_edges[:num_to_classify_low])
+        }
+        for future in tqdm(
+            as_completed(future_to_idx),
+            total=len(future_to_idx),
+            desc=f"Classifying LOW PRIORITY relationships for {company_name} ({embedding_key}) [parallel]",
+        ):
+            idx, original_edge = future_to_idx[future]
+            relationship_a_b, relationship_b_a, final_relationship = future.result()
+            direction_list[relationship_a_b["direction"]] += 1
+            updated_edge = original_edge
+            updated_edge["relationship"] = final_relationship
+            low_results[idx] = (
+                idx,
+                updated_edge,
+                relationship_a_b,
+                relationship_b_a if relation_process == "twoway_run" else None,
+                final_relationship,
+            )
+
+    # Append low priority results in original order
+    for (
+        _,
+        updated_edge,
+        relationship_a_b,
+        relationship_b_a,
+        final_relationship,
+    ) in low_results:
+        processed_edges.append(updated_edge)
+    classified_count += num_to_classify_low
+
+    # 2.b) Build edge labels for a subset of LOW PRIORITY results (twoway only)
+    if relation_process == "twoway_run" and total_edge_label_counter > 0:
+        edge_label_counter = 0
+        for (
+            _,
+            updated_edge,
+            relationship_a_b,
+            relationship_b_a,
+            final_relationship,
+        ) in low_results:
+            if edge_label_counter >= total_edge_label_counter:
+                break
+            if relationship_b_a is None:
+                continue
+            count_possible_missing_direction_relation = None
+            if (final_relationship["interdependency_type"] in ["Causal"]) and (
+                relationship_a_b["interdependency_type"] not in ["Causal"]
+            ):
+                count_possible_missing_direction_relation = True
+            if relationship_a_b["interdependency_type"] in ["Causal"]:
+                count_possible_missing_direction_relation = False
+
+            risk_a_data_str = ""
+            for key, value in updated_edge["risk_a_data"].model_dump().items():
+                risk_a_data_str += f"{key}: {value}\n"
+            risk_b_data_str = ""
+            for key, value in updated_edge["risk_b_data"].model_dump().items():
+                risk_b_data_str += f"{key}: {value}\n"
+
+            edge_label_data_a_b = {
+                "direction_risk": "a->b",
+                "analyze_model_name": "gpt-4.1-mini",
+                "source_risk": updated_edge["risk_a_data"].risk,
+                "source_risk_data": risk_a_data_str,
+                "target_risk": updated_edge["risk_b_data"].risk,
+                "target_risk_data": risk_b_data_str,
+                "interdependency_type": relationship_a_b["interdependency_type"],
+                "direction": relationship_a_b["direction"],
+                "rationale": relationship_a_b["rationale"],
+                "confidence": relationship_a_b["confidence"],
+                "final_interdependency_type": final_relationship[
+                    "interdependency_type"
+                ],
+                "final_direction": final_relationship["direction"],
+                "count_possible_missing_direction_relation": (
+                    count_possible_missing_direction_relation
+                ),
+            }
+            edge_label_data_b_a = {
+                "direction_risk": "b->a",
+                "analyze_model_name": "gpt-4.1-mini",
+                "source_risk": updated_edge["risk_a_data"].risk,
+                "source_risk_data": risk_a_data_str,
+                "target_risk": updated_edge["risk_b_data"].risk,
+                "target_risk_data": risk_b_data_str,
+                "interdependency_type": relationship_b_a["interdependency_type"],
+                "direction": relationship_b_a["direction"],
+                "rationale": relationship_b_a["rationale"],
+                "confidence": relationship_b_a["confidence"],
+                "final_interdependency_type": final_relationship[
+                    "interdependency_type"
+                ],
+                "final_direction": final_relationship["direction"],
+                "count_possible_missing_direction_relation": (
+                    count_possible_missing_direction_relation
+                ),
+            }
+            edge_label_list.append(edge_label_data_a_b)
+            edge_label_list.append(edge_label_data_b_a)
+            edge_label_counter += 1
+
+    # 3) Mark remaining LOW PRIORITY edges as unclassified
+    for edge in low_priority_edges[num_to_classify_low:]:
+        edge["relationship"] = {
+            "interdependency_type": None,
+            "direction": None,
+            "rationale": None,
+            "confidence": None,
+        }
+        processed_edges.append(edge)
+
+    return processed_edges, direction_list, edge_label_list, classified_count
+
+
 def _create_final_edge_data(processed_edges: List[Dict]) -> List[EdgeData]:
     """
     Converts processed edges into a list of EdgeData objects.
@@ -500,7 +702,8 @@ def _process_edges(
         direction_list,
         edge_label_list,
         classified_count,
-    ) = _classify_edges(
+    ) = _classify_edges_parallel(
+        # ) = _classify_edges(
         high_priority_edges,
         low_priority_edges,
         company_name,

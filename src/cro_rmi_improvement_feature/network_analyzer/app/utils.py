@@ -23,7 +23,12 @@ from default_value import (
 )
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
-set_llm_cache(SQLiteCache(database_path=f"{dir_path}/.langchain.db"))
+USE_CACHED_LLM = os.getenv("USE_CACHED_LLM", True)
+print(f"USE_CACHED_LLM: {USE_CACHED_LLM}")
+if USE_CACHED_LLM:
+    set_llm_cache(SQLiteCache(database_path=f"{dir_path}/.langchain.db"))
+else:
+    set_llm_cache(None)
 
 try:
     env_path = f"{dir_path}/../../../../.env"
