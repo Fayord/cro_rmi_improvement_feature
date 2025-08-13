@@ -18,7 +18,8 @@ from typing import Dict, Any
 
 dir_path = os.path.dirname(os.path.abspath(__file__))
 
-from masked_data import create_mask_dict_from_excel, mask_data  # type: ignore
+# from masked_data import create_mask_dict_from_excel, mask_data
+from data_processor.masked_data import create_mask_dict_from_excel, mask_data
 
 set_llm_cache(SQLiteCache(database_path=f"{dir_path}/.relationship_classifier.db"))
 

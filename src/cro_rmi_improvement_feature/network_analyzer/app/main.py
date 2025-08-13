@@ -798,7 +798,7 @@ app.layout = html.Div(
                     "value": "risk_focus",
                 },
                 {
-                    "label": "Cluster Focus (Size by Cluster Group, Color by Risk Level)",
+                    "label": "Cluster Focus (Size by Risk Level , Color by Cluster Group)",
                     "value": "cluster_focus",
                 },
             ],
