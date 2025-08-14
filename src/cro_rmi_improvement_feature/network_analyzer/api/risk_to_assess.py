@@ -318,8 +318,10 @@ def recommend_risk_to_assesses(
 def convert_existing_risk_to_risk_data(
     existing_risk_list: List[ExistingRisk],
     do_summarize: bool = False,
+    number_of_workers: int = NUMBER_OF_WORKERS,
 ) -> List[RiskData]:
-    risk_data_list = []
+    # Build entries to preserve order and enable parallel summarization
+    entries = []
     for risk in existing_risk_list:
         processes: List[Process] = [
             Process(id=process.id, name=process.name, description=process.description)
@@ -348,9 +350,36 @@ def convert_existing_risk_to_risk_data(
             "rootcause_data": root_causes_str,
             "process_data": processes_str,
         }
+        entries.append(
+            {
+                "risk": risk,
+                "processes": processes,
+                "root_causes": root_causes,
+                "risk_data": risk_data,
+            }
+        )
 
-        # Use actual LLM to create summaries
-        summaries = summarize_risk(risk_data)
+    def safe_summarize(payload: Dict[str, str]) -> Dict[str, str]:
+        try:
+            return summarize_risk(payload) if do_summarize else {}
+        except Exception as e:
+            print(f"summarize_risk failed: {e}")
+            return {}
+
+    # Run summarization in parallel if requested
+    if do_summarize and len(entries) > 0:
+        with ThreadPoolExecutor(max_workers=number_of_workers) as executor:
+            summaries_list = list(
+                executor.map(safe_summarize, [entry["risk_data"] for entry in entries])
+            )
+    else:
+        summaries_list = [{} for _ in entries]
+
+    risk_data_list: List[RiskData] = []
+    for entry, summaries in zip(entries, summaries_list):
+        risk: ExistingRisk = entry["risk"]
+        processes = entry["processes"]
+        root_causes = entry["root_causes"]
         risk_data_list.append(
             RiskData(
                 id=risk.risk_id,
