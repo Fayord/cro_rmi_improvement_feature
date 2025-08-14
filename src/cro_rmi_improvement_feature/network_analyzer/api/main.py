@@ -183,7 +183,15 @@ async def recommend_risks_to_assess_api(
 
             company_id = request.existing_risks[0].company_id
             company_graph_id = f"{company_id}|embedding_risk_desc_catalog|oneway_run"
-            risk_data_list = convert_existing_risk_to_risk_data(existing_risk_list)
+            start_time = time()
+            risk_data_list = convert_existing_risk_to_risk_data(
+                existing_risk_list,
+                do_summarize=True,
+            )
+            end_time = time()
+            print(
+                f"Time taken to convert existing risk to risk data and summarize: {end_time - start_time} seconds"
+            )
 
             start_time = time()
             company_graph_data = create_company_graph_data(
@@ -342,7 +350,16 @@ async def recommend_risks_to_mitigate_api(
             # save the updated graph data
             company_id = request.existing_risks[0].company_id
             company_graph_id = f"{company_id}|embedding_risk_desc_catalog|oneway_run"
-            risk_data_list = convert_existing_risk_to_risk_data(existing_risk_list)
+            start_time = time()
+            risk_data_list = convert_existing_risk_to_risk_data(
+                existing_risk_list,
+                do_summarize=True,
+            )
+            end_time = time()
+            print(
+                f"Time taken to convert existing risk to risk data and summarize: {end_time - start_time} seconds"
+            )
+            start_time = time()
             company_graph_data = create_company_graph_data(
                 risk_data_list,
                 company_name=company_id,
@@ -353,7 +370,11 @@ async def recommend_risks_to_mitigate_api(
                 relation_process="oneway_run",
                 graph_data_library=graph_data_library,
             )
-
+            end_time = time()
+            print(
+                f"Time taken to create company graph data: {end_time - start_time} seconds"
+            )
+            start_time = time()
             save_company_graph_data(
                 company_graph_data, company_graph_id, graph_data_library
             )

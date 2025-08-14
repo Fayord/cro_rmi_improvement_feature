@@ -28,7 +28,7 @@ print(f"USE_CACHED_LLM: {USE_CACHED_LLM}")
 
 # === LangChain Setup ===
 
-from masked_data import create_mask_dict_from_excel, mask_data  # type: ignore
+from data_processor.masked_data import create_mask_dict_from_excel, mask_data
 
 
 def get_llm(model_name="o3-mini"):

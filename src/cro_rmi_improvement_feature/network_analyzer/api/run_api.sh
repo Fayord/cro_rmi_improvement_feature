@@ -10,6 +10,7 @@ fi
 
 echo "USE_CACHED_LLM: $USE_CACHED_LLM"
 echo "PORT: $PORT"
+echo "NUMBER_OF_WORKER: $NUMBER_OF_WORKER"
 if [ -z "$PORT" ]; then
     PORT=7900
 fi

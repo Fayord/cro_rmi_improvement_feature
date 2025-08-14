@@ -27,9 +27,6 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from collections import Counter
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.append("../")
-sys.path.append("../../find_similar_risk")
 
 from core.embedding_providers import (
     OpenAIEmbeddingProvider,
@@ -51,6 +48,7 @@ from data_processor.create_graph_data_library import (
     _create_final_edge_data,
     get_number_displayed_edges,
 )
+from data_processor.summarize_data import summarize_risk
 
 
 def _save_or_update_risk_data(
@@ -319,6 +317,7 @@ def recommend_risk_to_assesses(
 
 def convert_existing_risk_to_risk_data(
     existing_risk_list: List[ExistingRisk],
+    do_summarize: bool = False,
 ) -> List[RiskData]:
     risk_data_list = []
     for risk in existing_risk_list:
@@ -334,6 +333,24 @@ def convert_existing_risk_to_risk_data(
             )
             for root_cause in risk.root_causes
         ]
+        processes_str = "\n".join(
+            [f"{process.name}: {process.description}" for process in processes]
+        )
+        root_causes_str = "\n".join(
+            [
+                f"{root_cause.name}: {root_cause.description}"
+                for root_cause in root_causes
+            ]
+        )
+        risk_data = {
+            "risk": risk.risk_name,
+            "risk_desc": risk.risk_description,
+            "rootcause_data": root_causes_str,
+            "process_data": processes_str,
+        }
+
+        # Use actual LLM to create summaries
+        summaries = summarize_risk(risk_data)
         risk_data_list.append(
             RiskData(
                 id=risk.risk_id,
@@ -348,9 +365,9 @@ def convert_existing_risk_to_risk_data(
                 process=processes,
                 risk_desc=risk.risk_description,
                 rootcause=root_causes,
-                process_summary="",
-                rootcause_summary="",
-                risk_desc_summary="",
+                process_summary=summaries.get("process_summary", ""),
+                rootcause_summary=summaries.get("rootcause_summary", ""),
+                risk_desc_summary=summaries.get("risk_desc_summary", ""),
             )
         )
     return risk_data_list
