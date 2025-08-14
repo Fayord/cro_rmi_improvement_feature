@@ -12,7 +12,7 @@ It is responsible for:
 Intended for import and use in main.py to power the /recommend_risk_to_assess endpoint.
 """
 
-from schemas import (
+from api.schemas import (
     RiskRecommendationAssessmentResponse,
     RiskDataWithTags,
     ExistingRisk,
@@ -31,7 +31,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append("../")
 sys.path.append("../../find_similar_risk")
 
-from embedding_providers import (  # type: ignore
+from core.embedding_providers import (
     OpenAIEmbeddingProvider,
 )
 from core.models import Process, RootCause

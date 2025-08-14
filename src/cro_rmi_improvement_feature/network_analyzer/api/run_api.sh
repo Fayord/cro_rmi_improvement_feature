@@ -9,5 +9,9 @@ if [ -f "$SCRIPT_DIR/.env" ]; then
 fi
 
 echo "USE_CACHED_LLM: $USE_CACHED_LLM"
+echo "PORT: $PORT"
+if [ -z "$PORT" ]; then
+    PORT=7900
+fi
 
-uvicorn main:app --host 0.0.0.0 --port 7900 --reload --log-level info
+uvicorn api.main:app --host 0.0.0.0 --port $PORT --reload --log-level info

@@ -19,21 +19,12 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_community.callbacks import get_openai_callback
 from dotenv import load_dotenv
+from data_processor.utils import _parse_bool_env
 
 dir_path = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(dir_path, "../../../../.env"))
-USE_CACHED_LLM = os.getenv("USE_CACHED_LLM", True)
+USE_CACHED_LLM = _parse_bool_env(os.getenv("USE_CACHED_LLM"), default=True)
 print(f"USE_CACHED_LLM: {USE_CACHED_LLM}")
-USE_CACHED_LLM = os.getenv("USE_CACHED_LLM")
-if USE_CACHED_LLM is None:
-    USE_CACHED_LLM = True
-elif USE_CACHED_LLM == "False":
-    USE_CACHED_LLM = False
-elif USE_CACHED_LLM == "True":
-    USE_CACHED_LLM = True
-else:
-    raise ValueError(f"Unknown USE_CACHED_LLM: {USE_CACHED_LLM}")
-
 
 # === LangChain Setup ===
 

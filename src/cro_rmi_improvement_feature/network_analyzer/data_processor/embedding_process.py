@@ -23,36 +23,17 @@ import os
 
 # Add the find_similar_risk directory to the path
 dir_path = os.path.dirname(os.path.abspath(__file__))
-find_similar_risk_path = os.path.join(dir_path, "../../../find_similar_risk")
-sys.path.insert(0, find_similar_risk_path)
+
 from dotenv import load_dotenv
 
 env_path = os.path.join(dir_path, "../../../../.env")
 
 load_dotenv(env_path)
-try:
-    from embedding_providers import (  # type: ignore
-        OpenAIEmbeddingProvider,
-        SentenceTransformerProvider,
-    )
-except ImportError as e:
-    print(f"Error importing embedding_providers: {e}")
-    print(f"Tried to import from: {find_similar_risk_path}")
-    print(f"Current sys.path: {sys.path}")
 
-    # Try alternative path
-    alt_path = os.path.join(dir_path, "../../find_similar_risk")
-    sys.path.insert(0, alt_path)
-    try:
-        from embedding_providers import (  # type: ignore
-            OpenAIEmbeddingProvider,
-            SentenceTransformerProvider,
-        )
-
-        print(f"Successfully imported from alternative path: {alt_path}")
-    except ImportError as e2:
-        print(f"Alternative path also failed: {e2}")
-        raise
+from core.embedding_providers import (
+    OpenAIEmbeddingProvider,
+    SentenceTransformerProvider,
+)
 
 
 def load_merged_data(input_path: str) -> pd.DataFrame:

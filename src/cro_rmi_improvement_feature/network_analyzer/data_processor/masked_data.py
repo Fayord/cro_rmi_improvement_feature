@@ -5,7 +5,7 @@ import pandas as pd
 def create_mask_dict_from_excel(
     data_path: str = os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
-        "../data/raw/Stakeholder Analysis WJMod.xlsx",
+        "../data/raw/Stakeholder_Analysis_WJMod.xlsx",
     )
 ) -> dict:
     df = pd.read_excel(data_path, sheet_name="BusinessGroup_v1")

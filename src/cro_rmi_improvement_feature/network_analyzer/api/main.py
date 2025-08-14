@@ -12,7 +12,7 @@ from fastapi import FastAPI, HTTPException, status, Depends
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
-from schemas import (
+from api.schemas import (
     RiskRecommendationRequest,
     RiskDataWithTags,
     ErrorResponse,
@@ -44,18 +44,18 @@ from data_processor.create_graph_data_library import (
     EdgeData,
     RiskOverlayData,
 )
-from test_jwt import verify_access_token_fastapi
+from api.test_jwt import verify_access_token_fastapi
 from core.models import Process, RootCause
 from time import time
 
-from risk_to_assess import (
+from api.risk_to_assess import (
     recommend_risk_to_assesses,
     convert_existing_risk_to_risk_data,
     create_company_graph_data,
     save_company_graph_data,
     load_graph_data_library,
 )
-from risk_to_mitigate import (
+from api.risk_to_mitigate import (
     get_source_and_central_risk,
     update_tags_risk_data,
     remove_existing_risk_with_mitigation_plan,
@@ -718,4 +718,10 @@ def protected_route(payload: Dict = Depends(verify_access_token_fastapi)):
 
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=7900, reload=False, log_level="info")
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=os.getenv("PORT", 7900),
+        reload=False,
+        log_level="info",
+    )

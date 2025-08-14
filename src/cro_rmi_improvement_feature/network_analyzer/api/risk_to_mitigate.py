@@ -9,9 +9,9 @@ import numpy as np
 import networkx as nx
 import pandas as pd
 from networkx.classes.reportviews import InDegreeView, OutDegreeView
-from schemas import RiskDataWithTags, ExistingRisk
+from api.schemas import RiskDataWithTags, ExistingRisk
 from typing import Dict
-from utils import (
+from api.utils import (
     filter_non_arrow_edges2,
     get_networkx_graph_from_company_graph_data,
 )
