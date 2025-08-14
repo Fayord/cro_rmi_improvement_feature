@@ -699,6 +699,7 @@ def _process_edges(
     low_priority_edges = [edge for edge in edges if not edge["high_priority"]]
     print(f"high_priority_edges: {len(high_priority_edges)}")
     print(f"low_priority_edges: {len(low_priority_edges)}")
+    start_time = time.perf_counter()
     (
         processed_edges,
         direction_list,
@@ -714,7 +715,8 @@ def _process_edges(
         relation_process,
         get_number_displayed_edges(number_of_nodes),
     )
-
+    end_time = time.perf_counter()
+    print(f"Time to classify edges: {end_time - start_time:.4f} seconds")
     final_edge_data_list = _create_final_edge_data(processed_edges)
 
     return (

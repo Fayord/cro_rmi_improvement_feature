@@ -50,6 +50,8 @@ from data_processor.create_graph_data_library import (
 )
 from data_processor.summarize_data import summarize_risk
 
+use_cache = os.getenv("USE_CACHED_LLM", True)
+print(f"use_cache: {use_cache}")
 
 def _save_or_update_risk_data(
     company_id: str, risk_data: List[ExistingRisk]
@@ -127,7 +129,7 @@ def create_embedding_text_risk_desc_catalog(
     return " | ".join(text_parts)
 
 
-def create_embedding(text: str, use_cache: bool = True) -> List[float]:
+def create_embedding(text: str, use_cache: bool = use_cache) -> List[float]:
     provider = OpenAIEmbeddingProvider(model_name="text-embedding-3-large")
 
     def get_openai_large_embedding(text: str) -> List[float]:
@@ -159,15 +161,20 @@ def create_company_graph_data(
         for risk in risk_data_list
     ]
     embedding_risk_data_list = []
+    start_time = time.perf_counter()
     with ThreadPoolExecutor(max_workers=NUMBER_OF_WORKERS) as executor:
         embedding_risk_data_list = list(
             executor.map(create_embedding, embedding_text_list)
         )
+    end_time = time.perf_counter()
+    print(
+        f"Time to create embeddings for interested risks: {end_time - start_time:.4f} seconds"
+    )
     nodes = [
         RiskDataWithEmbedding(data=risk, embedding=embedding_risk_data_list[i])
         for i, risk in enumerate(risk_data_list)
     ]
-
+    start_time = time.perf_counter()
     (
         processed_edges,
         direction_list,
@@ -183,6 +190,8 @@ def create_company_graph_data(
         high_priority_search_space,
         high_priority_atmost_number_edges,
     )
+    end_time = time.perf_counter()
+    print(f"Time to process edges: {end_time - start_time:.4f} seconds")
 
     # The original function had `edges = []` here.
     # Now, `final_edge_data_list` contains the processed edges.
