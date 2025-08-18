@@ -26,7 +26,7 @@ import numpy as np
 import time
 from concurrent.futures import ThreadPoolExecutor
 from collections import Counter
-
+import math
 
 from core.embedding_providers import (
     OpenAIEmbeddingProvider,
@@ -52,6 +52,7 @@ from data_processor.summarize_data import summarize_risk
 
 use_cache = os.getenv("USE_CACHED_LLM", True)
 print(f"use_cache: {use_cache}")
+
 
 def _save_or_update_risk_data(
     company_id: str, risk_data: List[ExistingRisk]
@@ -274,7 +275,9 @@ def recommend_risk_to_assesses(
         timestamp
     ]
     embedding_risk_catalog_reference_data = [
-        risk.embedding for risk in risk_catalog_reference_data
+        risk.embedding
+        for risk in risk_catalog_reference_data
+        if risk.data.risk not in existing_risk_name_set
     ]
     end_get_reference_data_time = time.perf_counter()
     print(
@@ -295,14 +298,17 @@ def recommend_risk_to_assesses(
     print(
         f"Time to create embeddings for interested risks: {end_create_embeddings_time - end_get_reference_data_time:.4f} seconds"
     )
-
+    maximum_recommended_risks = 15
+    top_n = math.floor(maximum_recommended_risks / len(embedding_risk_data_list))
+    if top_n == 0:
+        top_n = 1
     for embedding_risk_data in embedding_risk_data_list:
         embedding_risk_data = np.array(embedding_risk_data)
         embedding_risk_catalog_reference_data = np.array(
             embedding_risk_catalog_reference_data
         )
         similar_reference_risk_indices = find_similar_embeddings(
-            embedding_risk_data, embedding_risk_catalog_reference_data, top_n=10
+            embedding_risk_data, embedding_risk_catalog_reference_data, top_n=top_n
         )
         similar_risk_data_list: List[RiskData] = [
             risk_catalog_reference_data[index].data
