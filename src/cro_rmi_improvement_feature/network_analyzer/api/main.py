@@ -378,16 +378,22 @@ async def recommend_risks_to_mitigate_api(
             save_company_graph_data(
                 company_graph_data, company_graph_id, graph_data_library
             )
-
+            high_critical_risks = [
+                risk for risk in risk_data_list if risk.risk_level >= 3
+            ]
             source_risks, central_risks = get_source_and_central_risk(
                 company_graph_data
             )
+
             # then update tags (it can be multiple tags)
             # then remove the risk that already have mitigation plan
             risk_data_dict = {
+                "is_high_risk": high_critical_risks,
                 "is_source_risk": source_risks,
                 "is_central_risk": central_risks,
             }
+            print(f"source_risks: {len(source_risks)}")
+            print(f"central_risks: {len(central_risks)}")
             recommendations_risks: List[RiskDataWithTags] = update_tags_risk_data(
                 risk_data_dict
             )

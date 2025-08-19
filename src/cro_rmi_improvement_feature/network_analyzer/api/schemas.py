@@ -361,7 +361,10 @@ class ExistingControl(BaseModel):
 class ExistingRisk(BaseModel):
     """Schema for existing risk data."""
 
-    risk_id: str = Field(..., description="Unique identifier for the risk")
+    risk_id: Optional[str] = Field(
+        None,
+        description="Unique identifier for the risk because custom risk has no risk id ",
+    )
     user_id: str = Field(
         ...,
         description="Unique identifier for the user",
