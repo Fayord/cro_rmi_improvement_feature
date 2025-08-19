@@ -31,11 +31,11 @@ COPY config ./config
 # --- Create data dirs in image ---
 RUN mkdir -p /app/data/graph /app/data/raw
 
-# --- Copy VM dataset into the image via BuildKit bind mount ---
-# Full host path: /home/thanatorn/coding/cro_rmi_improvement_feature/src/cro_rmi_improvement_feature/network_analyzer/data
-RUN --mount=type=bind,source=/home/thanatorn/coding/cro_rmi_improvement_feature/src/cro_rmi_improvement_feature/network_analyzer/data,target=/mnt/data,readonly \
-    cp -a /mnt/data/graph/graph_data_library.pkl /app/data/graph/ && \
-    cp -a /mnt/data/raw/Stakeholder_Analysis_WJMod.xlsx /app/data/raw/
+# --- Copy dataset from external build context ---
+# You’ll pass this context in .gitlab-ci.yml using:
+#   docker build --build-context dataset=local:///__dataset ...
+COPY --from=dataset graph/graph_data_library.pkl /app/data/graph/
+COPY --from=dataset raw/Stakeholder_Analysis_WJMod.xlsx /app/data/raw/
 
 # --- Runtime env ---
 ENV PYTHONUNBUFFERED=1 \
