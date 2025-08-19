@@ -31,6 +31,7 @@ class RiskDataWithTags(BaseModel):
     """Schema for recommended risk items with rationale."""
 
     risk_data: RiskData = Field(..., description="Risk data")
+    user_ids: List[str] = Field(..., description="User identifier")
     is_central_risk: bool = Field(
         False, description="Whether the risk is a central risk"
     )

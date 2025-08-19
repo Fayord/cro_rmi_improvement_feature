@@ -15,6 +15,7 @@ from api.utils import (
     filter_non_arrow_edges2,
     get_networkx_graph_from_company_graph_data,
 )
+from collections import defaultdict
 
 N_TOP = 3
 
@@ -94,26 +95,32 @@ def get_source_and_central_risk(
 
 def remove_existing_risk_with_mitigation_plan(
     recommendations_risk_data_list: List[RiskDataWithTags],
-    existing_risks: List[ExistingRisk],
+    is_have_mitigation_plan_mapping_dict: Dict[Tuple[str, str], bool],
 ) -> List[RiskDataWithTags]:
-    # remove recommendations_risk_data_list that already have mitigation plan
-    for risk_data_with_tags in recommendations_risk_data_list:
-        risk_name = risk_data_with_tags.risk_data.risk
-        for existing_risk in existing_risks:
-            mitigation_plans = existing_risk.mitigation_plans
+    # Create a mapping for efficient lookup of RiskDataWithTags objects by risk_name
+    risk_name_to_recommendation_map = {
+        r.risk_data.risk: r for r in recommendations_risk_data_list
+    }
 
-            if (
-                risk_name == existing_risk.risk_name
-                and mitigation_plans is not None
-                and mitigation_plans != []
-            ):
-                recommendations_risk_data_list.remove(risk_data_with_tags)
-                break
-    return recommendations_risk_data_list
+    # Iterate through the mitigation plan dictionary and remove user_ids
+    for (
+        risk_name,
+        user_id,
+    ), has_mitigation_plan in is_have_mitigation_plan_mapping_dict.items():
+        if has_mitigation_plan and risk_name in risk_name_to_recommendation_map:
+            recommendation = risk_name_to_recommendation_map[risk_name]
+            # Ensure the user_id exists in the list before trying to remove it
+            if user_id in recommendation.user_ids:
+                recommendation.user_ids.remove(user_id)
+
+    # Filter out recommendations where user_ids list is now empty
+    filtered_recommendations = [r for r in recommendations_risk_data_list if r.user_ids]
+    return filtered_recommendations
 
 
-def update_tags_risk_data(
+def add_tags_and_update_user_ids_to_risk_data(
     risk_data_dict: Dict[str, List[RiskData]],
+    risk_name_to_user_ids_mapping_dict: Dict[str, List[str]],
 ) -> List[RiskDataWithTags]:
     recommnend_risk_data_list: List[RiskDataWithTags] = []
     # check is dict keys is in Literal tags
@@ -131,15 +138,11 @@ def update_tags_risk_data(
 
     for risk_data_list in risk_data_dict.values():
         for risk_data in risk_data_list:
+            user_ids = risk_name_to_user_ids_mapping_dict[risk_data.risk]
             recommnend_risk_data_list.append(
                 RiskDataWithTags(
                     risk_data=risk_data,
-                    is_source_risk=False,
-                    is_central_risk=False,
-                    is_high_risk=False,
-                    is_shared_root_cause=False,
-                    is_news_trended=False,
-                    is_emerging_risk=False,
+                    user_ids=user_ids,
                 )
             )
     # then loop in each key in risk_data_dict and update the tags
@@ -151,3 +154,32 @@ def update_tags_risk_data(
                     break
 
     return recommnend_risk_data_list
+
+
+def get_risk_name_to_user_ids_mapping_dict(
+    existing_risks: List[ExistingRisk],
+) -> Dict[str, List[str]]:
+    risk_name_to_user_ids_mapping_dict = defaultdict(list)
+    for existing_risk in existing_risks:
+        risk_name = existing_risk.risk_name
+        user_id = existing_risk.user_id
+        risk_name_to_user_ids_mapping_dict[risk_name].append(user_id)
+    return risk_name_to_user_ids_mapping_dict
+
+
+def get_is_have_mitigation_plan_mapping_dict(
+    existing_risks: List[ExistingRisk],
+) -> Dict[Tuple[str, str], bool]:
+    # loop in existing_risks and get the risk_name and user_id
+    is_have_mitigation_plan_mapping_dict = {}
+    for existing_risk in existing_risks:
+        risk_name = existing_risk.risk_name
+        user_id = existing_risk.user_id
+        is_have_mitigation_plan = (
+            existing_risk.mitigation_plans is not None
+            and existing_risk.mitigation_plans != []
+        )
+        is_have_mitigation_plan_mapping_dict[(risk_name, user_id)] = (
+            is_have_mitigation_plan
+        )
+    return is_have_mitigation_plan_mapping_dict

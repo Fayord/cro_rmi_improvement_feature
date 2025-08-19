@@ -27,6 +27,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from collections import Counter
 import math
+import itertools
 
 from core.embedding_providers import (
     OpenAIEmbeddingProvider,
@@ -335,42 +336,64 @@ def convert_existing_risk_to_risk_data(
     do_summarize: bool = False,
     number_of_workers: int = NUMBER_OF_WORKERS,
 ) -> List[RiskData]:
+    # Group existing risks by risk_name
+    grouped_risks = itertools.groupby(
+        sorted(existing_risk_list, key=lambda x: x.risk_name),
+        key=lambda x: x.risk_name,
+    )
+
     # Build entries to preserve order and enable parallel summarization
     entries = []
-    for risk in existing_risk_list:
-        processes: List[Process] = [
-            Process(id=process.id, name=process.name, description=process.description)
-            for process in risk.processes
-        ]
-        root_causes: List[RootCause] = [
-            RootCause(
-                id=root_cause.id,
-                name=root_cause.name,
-                description=root_cause.description,
+    for risk_name, risks_group in grouped_risks:
+        risks_in_group = list(risks_group)
+
+        # Aggregate risk descriptions
+        risk_desc_list = [risk.risk_description for risk in risks_in_group]
+        aggregated_risk_description = "\n".join(risk_desc_list)
+
+        # Aggregate processes and root causes
+        all_processes: List[Process] = []
+        all_root_causes: List[RootCause] = []
+        for risk in risks_in_group:
+            all_processes.extend(
+                [
+                    Process(id=p.id, name=p.name, description=p.description)
+                    for p in risk.processes
+                ]
             )
-            for root_cause in risk.root_causes
-        ]
+            all_root_causes.extend(
+                [
+                    RootCause(id=rc.id, name=rc.name, description=rc.description)
+                    for rc in risk.root_causes
+                ]
+            )
+
         processes_str = "\n".join(
-            [f"{process.name}: {process.description}" for process in processes]
+            [f"{process.name}: {process.description}" for process in all_processes]
         )
         root_causes_str = "\n".join(
             [
                 f"{root_cause.name}: {root_cause.description}"
-                for root_cause in root_causes
+                for root_cause in all_root_causes
             ]
         )
-        risk_data = {
-            "risk": risk.risk_name,
-            "risk_desc": risk.risk_description,
+
+        # Use the first risk in the group for other fields that are assumed to be consistent
+        first_risk_in_group = risks_in_group[0]
+
+        risk_data_payload = {
+            "risk": risk_name,
+            "risk_desc": aggregated_risk_description,
             "rootcause_data": root_causes_str,
             "process_data": processes_str,
         }
         entries.append(
             {
-                "risk": risk,
-                "processes": processes,
-                "root_causes": root_causes,
-                "risk_data": risk_data,
+                "risk": first_risk_in_group,  # Keep the first risk object for ID, score etc.
+                "risk_desc": risk_desc_list,
+                "processes": all_processes,
+                "root_causes": all_root_causes,
+                "risk_data": risk_data_payload,
             }
         )
 
@@ -407,7 +430,7 @@ def convert_existing_risk_to_risk_data(
                 risk_impact=risk.score.impact,
                 risk_likelihood=risk.score.likelihood,
                 process=processes,
-                risk_desc=risk.risk_description,
+                risk_desc=risk_desc_list,
                 rootcause=root_causes,
                 process_summary=summaries.get("process_summary", ""),
                 rootcause_summary=summaries.get("rootcause_summary", ""),

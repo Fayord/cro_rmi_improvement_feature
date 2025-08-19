@@ -59,6 +59,8 @@ from api.risk_to_mitigate import (
     get_source_and_central_risk,
     update_tags_risk_data,
     remove_existing_risk_with_mitigation_plan,
+    get_is_have_mitigation_plan_mapping_dict,
+    get_risk_name_to_user_ids_mapping_dict,
 )
 from traceback import print_exc
 
@@ -350,6 +352,13 @@ async def recommend_risks_to_mitigate_api(
             # save the updated graph data
             company_id = request.existing_risks[0].company_id
             company_graph_id = f"{company_id}|embedding_risk_desc_catalog|oneway_run"
+            # get mapping_dict tuple(risk_name,user_id) is_have_mitigation_plan
+            is_have_mitigation_plan_mapping_dict = (
+                get_is_have_mitigation_plan_mapping_dict(existing_risk_list)
+            )
+            risk_name_to_user_ids_mapping_dict = get_risk_name_to_user_ids_mapping_dict(
+                existing_risk_list
+            )
             start_time = time()
             risk_data_list = convert_existing_risk_to_risk_data(
                 existing_risk_list,
@@ -394,14 +403,17 @@ async def recommend_risks_to_mitigate_api(
             }
             print(f"source_risks: {len(source_risks)}")
             print(f"central_risks: {len(central_risks)}")
-            recommendations_risks: List[RiskDataWithTags] = update_tags_risk_data(
-                risk_data_dict
+            recommendations_risks: List[RiskDataWithTags] = (
+                add_tags_and_update_user_ids_to_risk_data(
+                    risk_data_dict, risk_name_to_user_ids_mapping_dict
+                )
             )
             recommendations_risks: List[RiskDataWithTags] = (
                 remove_existing_risk_with_mitigation_plan(
-                    recommendations_risks, existing_risk_list
+                    recommendations_risks, is_have_mitigation_plan_mapping_dict
                 )
             )
+            # NOTE: change for each RiskDataWithTags will have user_ids and we will return with all user that have same risk name, then we will pop out user_id where they have mitigation plan and if it pop to 0 then we remove that risk.
 
         response = RiskRecommendationMitigationPlanResponse(
             id=request.id,
