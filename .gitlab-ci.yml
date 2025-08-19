@@ -8,6 +8,34 @@ variables:
 
 stages: [build]
 
+script:
+  # Debug: Check what's available from root
+  - ls -la /
+  
+  # Debug: Check if /home exists and what's in it
+  - ls -la /home/ || echo "/home/ does not exist"
+  
+  # Debug: Check if /home/thanatorn exists
+  - ls -la /home/thanatorn/ || echo "/home/thanatorn/ does not exist"
+  
+  # Debug: Check if /coding exists (as you suggested)
+  - ls -la /coding/ || echo "/coding/ does not exist"
+  
+  # Debug: Check what's mounted in the container
+  - mount | grep dataset || echo "No dataset mount found"
+  
+  # Debug: Check if the original mount point exists
+  - ls -la /__dataset || echo "/__dataset does not exist"
+  
+  # Debug: Find any directories that might contain your data
+  - find / -name "*network_analyzer*" 2>/dev/null || echo "No network_analyzer directory found"
+  - find / -name "*dataset*" -type d 2>/dev/null || echo "No dataset directory found"
+  
+  # Debug: Check current working directory and CI variables
+  - pwd
+  - echo "CI_PROJECT_DIR: $CI_PROJECT_DIR"
+  - ls -la "$CI_PROJECT_DIR"
+
 before_script:
   - apk add --no-cache aws-cli docker-cli jq
   - aws --version
