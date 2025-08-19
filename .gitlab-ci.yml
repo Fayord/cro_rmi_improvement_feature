@@ -3,7 +3,7 @@ image: docker:27.3.1
 
 variables:
   DOCKER_BUILDKIT: "1"
-  DOCKERFILE_DIR: "src/cro_improvement_feature/network_analyzer"
+  DOCKERFILE_DIR: "src/cro_rmi__improvement_feature/network_analyzer"
   ECR_REGISTRY: "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com"
 
 stages: [build]
@@ -16,8 +16,8 @@ before_script:
   - echo "CI_PROJECT_DIR=$CI_PROJECT_DIR"
   - ls -la
   - ls -la src || true
-  - ls -la src/cro_improvement_feature || true
-  - ls -la src/cro_improvement_feature/network_analyzer || true
+  - ls -la src/cro_rmi_improvement_feature || true
+  - ls -la src/cro_rmi_improvement_feature/network_analyzer || true
   - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
   
 build-and-push:
