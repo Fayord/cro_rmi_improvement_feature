@@ -26,9 +26,5 @@ build-and-push:
   script:
     - export IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY"
     - export TAG="${CI_COMMIT_SHORT_SHA}"
-    - docker build \
-        -t "$IMAGE:$TAG" \
-        -f "$DOCKERFILE_DIR/Dockerfile.GitLab" \
-        --build-context dataset=local:///__dataset \
-        "$DOCKERFILE_DIR"
+    - docker build -t "$IMAGE:$TAG" -f "$CI_PROJECT_DIR/$DOCKERFILE_DIR/Dockerfile.GitLab" --build-context dataset=local:///__dataset "$CI_PROJECT_DIR/$DOCKERFILE_DIR"
     - docker push "$IMAGE:$TAG"
