@@ -32,10 +32,8 @@ COPY config ./config
 RUN mkdir -p /app/data/graph /app/data/raw
 
 # --- Copy VM dataset into the image via BuildKit bind mount ---
-# Ensure the host path exists on the runner VM:
-#   /datasets/network_analyzer/data/graph/graph_data_library.pkl
-#   /datasets/network_analyzer/data/raw/Stakeholder_Analysis_WJMod.xlsx
-RUN --mount=type=bind,source=/datasets/network_analyzer/data,target=/mnt/data,readonly \
+# Full host path: /home/thanatorn/coding/cro_rmi_improvement_feature/src/cro_rmi_improvement_feature/network_analyzer/data
+RUN --mount=type=bind,source=/home/thanatorn/coding/cro_rmi_improvement_feature/src/cro_rmi_improvement_feature/network_analyzer/data,target=/mnt/data,readonly \
     cp -a /mnt/data/graph/graph_data_library.pkl /app/data/graph/ && \
     cp -a /mnt/data/raw/Stakeholder_Analysis_WJMod.xlsx /app/data/raw/
 
