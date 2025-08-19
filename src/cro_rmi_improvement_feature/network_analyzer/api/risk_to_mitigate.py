@@ -19,9 +19,26 @@ from api.utils import (
 N_TOP = 3
 
 
-def top_n_strict_with_priority_on_highest(
-    df: pd.DataFrame, column: str, n: int = 3
+def top_n_with_threshold(
+    df: pd.DataFrame, column: str, n: int = 3, threshold: int = 0
 ) -> pd.DataFrame:
+    """
+    Keep:
+      1) All rows with the highest value (even if count > n), BUT only if highest >= threshold.
+      2) Then add rows of the next-highest values while total rows <= n.
+      3) Stop before adding any group that would exceed n.
+
+    If max(column) < threshold, return an empty DataFrame.
+    """
+    if column not in df.columns:
+        raise KeyError(f"Column '{column}' not in DataFrame")
+
+    # Highest must be greater than threshold
+    max_val = df[column].max()
+    if pd.isna(max_val) or not (max_val >= threshold):
+        return df.iloc[0:0]  # empty with same columns
+
+    # Sort and count occurrences of each value (descending by value)
     df_sorted = df.sort_values(by=column, ascending=False)
     counts = df_sorted[column].value_counts().sort_index(ascending=False)
 
@@ -30,17 +47,16 @@ def top_n_strict_with_priority_on_highest(
 
     for i, (value, count) in enumerate(counts.items()):
         if i == 0:
-            # Always keep all rows with the highest value
+            # Always keep the entire highest group
             allowed_values.append(value)
             total += count
         elif total + count <= n:
             allowed_values.append(value)
             total += count
         else:
-            break  # Stop adding more if it would exceed the limit
+            break
 
-    result = df_sorted[df_sorted[column].isin(allowed_values)]
-    return result
+    return df_sorted[df_sorted[column].isin(allowed_values)]
 
 
 def get_source_and_central_risk(
@@ -52,11 +68,17 @@ def get_source_and_central_risk(
         company_graph_data
     )
     # find the source and central risk with existing code from notebook
-    central_risks_df = top_n_strict_with_priority_on_highest(
-        all_data_df, "betweenness_centrality_non_weight", n=top_n
+    central_risks_df = top_n_with_threshold(
+        all_data_df,
+        "betweenness_centrality_non_weight",
+        n=top_n,
+        threshold=0.001,  # to prevent empty central risks
     )
-    source_risks_df = top_n_strict_with_priority_on_highest(
-        all_data_df, "out_degree", n=top_n
+    source_risks_df = top_n_with_threshold(
+        all_data_df,
+        "out_degree",
+        n=top_n,
+        threshold=2,  # to prevent all risks is source risks in small graph
     )
     central_risks: List[RiskData] = []
     source_risks: List[RiskData] = []
