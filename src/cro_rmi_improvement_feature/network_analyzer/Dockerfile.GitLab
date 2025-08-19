@@ -1,0 +1,55 @@
+# syntax=docker/dockerfile:1.7
+
+FROM python:3.12-slim AS base
+
+# --- OS deps (adjust as needed) ---
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    gcc \
+    libcairo2 \
+    libcairo2-dev \
+    libxml2 \
+    libxml2-dev \
+    zlib1g-dev \
+    git \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# --- Python deps (cache-friendly order) ---
+COPY pyproject.toml .
+COPY requirements.txt .
+RUN python -m pip install --upgrade pip \
+ && pip install --no-cache-dir -r requirements.txt
+
+# --- Application code (no large data here) ---
+COPY data_processor ./data_processor
+COPY api ./api
+COPY core ./core
+COPY config ./config
+
+# --- Create data dirs in image ---
+RUN mkdir -p /app/data/graph /app/data/raw
+
+# --- Copy VM dataset into the image via BuildKit bind mount ---
+# Ensure the host path exists on the runner VM:
+#   /datasets/network_analyzer/data/graph/graph_data_library.pkl
+#   /datasets/network_analyzer/data/raw/Stakeholder_Analysis_WJMod.xlsx
+RUN --mount=type=bind,source=/datasets/network_analyzer/data,target=/mnt/data,readonly \
+    cp -a /mnt/data/graph/graph_data_library.pkl /app/data/graph/ && \
+    cp -a /mnt/data/raw/Stakeholder_Analysis_WJMod.xlsx /app/data/raw/
+
+# --- Runtime env ---
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/app
+
+# Optional test stage (uncomment if you have tests)
+# RUN pytest -q
+
+# If your app reads PORT, this keeps parity with your runner task
+EXPOSE $PORT
+
+# --- Entrypoint ---
+CMD ["sh", "api/run_api.sh"]
+
