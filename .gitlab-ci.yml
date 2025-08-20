@@ -1,57 +1,40 @@
-# .gitlab-ci.yml (snippet)
-image: docker:27.3.1
+image: docker:28-dind
+
+services:
+    - name: docker:28-dind
+
+default:
+  tags:
+    - vision_vm
 
 variables:
-  DOCKER_BUILDKIT: "1"
   DOCKERFILE_DIR: "src/cro_rmi_improvement_feature/network_analyzer"
   ECR_REGISTRY: "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com"
 
-stages: [build]
+stages:
+    - exploration
+    - build_push
 
-before_script:
-  - apk add --no-cache aws-cli docker-cli jq
-  - aws --version
-  - docker --version
-  - pwd
-  - echo "CI_PROJECT_DIR=$CI_PROJECT_DIR"
-  - ls -la
-  - ls -la src || true
-  - ls -la src/cro_rmi_improvement_feature || true
-  - ls -la src/cro_rmi_improvement_feature/network_analyzer || true
-  - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
-  
-build-and-push:
-  stage: build
-  tags: ["docker"]
-  script:
-    # Debug: Check what's available from root
-    - ls -la /
-    
-    # Debug: Check if /home exists and what's in it
-    - ls -la /home/ || echo "/home/ does not exist"
-    
-    # Debug: Check if /home/thanatorn exists
-    - ls -la /home/thanatorn/ || echo "/home/thanatorn/ does not exist"
-    
-    # Debug: Check if /coding exists (as you suggested)
-    - ls -la /coding/ || echo "/coding/ does not exist"
-    
-    # Debug: Check what's mounted in the container
-    - mount | grep dataset || echo "No dataset mount found"
-    
-    # Debug: Check if the original mount point exists
-    - ls -la /__dataset || echo "/__dataset does not exist"
-    
-    # Debug: Find any directories that might contain your data
-    - find / -name "*network_analyzer*" 2>/dev/null || echo "No network_analyzer directory found"
-    - find / -name "*dataset*" -type d 2>/dev/null || echo "No dataset directory found"
-    
-    # Debug: Check current working directory and CI variables
-    - pwd
-    - echo "CI_PROJECT_DIR: $CI_PROJECT_DIR"
-    - ls -la "$CI_PROJECT_DIR"
-    - export IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY"
-    - export TAG="${CI_COMMIT_SHORT_SHA}"
-    - docker build -t "$IMAGE:$TAG" -f "$CI_PROJECT_DIR/$DOCKERFILE_DIR/Dockerfile.GitLab" --build-context dataset="/home/thanatorn/coding/cro_rmi_improvement_feature/src/cro_rmi_improvement_feature/network_analyzer/data" "$CI_PROJECT_DIR/$DOCKERFILE_DIR"
-    - docker push "$IMAGE:$TAG"
+exploration:
+    stage: exploration
+    before_script:
+        - apk add --no-cache tree
+    script:
+        - cd /mnt/data
+        - ls -la
+        - echo "=== Directory Tree Structure ==="
+        - echo "=== Contents of /mnt/data ===" 
+        - tree .
 
+build_and_push:
+    stage: build_push
+    before_script:
+        - apk add --no-cache aws-cli docker-cli jq
+        - aws --version
+        - docker --version
+        - pwd
+        - echo "$CI_PROJECT_DIR"
+        - cd "$CI_PROJECT_DIR/$DOCKERFILE_DIR
+        - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+    script:
+        - docker version
