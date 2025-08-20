@@ -45,4 +45,13 @@ build_and_push:
         - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
     script:
         - docker version
+        # Build the Docker image
+        - docker build -f Dockerfile -t rmi-ai/ai-service .
+        - docker tag rmi-ai/ai-service:latest 088342693028.dkr.ecr.ap-southeast-1.amazonaws.com/rmi-ai/ai-service:latest
+        - echo "Built images:"
+        - docker images | head -n 20
+        # Push to ECR
+        - docker push 088342693028.dkr.ecr.ap-southeast-1.amazonaws.com/rmi-ai/ai-service:latest
+        - echo "Successfully pushed rmi-ai/ai-service to ECR"
+
 
