@@ -21,5 +21,5 @@ def client(api_base_url):
         raise ValueError("TOKEN_AUTH not found in .env.test file")
 
     headers = {"Authorization": f"Bearer {auth_token}"}
-    with httpx.Client(base_url=api_base_url, headers=headers) as client:
+    with httpx.Client(base_url=api_base_url, headers=headers, timeout=60.0) as client:
         yield client
