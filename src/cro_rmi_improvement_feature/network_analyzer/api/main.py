@@ -57,7 +57,7 @@ from api.risk_to_assess import (
 )
 from api.risk_to_mitigate import (
     get_source_and_central_risk,
-    update_tags_risk_data,
+    add_tags_and_update_user_ids_to_risk_data,
     remove_existing_risk_with_mitigation_plan,
     get_is_have_mitigation_plan_mapping_dict,
     get_risk_name_to_user_ids_mapping_dict,
