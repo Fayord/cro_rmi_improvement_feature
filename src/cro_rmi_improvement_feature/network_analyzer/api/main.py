@@ -55,11 +55,6 @@ from api.risk_to_assess import (
     load_graph_data_library,
 )
 from api.risk_to_mitigate import (
-    get_source_and_central_risk,
-    add_tags_and_update_user_ids_to_risk_data,
-    remove_existing_risk_with_mitigation_plan,
-    get_is_have_mitigation_plan_mapping_dict,
-    get_risk_name_to_user_ids_mapping_dict,
     _process_company_graph_data,
     _generate_mitigation_recommendations_with_tags,
 )
