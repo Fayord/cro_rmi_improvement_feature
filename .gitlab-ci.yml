@@ -10,6 +10,9 @@ default:
 variables:
   DOCKERFILE_DIR: "src/cro_rmi_improvement_feature/network_analyzer"
   ECR_REGISTRY: "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com"
+  DOCKER_TLS_CERTDIR: ""                # disable TLS so we can talk to DinD over plain TCP
+  DOCKER_HOST: tcp://docker:2375        # point the Docker CLI at the DinD service
+  DOCKER_DRIVER: overlay2
 
 stages:
     - exploration
@@ -35,6 +38,11 @@ build_and_push:
         - pwd
         - echo "$CI_PROJECT_DIR"
         - cd "$CI_PROJECT_DIR/$DOCKERFILE_DIR"
+        # Copy data from mounted path
+        - rm -rf data && mkdir -p data
+        - cp -a /mnt/data/. data/
+        - ls -la data | head -n 50
         - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
     script:
         - docker version
+
