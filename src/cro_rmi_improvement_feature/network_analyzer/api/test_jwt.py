@@ -83,7 +83,7 @@ if __name__ == "__main__":
     decoded = verify_access_token(token)
     print("Decoded:", decoded)
 
-    token = generate_permanent_token_no_exp(1)
+    token = generate_permanent_token_no_exp("test_user")
     print("Permanent Token:", token)
 
     # Later, validate it
