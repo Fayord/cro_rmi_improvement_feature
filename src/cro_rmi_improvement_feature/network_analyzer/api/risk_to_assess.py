@@ -251,12 +251,22 @@ def _load_and_filter_initial_data(
     graph_data_library: GraphDataLibrary,
 ) -> Tuple[str, Set[str], List[RiskData], List[RiskDataWithEmbedding]]:
     year_quarter_to_timestamp_dict = {
-        "2024-Q4": "20250513",
+        # "2024-Q4": "20250513",
         "2025-Q1": "20250513",
         "2025-Q2": "20250513",
         "2025-Q3": "20250513",
+        "2025-Q4": "20250513",
     }
-    timestamp = year_quarter_to_timestamp_dict[year_quarter]
+    year_str, quarter_str = year_quarter.split("-")
+    year = int(year_str)
+    quarter = int(quarter_str.upper().replace("Q", ""))
+    # for year >2026 and so on we will use last timestamp
+    if year > 2025:
+        timestamp = year_quarter_to_timestamp_dict["2025-Q4"]
+    else:
+        timestamp = year_quarter_to_timestamp_dict.get(f"{year}-Q{quarter}", None)
+    if timestamp is None:
+        raise Exception(f"year_quarter is not found in mapping dict {year_quarter}")
 
     existing_risk_name_set = {risk.risk for risk in risk_data_list}
     interested_risks = filter_interested_risk(risk_data_list)
