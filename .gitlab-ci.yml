@@ -34,7 +34,7 @@ build_and_push:
         - docker --version
         - pwd
         - echo "$CI_PROJECT_DIR"
-        - cd "$CI_PROJECT_DIR/$DOCKERFILE_DIR
+        - cd "$CI_PROJECT_DIR/$DOCKERFILE_DIR"
         - aws ecr get-login-password --region "$AWS_DEFAULT_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
     script:
         - docker version
