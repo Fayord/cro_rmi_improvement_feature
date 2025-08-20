@@ -245,11 +245,11 @@ def save_company_graph_data(
         pickle.dump(graph_data_library, f)
 
 
-def recommend_risk_to_assesses(
+def _load_and_filter_initial_data(
     risk_data_list: List[RiskData],
     year_quarter: str,
     graph_data_library: GraphDataLibrary,
-) -> List[RiskData]:
+) -> Tuple[str, Set[str], List[RiskData], List[RiskDataWithEmbedding]]:
     year_quarter_to_timestamp_dict = {
         "2024-Q4": "20250513",
         "2025-Q1": "20250513",
@@ -257,59 +257,52 @@ def recommend_risk_to_assesses(
         "2025-Q3": "20250513",
     }
     timestamp = year_quarter_to_timestamp_dict[year_quarter]
-    start_time = time.perf_counter()
-    all_recommended_risks: List[RiskData] = []
-
-    end_load_graph_data_library_time = time.perf_counter()
-    print(
-        f"Time to load graph data library: {end_load_graph_data_library_time - start_time:.4f} seconds"
-    )
 
     existing_risk_name_set = {risk.risk for risk in risk_data_list}
     interested_risks = filter_interested_risk(risk_data_list)
-    end_filter_interested_risk_time = time.perf_counter()
-    print(
-        f"Time to filter interested risks: {end_filter_interested_risk_time - end_load_graph_data_library_time:.4f} seconds"
-    )
 
     risk_catalog_reference_data = graph_data_library.risk_catalog_reference_datas[
         timestamp
     ]
-    embedding_risk_catalog_reference_data = [
-        risk.embedding
-        for risk in risk_catalog_reference_data
-        if risk.data.risk not in existing_risk_name_set
-    ]
-    end_get_reference_data_time = time.perf_counter()
-    print(
-        f"Time to get risk catalog reference data: {end_get_reference_data_time - end_filter_interested_risk_time:.4f} seconds"
+    return (
+        timestamp,
+        existing_risk_name_set,
+        interested_risks,
+        risk_catalog_reference_data,
     )
 
+
+def _create_risk_embeddings(
+    interested_risks: List[RiskData],
+) -> List[List[float]]:
     embedding_text_list = [
         create_embedding_text_raw_user_data(risk) for risk in interested_risks
     ]
-    # Parallelize embedding creation
-    embedding_risk_data_list = []
     with ThreadPoolExecutor(max_workers=NUMBER_OF_WORKERS) as executor:
         embedding_risk_data_list = list(
             executor.map(create_embedding, embedding_text_list)
         )
+    return embedding_risk_data_list
 
-    end_create_embeddings_time = time.perf_counter()
-    print(
-        f"Time to create embeddings for interested risks: {end_create_embeddings_time - end_get_reference_data_time:.4f} seconds"
-    )
+
+def _find_and_filter_similar_risks(
+    embedding_risk_data_list: List[List[float]],
+    embedding_risk_catalog_reference_data: List[List[float]],
+    risk_catalog_reference_data: List[RiskDataWithEmbedding],
+    existing_risk_name_set: Set[str],
+) -> List[RiskData]:
+    all_recommended_risks: List[RiskData] = []
     maximum_recommended_risks = 15
     top_n = math.floor(maximum_recommended_risks / len(embedding_risk_data_list))
     if top_n == 0:
         top_n = 1
     for embedding_risk_data in embedding_risk_data_list:
         embedding_risk_data = np.array(embedding_risk_data)
-        embedding_risk_catalog_reference_data = np.array(
+        embedding_risk_catalog_reference_data_np = np.array(
             embedding_risk_catalog_reference_data
         )
         similar_reference_risk_indices = find_similar_embeddings(
-            embedding_risk_data, embedding_risk_catalog_reference_data, top_n=top_n
+            embedding_risk_data, embedding_risk_catalog_reference_data_np, top_n=top_n
         )
         similar_risk_data_list: List[RiskData] = [
             risk_catalog_reference_data[index].data
@@ -321,13 +314,56 @@ def recommend_risk_to_assesses(
             if risk.risk not in existing_risk_name_set
         ]
         all_recommended_risks.extend(similar_risk_data_list)
+    return all_recommended_risks
+
+
+def recommend_risks_for_assessment(
+    risk_data_list: List[RiskData],
+    year_quarter: str,
+    graph_data_library: GraphDataLibrary,
+) -> List[RiskData]:
+    start_time = time.perf_counter()
+
+    (
+        timestamp,
+        existing_risk_name_set,
+        interested_risks,
+        risk_catalog_reference_data,
+    ) = _load_and_filter_initial_data(risk_data_list, year_quarter, graph_data_library)
+    end_load_graph_data_library_time = time.perf_counter()
+    print(
+        f"Time to load graph data library and filter initial data: {end_load_graph_data_library_time - start_time:.4f} seconds"
+    )
+
+    embedding_risk_catalog_reference_data_filtered = [
+        risk.embedding
+        for risk in risk_catalog_reference_data
+        if risk.data.risk not in existing_risk_name_set
+    ]
+    end_get_reference_data_time = time.perf_counter()
+    print(
+        f"Time to get risk catalog reference data: {end_get_reference_data_time - end_load_graph_data_library_time:.4f} seconds"
+    )
+
+    embedding_risk_data_list = _create_risk_embeddings(interested_risks)
+
+    end_create_embeddings_time = time.perf_counter()
+    print(
+        f"Time to create embeddings for interested risks: {end_create_embeddings_time - end_get_reference_data_time:.4f} seconds"
+    )
+    all_recommended_risks = _find_and_filter_similar_risks(
+        embedding_risk_data_list,
+        embedding_risk_catalog_reference_data_filtered,
+        risk_catalog_reference_data,
+        existing_risk_name_set,
+    )
     end_find_similar_risks_time = time.perf_counter()
     print(
         f"Time to find and filter similar risks: {end_find_similar_risks_time - end_create_embeddings_time:.4f} seconds"
     )
 
     total_time = time.perf_counter() - start_time
-    print(f"Total time for recommend_risk_to_assesses: {total_time:.4f} seconds")
+    print(f"Total time for recommend_risks_for_assessment: {total_time:.4f} seconds")
     return all_recommended_risks
 
 

@@ -48,7 +48,7 @@ from core.models import Process, RootCause
 from time import time
 
 from api.risk_to_assess import (
-    recommend_risk_to_assesses,
+    recommend_risks_for_assessment,
     convert_existing_risk_to_risk_data,
     create_company_graph_data,
     save_company_graph_data,
@@ -216,7 +216,7 @@ async def recommend_risks_to_assess_api(
             )
 
         # pass list risk_data to recommend_risk_to_assesses
-        all_recommended_risks = recommend_risk_to_assesses(
+        all_recommended_risks = recommend_risks_for_assessment(
             risk_data_list, request.year_quarter, graph_data_library
         )
         return RiskRecommendationAssessmentResponse(
