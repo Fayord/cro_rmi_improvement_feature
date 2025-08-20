@@ -5,9 +5,8 @@ FastAPI application for risk recommendation service.
 from datetime import datetime
 
 from json import load
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Dict
 import uuid
-from typing import Dict
 from fastapi import FastAPI, HTTPException, status, Depends
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -61,6 +60,8 @@ from api.risk_to_mitigate import (
     remove_existing_risk_with_mitigation_plan,
     get_is_have_mitigation_plan_mapping_dict,
     get_risk_name_to_user_ids_mapping_dict,
+    _process_company_graph_data,
+    _generate_mitigation_recommendations_with_tags,
 )
 from traceback import print_exc
 
@@ -350,70 +351,12 @@ async def recommend_risks_to_mitigate_api(
             # create new graph data
             # then find the source and central risk from graph data
             # save the updated graph data
-            company_id = request.existing_risks[0].company_id
-            company_graph_id = f"{company_id}|embedding_risk_desc_catalog|oneway_run"
-            # get mapping_dict tuple(risk_name,user_id) is_have_mitigation_plan
-            is_have_mitigation_plan_mapping_dict = (
-                get_is_have_mitigation_plan_mapping_dict(existing_risk_list)
+            risk_data_list, company_graph_data = _process_company_graph_data(
+                existing_risk_list, graph_data_library
             )
-            risk_name_to_user_ids_mapping_dict = get_risk_name_to_user_ids_mapping_dict(
-                existing_risk_list
+            recommendations_risks = _generate_mitigation_recommendations_with_tags(
+                risk_data_list, company_graph_data, existing_risk_list
             )
-            start_time = time()
-            risk_data_list = convert_existing_risk_to_risk_data(
-                existing_risk_list,
-                do_summarize=True,
-            )
-            end_time = time()
-            print(
-                f"Time taken to convert existing risk to risk data and summarize: {end_time - start_time} seconds"
-            )
-            start_time = time()
-            company_graph_data = create_company_graph_data(
-                risk_data_list,
-                company_name=company_id,
-                embedding_key="embedding_risk_desc_catalog",
-                classify_model_name="gpt-4.1-mini",
-                high_priority_search_space=4.0,
-                high_priority_atmost_number_edges=3,
-                relation_process="oneway_run",
-                graph_data_library=graph_data_library,
-            )
-            end_time = time()
-            print(
-                f"Time taken to create company graph data: {end_time - start_time} seconds"
-            )
-            start_time = time()
-            save_company_graph_data(
-                company_graph_data, company_graph_id, graph_data_library
-            )
-            high_critical_risks = [
-                risk for risk in risk_data_list if risk.risk_level >= 3
-            ]
-            source_risks, central_risks = get_source_and_central_risk(
-                company_graph_data
-            )
-
-            # then update tags (it can be multiple tags)
-            # then remove the risk that already have mitigation plan
-            risk_data_dict = {
-                "is_high_risk": high_critical_risks,
-                "is_source_risk": source_risks,
-                "is_central_risk": central_risks,
-            }
-            print(f"source_risks: {len(source_risks)}")
-            print(f"central_risks: {len(central_risks)}")
-            recommendations_risks: List[RiskDataWithTags] = (
-                add_tags_and_update_user_ids_to_risk_data(
-                    risk_data_dict, risk_name_to_user_ids_mapping_dict
-                )
-            )
-            recommendations_risks: List[RiskDataWithTags] = (
-                remove_existing_risk_with_mitigation_plan(
-                    recommendations_risks, is_have_mitigation_plan_mapping_dict
-                )
-            )
-            # NOTE: change for each RiskDataWithTags will have user_ids and we will return with all user that have same risk name, then we will pop out user_id where they have mitigation plan and if it pop to 0 then we remove that risk.
 
         response = RiskRecommendationMitigationPlanResponse(
             id=request.id,
@@ -702,7 +645,6 @@ def get_latest_graph_id_from_library(
 
     # Sort to get the latest. This assumes a convention like timestamp in the graph_id.
     # If no timestamp, then a more complex logic is needed, or a simple alphabetical sort.
-    # For this implementation, we'll assume a temporal component or version is implicitly sortable.
     # For example, if graph_id is 'company_id|embedding_key|timestamp'
     # The exact sorting logic might need to be refined based on actual graph ID structure.
     return sorted(matching_graph_ids)[

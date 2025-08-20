@@ -1,21 +1,32 @@
-from typing import List, Tuple
-from data_processor.create_graph_data_library import (
-    CompanyGraphData,
-    RiskData,
-    RiskDataWithEmbedding,
-    EdgeData,
-)
-import numpy as np
-import networkx as nx
+# Standard library imports
+import json
+from typing import Dict, List, Tuple
+
+# Third-party imports
 import pandas as pd
-from networkx.classes.reportviews import InDegreeView, OutDegreeView
+import networkx as nx
+
+# Local imports
 from api.schemas import RiskDataWithTags, ExistingRisk
-from typing import Dict
 from api.utils import (
     filter_non_arrow_edges2,
     get_networkx_graph_from_company_graph_data,
 )
 from collections import defaultdict
+from data_processor.create_graph_data_library import (
+    CompanyGraphData,
+    GraphDataLibrary,
+    RiskData,
+    RiskDataWithEmbedding,
+    EdgeData,
+)
+from api.risk_to_assess import (
+    convert_existing_risk_to_risk_data,
+    create_company_graph_data,
+    save_company_graph_data,
+)
+from time import time
+import uuid
 
 N_TOP = 3
 
@@ -58,6 +69,84 @@ def top_n_with_threshold(
             break
 
     return df_sorted[df_sorted[column].isin(allowed_values)]
+
+
+def _process_company_graph_data(
+    existing_risk_list: List[ExistingRisk], graph_data_library: GraphDataLibrary
+) -> Tuple[List[RiskData], CompanyGraphData]:
+    """
+    Converts existing risks to RiskData, creates company graph data, and saves it.
+    """
+    company_id = existing_risk_list[0].company_id
+    company_graph_id = f"{company_id}|embedding_risk_desc_catalog|oneway_run"
+
+    start_time = time()
+    risk_data_list = convert_existing_risk_to_risk_data(
+        existing_risk_list,
+        do_summarize=True,
+    )
+    end_time = time()
+    print(
+        f"Time taken to convert existing risk to risk data and summarize: {end_time - start_time} seconds"
+    )
+
+    start_time = time()
+    company_graph_data = create_company_graph_data(
+        risk_data_list,
+        company_name=company_id,
+        embedding_key="embedding_risk_desc_catalog",
+        classify_model_name="gpt-4.1-mini",
+        high_priority_search_space=4.0,
+        high_priority_atmost_number_edges=3,
+        relation_process="oneway_run",
+        graph_data_library=graph_data_library,
+    )
+    end_time = time()
+    print(f"Time taken to create company graph data: {end_time - start_time} seconds")
+
+    start_time = time()
+    save_company_graph_data(company_graph_data, company_graph_id, graph_data_library)
+    end_time = time()
+    print(f"Time taken to save company graph data: {end_time - start_time} seconds")
+
+    return risk_data_list, company_graph_data
+
+
+def _generate_mitigation_recommendations_with_tags(
+    risk_data_list: List[RiskData],
+    company_graph_data: CompanyGraphData,
+    existing_risk_list: List[ExistingRisk],
+) -> List[RiskDataWithTags]:
+    """
+    Generates mitigation recommendations with tags based on risk data and company graph data.
+    """
+    is_have_mitigation_plan_mapping_dict = get_is_have_mitigation_plan_mapping_dict(
+        existing_risk_list
+    )
+    risk_name_to_user_ids_mapping_dict = get_risk_name_to_user_ids_mapping_dict(
+        existing_risk_list
+    )
+
+    high_critical_risks = [risk for risk in risk_data_list if risk.risk_level >= 3]
+    source_risks, central_risks = get_source_and_central_risk(company_graph_data)
+
+    risk_data_dict = {
+        "is_high_risk": high_critical_risks,
+        "is_source_risk": source_risks,
+        "is_central_risk": central_risks,
+    }
+    print(f"source_risks: {len(source_risks)}")
+    print(f"central_risks: {len(central_risks)}")
+
+    recommendations_risks: List[RiskDataWithTags] = (
+        _add_tags_and_assign_user_ids_to_risk_data(
+            risk_data_dict, risk_name_to_user_ids_mapping_dict
+        )
+    )
+    recommendations_risks = remove_existing_risk_with_mitigation_plan(
+        recommendations_risks, is_have_mitigation_plan_mapping_dict
+    )
+    return recommendations_risks
 
 
 def get_source_and_central_risk(
@@ -118,7 +207,7 @@ def remove_existing_risk_with_mitigation_plan(
     return filtered_recommendations
 
 
-def add_tags_and_update_user_ids_to_risk_data(
+def _add_tags_and_assign_user_ids_to_risk_data(
     risk_data_dict: Dict[str, List[RiskData]],
     risk_name_to_user_ids_mapping_dict: Dict[str, List[str]],
 ) -> List[RiskDataWithTags]:
