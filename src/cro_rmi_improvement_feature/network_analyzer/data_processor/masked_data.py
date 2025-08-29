@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+from typing import Union
 
 
 def create_mask_dict_from_excel(
@@ -27,11 +28,12 @@ def create_mask_dict_from_excel(
     return mask_dict
 
 
-def mask_data(data: str, mask_dict: dict) -> str:
+def mask_data(data: Union[str, None], mask_dict: dict) -> Union[str, None]:
+    if data is None:
+        return data
     for key, value in mask_dict.items():
         # if key is in data, replace it with value and show the key and value
         if key in data:
-            print(f"Replacing {key} with {value}")
             data = data.replace(key, value)
     return data
 
